@@ -274,6 +274,51 @@ export interface OrganizationContextProfile {
   readonly confidence: number;
 }
 
+export enum PlacementTargetType {
+  AgentAccessibleFolder = 'agent_accessible_folder',
+  ArchitectureDocument = 'architecture_document',
+  BrowserAiWorkflow = 'browser_ai_workflow',
+  CiCdFile = 'ci_cd_file',
+  ConfigFile = 'config_file',
+  DatabaseRow = 'database_row',
+  DocumentationFile = 'documentation_file',
+  EnvironmentFile = 'environment_file',
+  ExampleEnvironmentFile = 'example_environment_file',
+  ExportableReport = 'exportable_report',
+  InternalWikiPage = 'internal_wiki_page',
+  LegacyScript = 'legacy_script',
+  McpConfig = 'mcp_config',
+  RagDocument = 'rag_document',
+  SpreadsheetRow = 'spreadsheet_row',
+}
+
+export interface PlacementRecommendation {
+  readonly target_type: PlacementTargetType;
+  readonly target_location: string;
+  readonly placement_priority: number;
+  readonly confidence: number;
+  readonly reasoning: readonly string[];
+  readonly expected_detection_quality: number;
+  readonly risk_score: number;
+  readonly expected_attacker_agent_visibility: number;
+  readonly expected_false_positive_risk: number;
+  readonly future_asset_type_recommendation: DecoyKind;
+  readonly evidence: readonly string[];
+}
+
+export interface RejectedPlacementCandidate {
+  readonly target_type: PlacementTargetType;
+  readonly target_location: string;
+  readonly rejection_reasons: readonly string[];
+}
+
+export interface PlacementPlan {
+  readonly repository_name: string;
+  readonly context: OrganizationContextProfile;
+  readonly recommendations: readonly PlacementRecommendation[];
+  readonly rejected_candidates: readonly RejectedPlacementCandidate[];
+}
+
 export interface ContentReference {
   readonly locator: string;
   readonly sha256: string;
