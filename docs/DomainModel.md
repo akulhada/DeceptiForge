@@ -23,3 +23,39 @@ The TypeScript contracts mirror the serialized shape. Python is the validation a
 ## Embedded records
 
 `TechnologyEvidence`, `RiskArea`, and `NamingPattern` provide provenance and confidence. `RepositoryStatistics` is a measurable snapshot. They are intentionally embedded, because splitting them into tables would make one profile revision mutable and break auditability.
+
+## Decoy
+
+**Purpose:** one durable envelope for every deployed or proposed decoy. **Fields:** ownership/context IDs, state, a discriminated payload, and schema version. **Relationships:** belongs to an organization; may reference the repository/profile that supplied its context; has placement and believability records. **Future extensibility:** deployment status belongs in a separate aggregate, preserving this model's content identity.
+
+### Composed payloads
+
+`SecretPayload`, `DatabaseRecordPayload`, `DocumentPayload`, `SpreadsheetRowPayload`, `McpConfigPayload`, `EmbeddingPayload`, and `AgentAssetPayload` share no base table or inherited behavior. Each is selected by the `kind` discriminator and contains only safe metadata plus a `ContentReference`. Raw decoy material is deliberately excluded from API, JSONB, and event serialization; a future encrypted asset store owns it.
+
+## Placement
+
+**Purpose:** preserve a recommendation for where and why a decoy belongs. **Fields:** target, confidence, reason, priority, risk, and expected detection quality. **Relationships:** belongs to a decoy; its target may reference a repository. **Future extensibility:** deployment execution and status remain separate so recommendations are immutable evidence.
+
+## Believability
+
+**Purpose:** retain a human-reviewable scoring breakdown. **Fields:** naming, entropy, context, schema, placement, and overall scores plus an explanation. **Relationships:** belongs to one decoy and may be evaluated against its placement. **Future extensibility:** evaluator version and individual evidence references can be added without altering score meaning.
+
+## TimelineEvent
+
+**Purpose:** the canonical immutable observation for read, copy, export, paste, index, embed, authentication, tool call, database query, package install, and document access. **Fields:** source, timestamp, target, optional actor/decoy references, confidence, and bounded safe attributes. **Relationships:** alerts reference an event; incidents embed a portable event snapshot. **Future extensibility:** add correlation and external event IDs without changing action meaning.
+
+## Alert
+
+**Purpose:** one normalized actionable detection. **Fields:** severity, source, timestamp, confidence, trigger type, detection method, and timeline-event reference. **Relationships:** belongs to an organization and may reference a decoy and incident. **Future extensibility:** acknowledgement and assignment are workflow concerns and remain separate.
+
+## Incident
+
+**Purpose:** portable forensic assessment. **Fields:** timeline, root cause, affected assets, risk, summary, evidence references, and recommendations. **Relationships:** belongs to an organization and preserves immutable copies of its timeline facts. **Future extensibility:** state, ownership, and remediation tasks stay in separate workflow aggregates.
+
+## Coverage
+
+**Purpose:** measured assessment of repository, database, document, AI, and overall protection. **Fields:** normalized coverage dimensions, scope, timestamp, and schema version. **Relationships:** belongs to an organization and may be repository-scoped. **Future extensibility:** evaluator versions and evidence references can be added without redefining score semantics.
+
+## Interfaces
+
+The Python `Protocol` and TypeScript interfaces declare scanner, generator, engine, prompt, browser-monitor, and database-monitor boundaries. They contain no behavior, prompts, monitoring code, or runtime implementations; future adapters must conform to these contracts.

@@ -11,6 +11,13 @@ from pydantic import BaseModel, ConfigDict, Field
 OrganizationId = NewType("OrganizationId", UUID)
 RepositoryId = NewType("RepositoryId", UUID)
 RepositoryProfileId = NewType("RepositoryProfileId", UUID)
+DecoyId = NewType("DecoyId", UUID)
+PlacementId = NewType("PlacementId", UUID)
+BelievabilityId = NewType("BelievabilityId", UUID)
+AlertId = NewType("AlertId", UUID)
+IncidentId = NewType("IncidentId", UUID)
+TimelineEventId = NewType("TimelineEventId", UUID)
+CoverageId = NewType("CoverageId", UUID)
 
 JsonObject = dict[str, Any]
 
