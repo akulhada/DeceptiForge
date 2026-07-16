@@ -59,3 +59,7 @@ The TypeScript contracts mirror the serialized shape. Python is the validation a
 ## Interfaces
 
 The Python `Protocol` and TypeScript interfaces declare scanner, generator, engine, prompt, browser-monitor, and database-monitor boundaries. They contain no behavior, prompts, monitoring code, or runtime implementations; future adapters must conform to these contracts.
+
+## Repository intelligence and context
+
+`RepositoryIntelligenceProfile` is an additive scanner-output contract: languages, frameworks, services, infrastructure, database/cloud/document/MCP evidence, naming profile, secret locations, risks, and analyzer confidence. `OrganizationContextProfile` is a derived, immutable interpretation used by later decoy-generation and placement use cases. Neither model is an ORM entity or an API route payload by itself.

@@ -223,6 +223,57 @@ export interface RepositoryProfile {
   readonly schema_version: number;
 }
 
+export enum NamingCategory {
+  EnvironmentVariable = 'environment_variable',
+  Service = 'service',
+  Database = 'database',
+  File = 'file',
+  Folder = 'folder',
+  Api = 'api',
+  Resource = 'resource',
+}
+
+export enum NamingStyle {
+  ScreamingSnake = 'screaming_snake',
+  Snake = 'snake',
+  Kebab = 'kebab',
+  Dot = 'dot',
+  Camel = 'camel',
+  Pascal = 'pascal',
+  FlatLower = 'flat_lower',
+  FlatUpper = 'flat_upper',
+}
+
+export interface NamingConvention {
+  readonly category: NamingCategory;
+  readonly style: NamingStyle;
+  readonly separator: string;
+  readonly support: number;
+  readonly confidence: number;
+  readonly samples: readonly string[];
+}
+
+export interface NamingProfile {
+  readonly naming_style: readonly NamingConvention[];
+  readonly common_prefixes: readonly string[];
+  readonly common_suffixes: readonly string[];
+  readonly vocabulary: readonly { readonly value: string; readonly support: number }[];
+  readonly confidence: number;
+}
+
+export interface OrganizationContextProfile {
+  readonly repository_name: string;
+  readonly organization_archetype: string;
+  readonly stack_maturity: string;
+  readonly primary_technical_vocabulary: NamingProfile['vocabulary'];
+  readonly likely_sensitive_asset_types: readonly string[];
+  readonly ai_exposure_risk: number;
+  readonly database_sensitivity_confidence: number;
+  readonly documentation_culture: string;
+  readonly operational_complexity: string;
+  readonly confidence: number;
+}
+
 export interface ContentReference {
   readonly locator: string;
   readonly sha256: string;
