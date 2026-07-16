@@ -1,0 +1,9 @@
+# Purpose: keep API container builds small and deterministic. Responsibilities: exclude local environments, caches, tests, and secrets. Future modules: add generated assets only when introduced.
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/

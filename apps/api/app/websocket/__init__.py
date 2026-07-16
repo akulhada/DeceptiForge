@@ -1,0 +1,1 @@
+# Purpose: reserve WebSocket transport modules. Responsibilities: keep future realtime connections separate from HTTP handlers. Future modules: add connection management with an owning realtime feature.

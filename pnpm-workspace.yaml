@@ -1,0 +1,15 @@
+# Purpose: define JavaScript packages in the monorepo. Responsibilities: discover application and shared package workspaces. Future modules: add new packages under packages/.
+packages:
+  - apps/web
+  - apps/extension
+  - packages/*
+
+# Purpose: explicitly permit required native build helpers. Responsibilities: keep pnpm's dependency lifecycle-script policy deny-by-default. Future modules: review each new entry before adding it.
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true
+  sharp: true
+  unrs-resolver: true

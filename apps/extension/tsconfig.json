@@ -1,0 +1,11 @@
+// Purpose: configure TypeScript for Plasmo source files. Responsibilities: enable strict extension type checking and local aliases. Future modules: add aliases only after a stable shared boundary exists.
+{
+  "extends": "plasmo/templates/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
+}

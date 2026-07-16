@@ -1,0 +1,22 @@
+{
+  "_comment": "Purpose: publish framework-neutral TypeScript domain contracts. Responsibilities: keep browser applications aligned on serialized core-domain shapes. Future modules: add only approved domain aggregates and event contracts.",
+  "name": "@deceptiforge/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^2.1.9"
+  }
+}

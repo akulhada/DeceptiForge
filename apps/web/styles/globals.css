@@ -1,0 +1,2 @@
+/* Purpose: establish global frontend styles and Tailwind entry point. Responsibilities: load Tailwind without declaring product design tokens prematurely. Future modules: add token layers with the design system. */
+@import 'tailwindcss';

@@ -1,0 +1,10 @@
+# Purpose: exclude generated assets from Prettier. Responsibilities: avoid formatting dependency and build output. Future modules: add generated paths only.
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+.plasmo/
+coverage/
+.venv/
+*.lock

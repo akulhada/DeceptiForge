@@ -1,0 +1,22 @@
+<%doc>
+Purpose: template future Alembic revisions. Responsibilities: provide a consistent revision skeleton. Future modules: generated revisions will define domain schema changes.
+</%doc>
+"""${message}"""
+
+from collections.abc import Sequence
+
+from alembic import op
+import sqlalchemy as sa
+
+revision: str = ${repr(up_revision)}
+down_revision: str | Sequence[str] | None = ${repr(down_revision)}
+branch_labels: str | Sequence[str] | None = ${repr(branch_labels)}
+depends_on: str | Sequence[str] | None = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    pass
+
+
+def downgrade() -> None:
+    pass

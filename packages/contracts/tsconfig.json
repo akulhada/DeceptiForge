@@ -1,0 +1,12 @@
+// Purpose: configure strict TypeScript checks for shared contracts. Responsibilities: preserve framework-neutral declarations with no emitted runtime code. Future modules: add project references only when another shared package is introduced.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"]
+}

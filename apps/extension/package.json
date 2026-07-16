@@ -1,0 +1,33 @@
+{
+  "_comment": "Purpose: define the Plasmo browser-extension package. Responsibilities: provide build, lint, typecheck, and test scripts. Future modules: add runtime dependencies only when an extension capability owns them.",
+  "name": "@deceptiforge/extension",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "plasmo": "^0.90.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^22.13.4",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "eslint": "^9.20.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^2.1.9"
+  },
+  "manifest": {
+    "name": "DeceptiForge",
+    "description": "DeceptiForge browser extension.",
+    "version": "0.1.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "_comment": "Purpose: root JavaScript workspace manifest. Responsibilities: shared scripts and tooling. Future modules: app-specific commands remain in their own manifests.",
+  "name": "deceptiforge",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4"
+  }
+}

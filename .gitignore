@@ -1,0 +1,21 @@
+# Purpose: exclude generated, local, and secret files from Git. Responsibilities: keep commits reproducible and credential-free. Future modules: add only tool-specific generated paths.
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+.plasmo/
+coverage/
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
