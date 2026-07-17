@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import Field
 
@@ -60,6 +61,20 @@ class DetectionMethod(StrEnum):
     BROWSER_TELEMETRY = "browser_telemetry"
     TOOL_TELEMETRY = "tool_telemetry"
     DATABASE_AUDIT = "database_audit"
+
+
+class MonitorType(StrEnum):
+    FILE_CONTENT = "file_content"
+    REPOSITORY = "repository"
+    DATABASE_PAYLOAD = "database_payload"
+    TEXT_PAYLOAD = "text_payload"
+
+
+class MonitorHealthStatus(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DEGRADED = "degraded"
+    FAILED = "failed"
 
 
 class TimelineAction(StrEnum):
@@ -205,3 +220,48 @@ class Coverage(DomainModel):
     overall_coverage: float = Field(ge=0, le=1)
     measured_at: datetime
     schema_version: int = Field(default=1, ge=1)
+
+
+class TripwireRegistryEntry(DomainModel):
+    trace_identifier: str = Field(min_length=1, max_length=128)
+    decoy_id: UUID
+    placement_id: UUID
+    target_location: str = Field(min_length=1, max_length=2048)
+    template_id: str = Field(min_length=1, max_length=128)
+    decoy_type: str = Field(min_length=1, max_length=128)
+    enabled: bool = True
+
+
+class MonitorRegistration(DomainModel):
+    monitor_type: MonitorType
+    trace_identifier: str = Field(min_length=1, max_length=128)
+    target_location: str = Field(min_length=1, max_length=2048)
+    status: MonitorHealthStatus
+
+
+class MonitorRegistrationPlan(DomainModel):
+    registrations: tuple[MonitorRegistration, ...] = ()
+    rejected_decoy_ids: tuple[UUID, ...] = ()
+
+
+class MonitorHealthMetadata(DomainModel):
+    monitor_type: MonitorType
+    status: MonitorHealthStatus
+    detail: str = Field(min_length=1, max_length=1000)
+
+
+class RawDetectionEvent(DomainModel):
+    event_id: UUID
+    trace_identifier: str = Field(min_length=1, max_length=128)
+    decoy_id: UUID
+    monitor_type: MonitorType
+    observed_location: str = Field(min_length=1, max_length=2048)
+    observed_value_excerpt: str = Field(min_length=1, max_length=256)
+    timestamp: datetime
+    source: DetectionSource
+    confidence: float = Field(ge=0, le=1)
+    severity_suggestion: Severity
+    evidence_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    detection_method: DetectionMethod
+    raw_metadata: tuple[EventAttribute, ...] = ()
+    correlation_id: UUID

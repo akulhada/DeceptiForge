@@ -143,6 +143,20 @@ export enum DetectionMethod {
   DatabaseAudit = 'database_audit',
 }
 
+export enum MonitorType {
+  FileContent = 'file_content',
+  Repository = 'repository',
+  DatabasePayload = 'database_payload',
+  TextPayload = 'text_payload',
+}
+
+export enum MonitorHealthStatus {
+  Active = 'active',
+  Inactive = 'inactive',
+  Degraded = 'degraded',
+  Failed = 'failed',
+}
+
 export enum TimelineAction {
   Read = 'read',
   Copy = 'copy',
@@ -603,6 +617,32 @@ export interface Coverage {
   readonly overall_coverage: number;
   readonly measured_at: IsoDateTime;
   readonly schema_version: number;
+}
+
+export interface TripwireRegistryEntry {
+  readonly trace_identifier: string;
+  readonly decoy_id: string;
+  readonly placement_id: string;
+  readonly target_location: string;
+  readonly template_id: string;
+  readonly decoy_type: string;
+  readonly enabled: boolean;
+}
+
+export interface RawDetectionEvent {
+  readonly event_id: string;
+  readonly trace_identifier: string;
+  readonly decoy_id: string;
+  readonly monitor_type: MonitorType;
+  readonly observed_location: string;
+  readonly observed_value_excerpt: string;
+  readonly timestamp: IsoDateTime;
+  readonly source: DetectionSource;
+  readonly confidence: number;
+  readonly severity_suggestion: Severity;
+  readonly evidence_digest: string;
+  readonly detection_method: DetectionMethod;
+  readonly correlation_id: string;
 }
 
 export interface RepositoryScanner {
