@@ -645,6 +645,32 @@ export interface RawDetectionEvent {
   readonly correlation_id: string;
 }
 
+export enum AlertStatus {
+  Open = 'open',
+  Acknowledged = 'acknowledged',
+  Closed = 'closed',
+}
+
+export interface NormalizedAlert {
+  readonly alert_id: string;
+  readonly trace_identifier: string;
+  readonly decoy_id: string;
+  readonly severity: Severity;
+  readonly status: AlertStatus;
+  readonly title: string;
+  readonly summary: string;
+  readonly source_monitor: MonitorType;
+  readonly confidence: number;
+  readonly first_seen: IsoDateTime;
+  readonly last_seen: IsoDateTime;
+  readonly event_count: number;
+  readonly deduplication_key: string;
+  readonly affected_placement_id: string;
+  readonly affected_decoy_type: string;
+  readonly recommended_actions: readonly string[];
+  readonly correlation_id: string;
+}
+
 export interface RepositoryScanner {
   scan(repository: Repository): Promise<RepositoryProfile>;
 }

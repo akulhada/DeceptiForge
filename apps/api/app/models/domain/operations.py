@@ -265,3 +265,40 @@ class RawDetectionEvent(DomainModel):
     detection_method: DetectionMethod
     raw_metadata: tuple[EventAttribute, ...] = ()
     correlation_id: UUID
+
+
+class AlertStatus(StrEnum):
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    CLOSED = "closed"
+
+
+class AlertEvidence(DomainModel):
+    excerpt: str = Field(min_length=1, max_length=256)
+    digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    location: str = Field(min_length=1, max_length=2048)
+
+
+class NormalizedAlert(DomainModel):
+    alert_id: UUID
+    trace_identifier: str = Field(min_length=1, max_length=128)
+    decoy_id: UUID
+    severity: Severity
+    status: AlertStatus = AlertStatus.OPEN
+    title: str = Field(min_length=1, max_length=512)
+    summary: str = Field(min_length=1, max_length=2000)
+    source_monitor: MonitorType
+    trigger_type: TriggerType = TriggerType.DECOY_ACCESSED
+    confidence: float = Field(ge=0, le=1)
+    first_seen: datetime
+    last_seen: datetime
+    event_count: int = Field(ge=1)
+    deduplication_key: str = Field(min_length=1, max_length=512)
+    affected_placement_id: UUID
+    affected_decoy_type: str = Field(min_length=1, max_length=128)
+    evidence: tuple[AlertEvidence, ...] = Field(min_length=1, max_length=5)
+    raw_event_ids: tuple[UUID, ...] = Field(min_length=1, max_length=20)
+    recommended_actions: tuple[str, ...] = Field(min_length=1, max_length=10)
+    correlation_id: UUID
+    false_positive_notes: tuple[str, ...] = ()
+    escalation_hints: tuple[str, ...] = ()
