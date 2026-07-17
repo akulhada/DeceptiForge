@@ -302,3 +302,58 @@ class NormalizedAlert(DomainModel):
     correlation_id: UUID
     false_positive_notes: tuple[str, ...] = ()
     escalation_hints: tuple[str, ...] = ()
+
+
+class IncidentType(StrEnum):
+    AI_PASTE_LEAK = "ai_paste_leak"
+    REPOSITORY_EXPOSURE = "repository_exposure"
+    DATABASE_EXPORT = "database_export"
+    FILE_COPY_OR_SYNC = "file_copy_or_sync"
+    REPEATED_PROBE = "repeated_probe"
+    MULTI_SURFACE_EXPOSURE = "multi_surface_exposure"
+    UNKNOWN_TRIPWIRE_TOUCH = "unknown_tripwire_touch"
+
+
+class ReconstructedTimelineEvent(DomainModel):
+    sequence: int = Field(ge=1)
+    timestamp: datetime
+    source: DetectionSource
+    monitor_type: MonitorType
+    trace_identifier: str
+    decoy_id: UUID
+    placement_id: UUID
+    summary: str
+    evidence: AlertEvidence
+    confidence: float = Field(ge=0, le=1)
+
+
+class GptSummaryContextBundle(DomainModel):
+    incident_type: IncidentType
+    timeline: tuple[ReconstructedTimelineEvent, ...]
+    root_cause_hypothesis: str
+    recommended_actions: tuple[str, ...]
+
+
+class ReconstructedIncident(DomainModel):
+    incident_id: UUID
+    title: str
+    status: AlertStatus = AlertStatus.OPEN
+    severity: Severity
+    confidence: float = Field(ge=0, le=1)
+    incident_type: IncidentType
+    first_seen: datetime
+    last_seen: datetime
+    involved_alert_ids: tuple[UUID, ...] = Field(min_length=1)
+    involved_decoy_ids: tuple[UUID, ...] = Field(min_length=1)
+    involved_trace_ids: tuple[str, ...] = Field(min_length=1)
+    involved_placement_ids: tuple[UUID, ...] = Field(min_length=1)
+    affected_surfaces: tuple[str, ...] = Field(min_length=1)
+    timeline: tuple[ReconstructedTimelineEvent, ...] = Field(min_length=1)
+    evidence_summary: tuple[AlertEvidence, ...] = Field(min_length=1, max_length=10)
+    root_cause_hypothesis: str
+    recommended_actions: tuple[str, ...] = Field(min_length=1)
+    correlation_keys: tuple[str, ...] = Field(min_length=1)
+    correlation_reasons: tuple[str, ...] = Field(min_length=1)
+    escalation_hints: tuple[str, ...] = ()
+    false_positive_notes: tuple[str, ...] = ()
+    gpt_context_bundle: GptSummaryContextBundle
