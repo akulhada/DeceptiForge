@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import Field
 
@@ -322,3 +323,110 @@ class Believability(DomainModel):
     overall_score: float = Field(ge=0, le=1)
     explainability: str = Field(min_length=1, max_length=4000)
     schema_version: int = Field(default=1, ge=1)
+
+
+class DecoyTemplateId(StrEnum):
+    """Versioned, allow-listed templates used for deterministic generation."""
+
+    SECRET_V1 = "secret_v1"
+    DOCUMENT_V1 = "document_v1"
+    DATABASE_RECORD_V1 = "database_record_v1"
+
+
+class GeneratedSecret(DomainModel):
+    provider_family: str = Field(min_length=1, max_length=128)
+    key_name: str = Field(min_length=1, max_length=255)
+    fake_value: str = Field(min_length=16, max_length=512)
+    entropy_profile: str = Field(min_length=1, max_length=128)
+    naming_rationale: str = Field(min_length=1, max_length=1000)
+    target_file_style: str = Field(min_length=1, max_length=128)
+    authentication_capability: Literal["none"] = "none"
+    rotation_recommendation: str = Field(min_length=1, max_length=1000)
+
+
+class GeneratedDocument(DomainModel):
+    title: str = Field(min_length=1, max_length=512)
+    body: str = Field(min_length=1, max_length=4000)
+    target_document_type: str = Field(min_length=1, max_length=128)
+    sensitivity_label: str = Field(min_length=1, max_length=128)
+    trace_identifier: str = Field(min_length=1, max_length=128)
+
+
+class GeneratedDatabaseRecord(DomainModel):
+    table_name: str = Field(min_length=1, max_length=255)
+    entity_type: str = Field(min_length=1, max_length=128)
+    fields: tuple[DecoyField, ...] = Field(min_length=1)
+    synthetic_data_provenance: Literal["deterministic_synthetic"] = "deterministic_synthetic"
+    relationship_placeholders: tuple[str, ...] = ()
+    trace_identifier: str = Field(min_length=1, max_length=128)
+    no_real_person_safeguard: Literal["no_personal_data"] = "no_personal_data"
+    export_detection_fingerprint: str = Field(min_length=1, max_length=128)
+
+
+GeneratedDecoyPayload = GeneratedSecret | GeneratedDocument | GeneratedDatabaseRecord
+
+
+class BelievabilityInputs(DomainModel):
+    naming_match: float = Field(ge=0, le=1)
+    entropy_profile: float = Field(ge=0, le=1)
+    context_match: float = Field(ge=0, le=1)
+    placement_match: float = Field(ge=0, le=1)
+    schema_realism: float = Field(ge=0, le=1)
+    business_realism: float = Field(ge=0, le=1)
+    safety_risk: float = Field(ge=0, le=1)
+
+
+class DecoySafetyMetadata(DomainModel):
+    contains_real_credentials: Literal[False] = False
+    contains_real_customer_data: Literal[False] = False
+    safe_for_demo: Literal[True] = True
+    authentication_capability: Literal["none"] = "none"
+
+
+class CollisionCheckMetadata(DomainModel):
+    checked_names: tuple[str, ...] = ()
+    collision_detected: bool
+    reasons: tuple[str, ...] = ()
+
+
+class TriggerMetadataPlaceholder(DomainModel):
+    trace_identifier: str = Field(min_length=1, max_length=128)
+    monitoring_status: Literal["not_configured"] = "not_configured"
+
+
+class RotationMetadata(DomainModel):
+    expires_at: str | None = None
+    rotation_recommendation: str = Field(min_length=1, max_length=1000)
+
+
+class DecoyValidationResult(DomainModel):
+    valid: bool
+    checks: tuple[str, ...] = ()
+    reasons: tuple[str, ...] = ()
+
+
+class DecoyAsset(DomainModel):
+    decoy_id: UUID
+    decoy_type: DecoyKind
+    target_placement_id: UUID
+    target_location: str = Field(min_length=1, max_length=2048)
+    payload: GeneratedDecoyPayload
+    template_id: DecoyTemplateId
+    believability_inputs: BelievabilityInputs
+    safety_metadata: DecoySafetyMetadata
+    collision_check: CollisionCheckMetadata
+    trigger_metadata: TriggerMetadataPlaceholder
+    rotation_metadata: RotationMetadata
+    explanation: tuple[str, ...] = Field(min_length=1)
+    validation: DecoyValidationResult
+
+
+class RejectedGenerationCandidate(DomainModel):
+    target_location: str = Field(min_length=1, max_length=2048)
+    reasons: tuple[str, ...] = Field(min_length=1)
+
+
+class DecoyGenerationPlan(DomainModel):
+    repository_name: str = Field(min_length=1, max_length=256)
+    assets: tuple[DecoyAsset, ...] = ()
+    rejected_candidates: tuple[RejectedGenerationCandidate, ...] = ()

@@ -319,6 +319,68 @@ export interface PlacementPlan {
   readonly rejected_candidates: readonly RejectedPlacementCandidate[];
 }
 
+export enum DecoyTemplateId {
+  SecretV1 = 'secret_v1',
+  DocumentV1 = 'document_v1',
+  DatabaseRecordV1 = 'database_record_v1',
+}
+
+export interface BelievabilityInputs {
+  readonly naming_match: number;
+  readonly entropy_profile: number;
+  readonly context_match: number;
+  readonly placement_match: number;
+  readonly schema_realism: number;
+  readonly business_realism: number;
+  readonly safety_risk: number;
+}
+
+export interface DecoyValidationResult {
+  readonly valid: boolean;
+  readonly checks: readonly string[];
+  readonly reasons: readonly string[];
+}
+
+export interface DecoyAsset {
+  readonly decoy_id: string;
+  readonly decoy_type: DecoyKind;
+  readonly target_placement_id: string;
+  readonly target_location: string;
+  readonly payload: Record<string, unknown>;
+  readonly template_id: DecoyTemplateId;
+  readonly believability_inputs: BelievabilityInputs;
+  readonly safety_metadata: {
+    readonly contains_real_credentials: false;
+    readonly contains_real_customer_data: false;
+    readonly safe_for_demo: true;
+    readonly authentication_capability: 'none';
+  };
+  readonly collision_check: {
+    readonly checked_names: readonly string[];
+    readonly collision_detected: boolean;
+    readonly reasons: readonly string[];
+  };
+  readonly trigger_metadata: {
+    readonly trace_identifier: string;
+    readonly monitoring_status: 'not_configured';
+  };
+  readonly rotation_metadata: {
+    readonly expires_at: string | null;
+    readonly rotation_recommendation: string;
+  };
+  readonly explanation: readonly string[];
+  readonly validation: DecoyValidationResult;
+}
+
+export interface DecoyGenerationPlan {
+  readonly repository_name: string;
+  readonly assets: readonly DecoyAsset[];
+  readonly rejected_candidates: readonly {
+    readonly target_location: string;
+    readonly reasons: readonly string[];
+  }[];
+}
+
 export interface ContentReference {
   readonly locator: string;
   readonly sha256: string;
