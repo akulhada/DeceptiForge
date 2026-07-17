@@ -381,6 +381,38 @@ export interface DecoyGenerationPlan {
   }[];
 }
 
+export enum BelievabilityDecision {
+  Accept = 'accept',
+  Warn = 'warn',
+  Reject = 'reject',
+}
+
+export interface BelievabilityScoreBreakdown {
+  readonly naming_realism: number;
+  readonly context_fit: number;
+  readonly placement_compatibility: number;
+  readonly schema_completeness: number;
+  readonly entropy_realism: number;
+  readonly business_realism: number;
+  readonly traceability_quality: number;
+  readonly safety_inertness: number;
+  readonly production_collision_risk: number;
+  readonly accidental_use_risk: number;
+  readonly obvious_trap_risk: number;
+}
+
+export interface BelievabilitySafetyReport {
+  readonly decoy_id: string;
+  readonly overall_believability_score: number;
+  readonly overall_safety_score: number;
+  readonly decision: BelievabilityDecision;
+  readonly breakdown: BelievabilityScoreBreakdown;
+  readonly explainability_notes: readonly string[];
+  readonly failed_checks: readonly string[];
+  readonly warnings: readonly string[];
+  readonly recommended_fixes: readonly string[];
+}
+
 export interface ContentReference {
   readonly locator: string;
   readonly sha256: string;

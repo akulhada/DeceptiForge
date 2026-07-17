@@ -1,5 +1,12 @@
 # Purpose: expose stable, transport-independent domain models. Responsibilities: provide Pydantic contracts for core entities and their serialization. Future modules: export approved domain aggregates without coupling them to ORM tables or routes.
-from app.models.domain.decoy import Believability, Decoy, DecoyAsset, DecoyGenerationPlan, Placement
+from app.models.domain.decoy import (
+    Believability,
+    BelievabilitySafetyReport,
+    Decoy,
+    DecoyAsset,
+    DecoyGenerationPlan,
+    Placement,
+)
 from app.models.domain.intelligence import (
     OrganizationContextProfile,
     PlacementPlan,
@@ -11,6 +18,7 @@ from app.models.domain.organization import Organization, Repository, RepositoryP
 __all__ = [
     "Alert",
     "Believability",
+    "BelievabilitySafetyReport",
     "Coverage",
     "Decoy",
     "DecoyAsset",

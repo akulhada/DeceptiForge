@@ -430,3 +430,35 @@ class DecoyGenerationPlan(DomainModel):
     repository_name: str = Field(min_length=1, max_length=256)
     assets: tuple[DecoyAsset, ...] = ()
     rejected_candidates: tuple[RejectedGenerationCandidate, ...] = ()
+
+
+class BelievabilityDecision(StrEnum):
+    ACCEPT = "accept"
+    WARN = "warn"
+    REJECT = "reject"
+
+
+class BelievabilityScoreBreakdown(DomainModel):
+    naming_realism: float = Field(ge=0, le=100)
+    context_fit: float = Field(ge=0, le=100)
+    placement_compatibility: float = Field(ge=0, le=100)
+    schema_completeness: float = Field(ge=0, le=100)
+    entropy_realism: float = Field(ge=0, le=100)
+    business_realism: float = Field(ge=0, le=100)
+    traceability_quality: float = Field(ge=0, le=100)
+    safety_inertness: float = Field(ge=0, le=100)
+    production_collision_risk: float = Field(ge=0, le=100)
+    accidental_use_risk: float = Field(ge=0, le=100)
+    obvious_trap_risk: float = Field(ge=0, le=100)
+
+
+class BelievabilitySafetyReport(DomainModel):
+    decoy_id: UUID
+    overall_believability_score: float = Field(ge=0, le=100)
+    overall_safety_score: float = Field(ge=0, le=100)
+    decision: BelievabilityDecision
+    breakdown: BelievabilityScoreBreakdown
+    explainability_notes: tuple[str, ...] = ()
+    failed_checks: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+    recommended_fixes: tuple[str, ...] = ()
