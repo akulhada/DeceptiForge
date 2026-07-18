@@ -54,6 +54,10 @@ pnpm dev                                     # http://localhost:3000
 7. Click **Simulate detection**. A monitor event, alert, and incident appear.
 8. **Incidents** — a HIGH `repository_exposure` incident with a timeline, evidence, deterministic
    hypothesis, and response actions.
+9. In the incident, click **Generate AI Summary** for an on-demand analyst narrative. Without an
+   `OPENAI_API_KEY` it renders the deterministic fallback (labeled as such); see
+   [IncidentNarrative.md](IncidentNarrative.md). Frontend tests for this panel are deferred; the
+   backend narrative behavior is covered by `apps/api/tests/test_incident_narrative.py`.
 
 ## Seed without a server
 

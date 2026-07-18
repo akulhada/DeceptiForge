@@ -4,6 +4,7 @@
 from fastapi import APIRouter
 
 from app.api.demo import router as demo_router
+from app.api.narrative import router as narrative_router
 from app.api.pipeline import router as pipeline_router
 from app.config.settings import Settings
 
@@ -16,6 +17,7 @@ def build_api_router(settings: Settings) -> APIRouter:
     """
     router = APIRouter()
     router.include_router(pipeline_router)
+    router.include_router(narrative_router)
     if settings.demo_enabled:
         router.include_router(demo_router)
     return router

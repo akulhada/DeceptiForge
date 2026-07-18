@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     database_url: PostgresDsn
     cors_origins: list[str] = Field(default_factory=list)
     demo_enabled: bool = False
+    incident_narrative_enabled: bool = True
+    openai_api_key: str | None = None
+    openai_incident_model: str = "gpt-4o-mini"
+
+    @property
+    def openai_configured(self) -> bool:
+        """GPT narratives are attempted only when a key is present and the feature is on."""
+        return self.incident_narrative_enabled and bool(self.openai_api_key)
 
     @property
     def is_development(self) -> bool:

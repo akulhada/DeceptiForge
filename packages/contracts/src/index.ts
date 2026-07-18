@@ -933,3 +933,47 @@ export interface DemoState {
   readonly incidents: readonly DemoIncidentSummary[];
   readonly overview: DemoOverviewSummary;
 }
+
+// ---- GPT incident narrative (optional, never overrides deterministic incident data) ----
+
+export enum NarrativeSource {
+  Model = 'model',
+  Fallback = 'fallback',
+}
+
+export enum NarrativeStatus {
+  Generated = 'generated',
+  FallbackDisabled = 'fallback_disabled',
+  FallbackError = 'fallback_error',
+  FallbackInvalid = 'fallback_invalid',
+}
+
+export interface NarrativeTokenUsage {
+  readonly prompt_tokens: number;
+  readonly completion_tokens: number;
+  readonly total_tokens: number;
+}
+
+export interface IncidentNarrativeBody {
+  readonly executive_summary: string;
+  readonly analyst_summary: string;
+  readonly likely_sequence: readonly string[];
+  readonly evidence_summary: readonly string[];
+  readonly recommended_next_actions: readonly string[];
+  readonly uncertainty_caveats: readonly string[];
+  readonly confidence_notes: string;
+}
+
+export interface IncidentNarrative {
+  readonly narrative_id: string;
+  readonly incident_id: string;
+  readonly source: NarrativeSource;
+  readonly status: NarrativeStatus;
+  readonly model: string | null;
+  readonly prompt_version: string;
+  readonly source_context_hash: string;
+  readonly created_at: string;
+  readonly body: IncidentNarrativeBody;
+  readonly token_usage: NarrativeTokenUsage | null;
+  readonly error: string | null;
+}

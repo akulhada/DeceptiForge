@@ -16,6 +16,7 @@ from app.models.domain.intelligence import (
     PlacementPlan,
     RepositoryIntelligenceProfile,
 )
+from app.models.domain.narrative import IncidentNarrative
 from app.models.domain.operations import (
     NormalizedAlert,
     RawDetectionEvent,
@@ -27,6 +28,7 @@ from app.models.records import (
     DecoyPlanRecord,
     DetectionEventRecord,
     IncidentRecord,
+    NarrativeRecord,
     PlacementPlanRecord,
     RepositoryRecord,
     ValidationReportRecord,
@@ -198,6 +200,27 @@ class ArtifactRepository:
             select(IncidentRecord).order_by(IncidentRecord.created_at)
         ).all()
         return tuple(ReconstructedIncident.model_validate_json(row.data) for row in rows)
+
+    def get_incident(self, incident_id: UUID) -> ReconstructedIncident | None:
+        record = self._session.get(IncidentRecord, incident_id)
+        if record is None:
+            return None
+        return ReconstructedIncident.model_validate_json(record.data)
+
+    def upsert_narrative(self, narrative: IncidentNarrative) -> None:
+        self._session.merge(
+            NarrativeRecord(
+                incident_id=narrative.incident_id,
+                data=narrative.model_dump_json(),
+            )
+        )
+        self._session.flush()
+
+    def get_narrative(self, incident_id: UUID) -> IncidentNarrative | None:
+        record = self._session.get(NarrativeRecord, incident_id)
+        if record is None:
+            return None
+        return IncidentNarrative.model_validate_json(record.data)
 
     def _latest(self, model: Any, repository_id: UUID) -> Any:
         return self._session.scalars(

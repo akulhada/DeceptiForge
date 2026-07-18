@@ -1,7 +1,7 @@
 // Purpose: single typed client for the DeceptiForge demo API.
 // Responsibilities: centralize base URL, request handling, and error normalization so components
 //   never call fetch directly. Dependencies: the demo payload types.
-import type { DemoState } from './types';
+import type { DemoState, IncidentNarrative } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -41,4 +41,6 @@ export const api = {
   getState: () => request<DemoState>('/demo/state'),
   seed: () => request<DemoState>('/demo/seed', { method: 'POST' }),
   simulateDetection: () => request<DemoState>('/demo/simulate-detection', { method: 'POST' }),
+  generateIncidentNarrative: (incidentId: string) =>
+    request<IncidentNarrative>(`/incidents/${incidentId}/narrative`, { method: 'POST' }),
 };

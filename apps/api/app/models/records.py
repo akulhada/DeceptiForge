@@ -90,3 +90,11 @@ class IncidentRecord(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class NarrativeRecord(Base):
+    __tablename__ = "incident_narratives"
+
+    incident_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    data: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

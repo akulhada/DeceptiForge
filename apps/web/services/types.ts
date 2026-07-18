@@ -2,7 +2,12 @@
 // Responsibilities: re-export the single source of truth from @deceptiforge/contracts so component
 //   imports stay stable while the shapes and enums live in the shared package (no duplication).
 // Dependencies: the workspace contracts package.
-export { BelievabilityDecision as Decision, Severity } from '@deceptiforge/contracts';
+export {
+  BelievabilityDecision as Decision,
+  NarrativeSource,
+  NarrativeStatus,
+  Severity,
+} from '@deceptiforge/contracts';
 
 export type {
   DemoState,
@@ -22,4 +27,6 @@ export type {
   DemoTimelineEntry as TimelineEntry,
   DemoIncidentSummary as Incident,
   DemoOverviewSummary as Overview,
+  IncidentNarrative,
+  IncidentNarrativeBody,
 } from '@deceptiforge/contracts';
