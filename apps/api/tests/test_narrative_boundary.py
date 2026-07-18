@@ -18,7 +18,7 @@ def _seed_incident(client) -> str:
 
 
 def test_missing_auth_rejected_when_enabled(make_client) -> None:
-    with make_client(demo_enabled=True, auth_enabled=True, app_env="production") as client:
+    with make_client(demo_enabled=True, auth_enabled=True, app_env="development") as client:
         incident_id = _seed_incident(client)
         assert client.post(f"/incidents/{incident_id}/narrative").status_code == 401
         assert client.post(f"/incidents/{incident_id}/narrative", headers=_AUTH).status_code == 200
@@ -30,7 +30,7 @@ def test_auth_bypass_is_rejected_outside_development(make_client) -> None:
 
 
 def test_cross_org_incident_access_rejected(make_client) -> None:
-    with make_client(demo_enabled=True, auth_enabled=True, app_env="production") as client:
+    with make_client(demo_enabled=True, auth_enabled=True, app_env="development") as client:
         incident_id = _seed_incident(client)
         foreign = {"X-DeceptiForge-API-Key": _KEY, "X-DeceptiForge-Org-Id": str(uuid4())}
         assert (

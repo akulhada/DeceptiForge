@@ -67,7 +67,7 @@ class DemoOrchestrator:
     ) -> None:
         self._repo = repository
         self._settings = settings
-        self._pipeline = PipelineService(repository)
+        self._pipeline = PipelineService(repository, DEMO_ORGANIZATION_ID)
         self._demo = DemoService(repository)
         self._coverage = CoverageEngine()
         self._clock = clock or (lambda: datetime.now(UTC))

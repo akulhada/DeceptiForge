@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
 
+from app.config.constants import DEMO_ORGANIZATION_ID
 from app.models.domain.decoy import (
     BelievabilityDecision,
     BelievabilitySafetyReport,
@@ -35,7 +36,10 @@ class DemoService:
 
     def __init__(self, repository: ArtifactRepository) -> None:
         self._repo = repository
-        self._pipeline = PipelineService(repository)
+        # The demo is a single tenant; it explicitly uses the demo organization (never a silent
+        # global default). Production callers pass their authenticated organization instead.
+        self._org = DEMO_ORGANIZATION_ID
+        self._pipeline = PipelineService(repository, DEMO_ORGANIZATION_ID)
 
     def seed(self) -> DemoState:
         repository_id, _ = self._pipeline.scan(str(_FIXTURE_PATH), _FIXTURE_NAME)
@@ -51,11 +55,11 @@ class DemoService:
         if latest is None:
             return self.state()
         repository_id, _ = latest
-        decoy = self._repo.latest_decoy_plan(repository_id)
+        decoy = self._repo.latest_decoy_plan(self._org, repository_id)
         if decoy is None:
             return self.state()
         decoy_plan_id, decoy_plan = decoy
-        reports = self._repo.reports_for_decoy_plan(decoy_plan_id)
+        reports = self._repo.reports_for_decoy_plan(self._org, decoy_plan_id)
         trace = self._first_accepted_trace(decoy_plan, reports)
         if trace is not None:
             self._pipeline.ingest_event(
@@ -68,20 +72,22 @@ class DemoService:
         if latest is None:
             return self._empty_state()
         repository_id, profile = latest
-        context = self._repo.latest_context(repository_id)
-        placement_plan = self._repo.latest_placement_plan(repository_id)
-        decoy = self._repo.latest_decoy_plan(repository_id)
+        context = self._repo.latest_context(self._org, repository_id)
+        placement_plan = self._repo.latest_placement_plan(self._org, repository_id)
+        decoy = self._repo.latest_decoy_plan(self._org, repository_id)
         decoy_plan_id = decoy[0] if decoy else None
         decoy_plan = decoy[1] if decoy else None
-        reports = self._repo.reports_for_decoy_plan(decoy_plan_id) if decoy_plan_id else ()
+        reports = (
+            self._repo.reports_for_decoy_plan(self._org, decoy_plan_id) if decoy_plan_id else ()
+        )
         asset_ids = {asset.decoy_id for asset in decoy_plan.assets} if decoy_plan else set()
-        events = self._repo.detection_events_for_decoys(asset_ids)
-        alerts = self._repo.alerts_for_decoys(asset_ids)
-        # Incidents have no decoy foreign key; filter the portable snapshot by involved decoys as a
-        # safe fallback until an incident scoping column is introduced.
+        events = self._repo.detection_events_for_decoys(self._org, asset_ids)
+        alerts = self._repo.alerts_for_decoys(self._org, asset_ids)
+        # Incidents are already organization-scoped; the demo further narrows to the current
+        # generation's decoys so a reseed shows a clean story.
         incidents = tuple(
             incident
-            for incident in self._repo.all_incidents()
+            for incident in self._repo.incidents_for_organization(self._org)
             if asset_ids.intersection(incident.involved_decoy_ids)
         )
         return DemoState(
@@ -99,7 +105,7 @@ class DemoService:
         )
 
     def _demo_repository(self) -> tuple[UUID, RepositoryIntelligenceProfile] | None:
-        return self._repo.latest_repository_at_path(str(_FIXTURE_PATH))
+        return self._repo.latest_repository_at_path(self._org, str(_FIXTURE_PATH))
 
     @staticmethod
     def _first_accepted_trace(

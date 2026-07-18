@@ -40,6 +40,7 @@ class PipelineService:
     def __init__(
         self,
         repository: ArtifactRepository,
+        organization_id: UUID,
         *,
         scanner: LocalRepositoryScanner | None = None,
         context_engine: ContextEngine | None = None,
@@ -49,6 +50,7 @@ class PipelineService:
         incident_engine: IncidentReconstructionEngine | None = None,
     ) -> None:
         self._repo = repository
+        self._org = organization_id
         self._scanner = scanner or LocalRepositoryScanner()
         self._context = context_engine or ContextEngine()
         self._placement = placement_engine or PlacementReasoningEngine()
@@ -58,40 +60,42 @@ class PipelineService:
 
     def scan(self, path: str, name: str | None) -> tuple[UUID, RepositoryIntelligenceProfile]:
         profile = self._scanner.scan(Path(path))
-        repository_id = self._repo.add_repository(name or profile.repository_name, path, profile)
+        repository_id = self._repo.add_repository(
+            self._org, name or profile.repository_name, path, profile
+        )
         return repository_id, profile
 
     def get_profile(self, repository_id: UUID) -> RepositoryIntelligenceProfile | None:
-        return self._repo.get_profile(repository_id)
+        return self._repo.get_profile(self._org, repository_id)
 
     def plan(self, repository_id: UUID) -> tuple[UUID, UUID, PlacementPlan]:
         profile = self._require_profile(repository_id)
         context = self._context.build(profile)
-        context_id = self._repo.add_context(repository_id, context)
+        context_id = self._repo.add_context(self._org, repository_id, context)
         plan = self._placement.plan(profile, context)
-        plan_id = self._repo.add_placement_plan(repository_id, plan)
+        plan_id = self._repo.add_placement_plan(self._org, repository_id, plan)
         return plan_id, context_id, plan
 
     def generate(
         self, repository_id: UUID, config: DecoyGenerationConfig | None = None
     ) -> tuple[UUID, DecoyGenerationPlan]:
         profile = self._require_profile(repository_id)
-        context = self._repo.latest_context(repository_id)
-        plan = self._repo.latest_placement_plan(repository_id)
+        context = self._repo.latest_context(self._org, repository_id)
+        plan = self._repo.latest_placement_plan(self._org, repository_id)
         if context is None or plan is None:
             raise PipelineError("placement plan must be created before generating decoys")
         generated = self._decoys.generate(profile, context, plan, config)
-        decoy_plan_id = self._repo.add_decoy_plan(repository_id, generated)
+        decoy_plan_id = self._repo.add_decoy_plan(self._org, repository_id, generated)
         return decoy_plan_id, generated
 
     def evaluate(self, decoy_plan_id: UUID) -> tuple[BelievabilitySafetyReport, ...]:
-        loaded = self._repo.get_decoy_plan(decoy_plan_id)
+        loaded = self._repo.get_decoy_plan(self._org, decoy_plan_id)
         if loaded is None:
             raise PipelineError(f"decoy plan {decoy_plan_id} not found")
         repository_id, decoy_plan = loaded
         profile = self._require_profile(repository_id)
-        context = self._repo.latest_context(repository_id)
-        placement_plan = self._repo.latest_placement_plan(repository_id)
+        context = self._repo.latest_context(self._org, repository_id)
+        placement_plan = self._repo.latest_placement_plan(self._org, repository_id)
         if context is None or placement_plan is None:
             raise PipelineError("context and placement plan are required to evaluate decoys")
         recommendations = self._recommendation_by_location(placement_plan)
@@ -101,46 +105,43 @@ class PipelineService:
             if recommendation is None:
                 continue
             report = self._believability.evaluate(asset, context, profile, recommendation)
-            self._repo.add_validation_report(decoy_plan_id, report)
+            self._repo.add_validation_report(self._org, decoy_plan_id, report)
             reports.append(report)
         return tuple(reports)
 
     def ingest_event(
         self, decoy_plan_id: UUID, surface: str, location: str, value: str
     ) -> tuple[RawDetectionEvent | None, NormalizedAlert | None]:
-        loaded = self._repo.get_decoy_plan(decoy_plan_id)
+        loaded = self._repo.get_decoy_plan(self._org, decoy_plan_id)
         if loaded is None:
             raise PipelineError(f"decoy plan {decoy_plan_id} not found")
         _, decoy_plan = loaded
-        reports = self._repo.reports_for_decoy_plan(decoy_plan_id)
+        reports = self._repo.reports_for_decoy_plan(self._org, decoy_plan_id)
         monitor = MonitoringInstrumentationEngine()
         monitor.register(decoy_plan.assets, reports)
         event = self._scan_surface(monitor, surface, location, value)
         if event is None:
             return None, None
-        self._repo.add_detection_event(event)
+        self._repo.add_detection_event(self._org, event)
         alert = AlertingPipeline().ingest(event, None)
         if alert is not None:
-            self._repo.add_alert(alert)
-            self._repo.replace_incidents(self._incidents.reconstruct(self._repo.all_alerts()))
+            self._repo.add_alert(self._org, alert)
+            # Reconstruct from this organization's alerts only, and replace only this
+            # organization's incidents so other tenants' data is never touched.
+            self._repo.replace_incidents_for_organization(
+                self._org,
+                self._incidents.reconstruct(self._repo.alerts_for_organization(self._org)),
+            )
         return event, alert
 
-    def alerts(self, organization_id: UUID | None = None) -> tuple[NormalizedAlert, ...]:
-        return (
-            self._repo.all_alerts()
-            if organization_id is None
-            else self._repo.alerts_for_organization(organization_id)
-        )
+    def alerts(self) -> tuple[NormalizedAlert, ...]:
+        return self._repo.alerts_for_organization(self._org)
 
-    def incidents(self, organization_id: UUID | None = None) -> tuple[ReconstructedIncident, ...]:
-        return (
-            self._repo.all_incidents()
-            if organization_id is None
-            else self._repo.incidents_for_organization(organization_id)
-        )
+    def incidents(self) -> tuple[ReconstructedIncident, ...]:
+        return self._repo.incidents_for_organization(self._org)
 
     def _require_profile(self, repository_id: UUID) -> RepositoryIntelligenceProfile:
-        profile = self._repo.get_profile(repository_id)
+        profile = self._repo.get_profile(self._org, repository_id)
         if profile is None:
             raise PipelineError(f"repository {repository_id} has no stored profile")
         return profile

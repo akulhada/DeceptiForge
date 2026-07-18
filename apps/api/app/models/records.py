@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.config.constants import DEMO_ORGANIZATION_ID
@@ -33,6 +33,7 @@ class ContextProfileRecord(Base):
     __tablename__ = "context_profiles"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     repository_id: Mapped[UUID] = mapped_column(ForeignKey("repositories.id"), index=True)
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -42,6 +43,7 @@ class PlacementPlanRecord(Base):
     __tablename__ = "placement_plans"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     repository_id: Mapped[UUID] = mapped_column(ForeignKey("repositories.id"), index=True)
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -51,6 +53,7 @@ class DecoyPlanRecord(Base):
     __tablename__ = "decoy_plans"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     repository_id: Mapped[UUID] = mapped_column(ForeignKey("repositories.id"), index=True)
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -60,6 +63,7 @@ class ValidationReportRecord(Base):
     __tablename__ = "validation_reports"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     decoy_plan_id: Mapped[UUID] = mapped_column(ForeignKey("decoy_plans.id"), index=True)
     decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True)
     data: Mapped[str] = mapped_column(Text)
@@ -70,6 +74,7 @@ class DetectionEventRecord(Base):
     __tablename__ = "detection_events"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     trace_identifier: Mapped[str] = mapped_column(String(128), index=True)
     decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True)
     data: Mapped[str] = mapped_column(Text)
@@ -100,6 +105,14 @@ class NarrativeRevisionRecord(Base):
     """One immutable narrative generation. Regeneration appends a revision, never overwrites."""
 
     __tablename__ = "narrative_revisions"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "incident_id",
+            "revision_number",
+            name="uq_narrative_revision_scope",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)

@@ -20,16 +20,26 @@ This is a placeholder, not production-grade identity. There are no accounts, ses
 
 ## Organization scoping
 
-`repositories`, `alerts`, `incidents`, and `narrative_revisions` carry an `organization_id`. Demo
-and pipeline writes stamp the demo organization by column default (no engine changes).
+**Every** persisted artifact carries an `organization_id`: repositories, context profiles,
+placement plans, decoy plans, validation reports, detection events, alerts, incidents, and
+narrative revisions. Every read filters by `organization_id` and every write stamps it — no read or
+write path is globally scoped by default.
 
-Incident and narrative reads are **organization-scoped**: they fetch by `(organization_id,
-incident_id)`, never by id alone. A narrative request for an incident in another organization
-returns `404`. Narrative generation verifies incident ownership before doing any work.
+Propagation: `require_org` resolves the organization, the HTTP layer builds
+`PipelineService(repository, organization_id)`, and the service passes that id to every repository
+call. Services never silently default to global state; the demo path explicitly uses the demo
+organization (a single tenant), documented in `DemoService`.
 
-Scoping other pipeline artifacts (decoy plans, validation reports, monitor events, context/
-placement) is deliberately deferred; they are not reachable cross-tenant through the narrative
-surface. See "Remaining work".
+Effects:
+
+- Reading another organization's repository profile / plan / decoy / validation / monitor / alert /
+  incident returns `404`, or `409` for a use case whose prerequisite belongs to another org.
+- **Incident reconstruction is organization-scoped.** `ingest_event` reconstructs only from
+  `alerts_for_organization(org)` and calls `replace_incidents_for_organization(org, …)`, which
+  deletes and rebuilds **only that organization's** incidents. Other tenants' incidents are never
+  deleted or modified.
+- Narrative revisions are unique per `(organization_id, incident_id, revision_number)`, enforced by
+  a database unique constraint (`uq_narrative_revision_scope`, migration `0004`).
 
 ## Narrative revisions
 
@@ -74,10 +84,20 @@ curl -sX POST localhost:8000/incidents/<id>/narrative \
   -H 'X-DeceptiForge-Org-Id: 00000000-0000-0000-0000-0000000000de'
 ```
 
+## Demo route gating
+
+Demo routes (`/demo/*`) mount **only when `DEMO_ENABLED=true` AND `APP_ENV=development`**. They can
+never be exposed on a production-like deployment, even if `DEMO_ENABLED` is set to true. Auth-bypass
+(`AUTH_ENABLED=false`) is likewise restricted to development; in a production environment a disabled
+auth flag is rejected with `401` rather than silently bypassed.
+
 ## Remaining work (production hardening)
 
-- Real identity/tenant provisioning; replace the demo-org default and API-key stub.
-- Organization-scope the remaining pipeline artifacts (decoy plans, validation reports, monitor
-  events, context, and placement) before exposing them to multiple tenants.
-- Rate limiting beyond the per-incident reuse/cooldown.
+- Real identity/tenant provisioning; replace the demo-org default and API-key stub. Full auth,
+  API-key rotation, and RBAC are production requirements, not implemented here.
+- Repository integrations (GitHub/GitLab app installs, repository ids) instead of local-path
+  scanning, which stays development-only.
+- Durable monitor ingestion and deduplication (current monitoring/alerting rebuild per request).
+- Rate limiting beyond the per-incident reuse/cooldown; audit history retention policy.
 - Tokenizer-accurate budgeting if prompts grow.
+- CI/CD and deployment hardening.
