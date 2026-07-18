@@ -53,15 +53,15 @@ development/demo-only** (gated by `DEMO_ENABLED`/`AUTH_ENABLED`, off by default)
 explicitly future work, not solved here:
 
 - **Auth & authorization** — the API-key/org-id boundary is a stub, not user management/OAuth/RBAC.
-- **Real tenant isolation** — only repositories, alerts, incidents, and narratives are org-scoped;
-  remaining artifacts and list routes need scoping.
+- **Real tenant identity** — pipeline artifacts are organization-scoped, but the API-key binding
+  remains a stub; real tenant provisioning, identity, and authorization are future work.
 - **Repository integrations** — replace local filesystem paths with GitHub/GitLab app installs and
   repository ids; never accept arbitrary server paths in production.
 - **Durable monitor ingestion & dedup** — current monitoring/alerting rebuild per request; needs a
   durable queue and persistent deduplication.
 - **Repository-scoped incident persistence** — incidents currently filter by involved decoys as a
   fallback; add an incident scoping column.
-- **GPT rate limiting & audit history** — beyond the per-incident reuse/cooldown and revisions.
+- **Distributed rate limiting & audit history** — current limits are single-process and MVP-scoped.
 - **Full Coverage Engine** — the current coverage is a lightweight demo estimate, not a measured
   protected-vs-attack-surface metric.
 - **CI/CD & deployment hardening** — pipelines, secrets management, migrations, and observability.

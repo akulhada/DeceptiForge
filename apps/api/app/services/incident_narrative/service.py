@@ -49,6 +49,9 @@ class NarrativeService:
         revision = self._repo.next_revision_number(organization_id, incident_id)
         narrative = narrative.model_copy(update={"revision_number": revision})
         self._repo.add_narrative_revision(narrative)
+        self._repo.prune_narrative_revisions(
+            organization_id, incident_id, self._settings.narrative_revision_retention_count
+        )
         return narrative
 
     def latest(self, organization_id: UUID, incident_id: UUID) -> IncidentNarrative | None:

@@ -16,13 +16,24 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: PostgresDsn
     cors_origins: list[str] = Field(default_factory=list)
+    cors_allow_credentials: bool = False
     demo_enabled: bool = False
     auth_enabled: bool = True
     demo_api_key: str | None = None
+    # Maps an API key to the single organization it may act as (env: API_KEY_BINDINGS as JSON).
+    api_key_bindings: dict[str, str] = Field(default_factory=dict)
     incident_narrative_enabled: bool = True
     narrative_cooldown_seconds: int = 30
     openai_api_key: str | None = None
     openai_incident_model: str = "gpt-4o-mini"
+    # Abuse / resource limits (single-process MVP; production needs edge enforcement).
+    max_request_body_bytes: int = 1_048_576
+    max_artifact_bytes: int = 2_097_152
+    monitoring_max_value_bytes: int = 65_536
+    monitoring_rate_limit_per_minute: int = 60
+    narrative_rate_limit_per_minute: int = 10
+    narrative_revision_retention_count: int = 20
+    monitoring_event_retention_days: int = 30
 
     @property
     def openai_configured(self) -> bool:

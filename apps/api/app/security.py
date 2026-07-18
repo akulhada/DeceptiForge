@@ -27,24 +27,40 @@ def require_org(
 ) -> OrgContext:
     """Resolve the organization for a request.
 
-    When AUTH_ENABLED is false (development/demo only) the demo organization is returned so the
-    local demo works without headers. Otherwise a valid API key and organization id are required.
+    When AUTH_ENABLED is false (development only) the demo organization is returned so the local
+    demo works without headers. Otherwise an API key is required and it is bound to exactly one
+    organization: a request may not use one shared key to act as an arbitrary organization.
     """
     if not settings.auth_enabled and settings.is_development:
         return OrgContext(DEMO_ORGANIZATION_ID)
-
     if not settings.auth_enabled:
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            "authentication bypass is restricted to development",
+            status.HTTP_401_UNAUTHORIZED, "authentication bypass is restricted to development"
         )
+    if not x_deceptiforge_api_key:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing API key")
 
-    if settings.demo_api_key is None or x_deceptiforge_api_key != settings.demo_api_key:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or missing API key")
-    if x_deceptiforge_org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "missing organization id")
+    bound = settings.api_key_bindings.get(x_deceptiforge_api_key)
+    if bound is not None:
+        # Production-safe path: the key determines the organization; a mismatching header is denied.
+        bound_org = _parse_org(bound)
+        if x_deceptiforge_org_id is not None and _parse_org(x_deceptiforge_org_id) != bound_org:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "organization does not match the API key"
+            )
+        return OrgContext(bound_org)
+
+    # Development shortcut only: the demo key may act for a caller-supplied organization.
+    if settings.is_development and x_deceptiforge_api_key == settings.demo_api_key:
+        if x_deceptiforge_org_id is None:
+            return OrgContext(DEMO_ORGANIZATION_ID)
+        return OrgContext(_parse_org(x_deceptiforge_org_id))
+
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid API key")
+
+
+def _parse_org(value: str) -> UUID:
     try:
-        organization_id = UUID(x_deceptiforge_org_id)
+        return UUID(value)
     except ValueError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid organization id") from None
-    return OrgContext(organization_id)

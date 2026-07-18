@@ -18,6 +18,8 @@ from app.models.domain.operations import (
 @dataclass(frozen=True)
 class IncidentConfig:
     correlation_window_seconds: int = 3600
+    # Bound the number of alerts considered so a large backlog cannot explode reconstruction cost.
+    max_alerts: int = 1000
 
 
 class IncidentReconstructionEngine:
@@ -25,8 +27,11 @@ class IncidentReconstructionEngine:
         self, alerts: tuple[NormalizedAlert, ...], config: IncidentConfig | None = None
     ) -> tuple[ReconstructedIncident, ...]:
         config = config or IncidentConfig()
+        ordered = sorted(alerts, key=lambda item: (item.first_seen, str(item.alert_id)))
+        if len(ordered) > config.max_alerts:
+            ordered = ordered[-config.max_alerts :]  # keep the most recent alerts only
         groups: list[list[NormalizedAlert]] = []
-        for alert in sorted(alerts, key=lambda item: (item.first_seen, str(item.alert_id))):
+        for alert in ordered:
             for group in groups:
                 if self._related(alert, group, config):
                     group.append(alert)
@@ -42,15 +47,13 @@ class IncidentReconstructionEngine:
         latest = max(item.last_seen for item in group)
         if alert.first_seen - latest > timedelta(seconds=config.correlation_window_seconds):
             return False
+        # Group only on strong identity keys. Sharing a monitor/source alone is NOT correlation, so
+        # unrelated traces are never merged into one incident.
         return any(
             alert.trace_identifier == item.trace_identifier
             or alert.decoy_id == item.decoy_id
             or alert.affected_placement_id == item.affected_placement_id
             or alert.correlation_id == item.correlation_id
-            or (
-                alert.source_monitor == item.source_monitor
-                and alert.deduplication_key.split(":")[-2] == item.deduplication_key.split(":")[-2]
-            )
             for item in group
         )
 
