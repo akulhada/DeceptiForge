@@ -89,6 +89,26 @@ class ArtifactRepository:
             return None
         return record.repository_id, DecoyGenerationPlan.model_validate_json(record.data)
 
+    def latest_repository(self) -> tuple[UUID, RepositoryIntelligenceProfile] | None:
+        record = self._session.scalars(
+            select(RepositoryRecord).order_by(RepositoryRecord.created_at.desc())
+        ).first()
+        if record is None:
+            return None
+        return record.id, RepositoryIntelligenceProfile.model_validate_json(record.profile)
+
+    def latest_decoy_plan(self, repository_id: UUID) -> tuple[UUID, DecoyGenerationPlan] | None:
+        record = self._latest(DecoyPlanRecord, repository_id)
+        if record is None:
+            return None
+        return record.id, DecoyGenerationPlan.model_validate_json(record.data)
+
+    def all_detection_events(self) -> tuple[RawDetectionEvent, ...]:
+        rows = self._session.scalars(
+            select(DetectionEventRecord).order_by(DetectionEventRecord.created_at)
+        ).all()
+        return tuple(RawDetectionEvent.model_validate_json(row.data) for row in rows)
+
     def add_validation_report(self, decoy_plan_id: UUID, report: BelievabilitySafetyReport) -> None:
         self._session.add(
             ValidationReportRecord(
@@ -97,6 +117,7 @@ class ArtifactRepository:
                 data=report.model_dump_json(),
             )
         )
+        self._session.flush()
 
     def reports_for_decoy_plan(self, decoy_plan_id: UUID) -> tuple[BelievabilitySafetyReport, ...]:
         rows = self._session.scalars(
@@ -138,6 +159,7 @@ class ArtifactRepository:
             self._session.add(
                 IncidentRecord(id=incident.incident_id, data=incident.model_dump_json())
             )
+        self._session.flush()
 
     def all_incidents(self) -> tuple[ReconstructedIncident, ...]:
         rows = self._session.scalars(

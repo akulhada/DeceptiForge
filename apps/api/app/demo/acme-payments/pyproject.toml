@@ -1,0 +1,3 @@
+[tool.poetry]
+name = "acme-payments"
+version = "1.4.0"

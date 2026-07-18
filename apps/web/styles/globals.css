@@ -1,2 +1,19 @@
-/* Purpose: establish global frontend styles and Tailwind entry point. Responsibilities: load Tailwind without declaring product design tokens prematurely. Future modules: add token layers with the design system. */
+/* Purpose: establish global frontend styles and the security-console dark theme.
+   Responsibilities: load Tailwind and set base document colors and typography.
+   Future modules: promote repeated values into a design-token layer when the system grows. */
 @import 'tailwindcss';
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    @apply bg-slate-950 text-slate-200 antialiased;
+  }
+
+  ::selection {
+    @apply bg-sky-500/30;
+  }
+}
