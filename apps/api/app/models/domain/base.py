@@ -1,4 +1,6 @@
-# Purpose: define strict domain-model primitives. Responsibilities: provide typed identifiers, immutable validation, and JSON/database/event serialization. Future modules: add only cross-domain primitives that are stable across transports.
+# Purpose: define strict domain-model primitives. Responsibilities: provide typed identifiers,
+# immutable validation, and JSON/database/event serialization. Future modules: add only
+# cross-domain primitives that are stable across transports.
 from __future__ import annotations
 
 import json
@@ -51,7 +53,7 @@ class DomainModel(BaseModel):
         }
 
     @classmethod
-    def from_database(cls, record: JsonObject) -> "DomainModel":
+    def from_database(cls, record: JsonObject) -> DomainModel:
         """Reconstruct from JSON/JSONB values while preserving strict model rules."""
         return cls.model_validate_json(json.dumps(record))
 

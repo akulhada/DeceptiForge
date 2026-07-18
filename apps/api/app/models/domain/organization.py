@@ -1,4 +1,6 @@
-# Purpose: model organization, repository, and repository-profile aggregates. Responsibilities: represent durable ownership and observed repository context without scan behavior. Future modules: add approved profile revisions and repository integrations.
+# Purpose: model organization, repository, and repository-profile aggregates. Responsibilities:
+# represent durable ownership and observed repository context without scan behavior. Future
+# modules: add approved profile revisions and repository integrations.
 from __future__ import annotations
 
 from datetime import datetime
@@ -141,9 +143,12 @@ class RepositoryProfile(DomainModel):
     """An immutable observed-context snapshot for one repository revision.
 
     Purpose: hold scanner-derived context used by generation, placement, and coverage.
-    Fields: detected technologies, cloud and environment style, statistics, risks, and naming patterns.
-    Relationships: belongs to Repository; all detection records are embedded to preserve snapshot integrity.
-    Future extensibility: add new evidence categories with separate fields, never overload existing ones.
+    Fields: detected technologies, cloud and environment style, statistics, risks, and naming
+    patterns.
+    Relationships: belongs to Repository; all detection records are embedded to preserve snapshot
+    integrity.
+    Future extensibility: add new evidence categories with separate fields, never overload existing
+    ones.
     """
 
     id: RepositoryProfileId

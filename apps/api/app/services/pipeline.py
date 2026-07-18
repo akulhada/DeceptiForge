@@ -136,7 +136,10 @@ class PipelineService:
             self._repo.upsert_incidents_for_organization(
                 self._org,
                 self._incidents.reconstruct(
-                    self._repo.alerts_for_organization(self._org, limit=_RECONSTRUCTION_ALERT_LIMIT)
+                    self._repo.alerts_for_organization(
+                        self._org, limit=_RECONSTRUCTION_ALERT_LIMIT
+                    ),
+                    organization_id=self._org,
                 ),
             )
         return event, alert

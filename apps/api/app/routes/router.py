@@ -4,9 +4,11 @@
 #   contexts are added.
 from fastapi import APIRouter
 
+from app.api.admin import router as admin_router
 from app.api.demo import router as demo_router
 from app.api.narrative import router as narrative_router
 from app.api.pipeline import router as pipeline_router
+from app.api.tenant import router as tenant_router
 from app.config.settings import Settings
 
 
@@ -19,6 +21,8 @@ def build_api_router(settings: Settings) -> APIRouter:
     router = APIRouter()
     router.include_router(pipeline_router)
     router.include_router(narrative_router)
+    router.include_router(tenant_router)
+    router.include_router(admin_router)
     if settings.demo_enabled and settings.is_development:
         router.include_router(demo_router)
     return router

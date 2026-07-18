@@ -1,62 +1,24 @@
-# Purpose: provide a minimal, development-safe organization/auth boundary.
-# Responsibilities: resolve the requesting organization from headers under a simple API-key stub;
-#   bypass to the demo organization only when auth is explicitly disabled. This is intentionally
-#   NOT user management, OAuth, or RBAC. Dependencies: settings and the demo-org constant.
+# Purpose: provide the request authentication and authorization boundary.
+# Responsibilities: resolve the organization and scopes from a hashed API key, keep the development
+#   bypass restricted to development, and expose scope-checking dependencies. This is a scoped
+#   API-key model, not full user identity/OAuth/RBAC. Dependencies: settings, key service, session.
 from __future__ import annotations
 
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
+from sqlalchemy.orm import Session
 
 from app.config.constants import DEMO_ORGANIZATION_ID
 from app.config.settings import Settings, get_settings
+from app.dependencies import get_db
+from app.services.api_keys import PERMISSIONS, ApiKeyService, AuthContext, AuthError, write_audit
 
 
 @dataclass(frozen=True)
 class OrgContext:
-    """The authenticated organization for a request."""
-
     organization_id: UUID
-
-
-def require_org(
-    x_deceptiforge_org_id: str | None = Header(default=None),
-    x_deceptiforge_api_key: str | None = Header(default=None),
-    settings: Settings = Depends(get_settings),
-) -> OrgContext:
-    """Resolve the organization for a request.
-
-    When AUTH_ENABLED is false (development only) the demo organization is returned so the local
-    demo works without headers. Otherwise an API key is required and it is bound to exactly one
-    organization: a request may not use one shared key to act as an arbitrary organization.
-    """
-    if not settings.auth_enabled and settings.is_development:
-        return OrgContext(DEMO_ORGANIZATION_ID)
-    if not settings.auth_enabled:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "authentication bypass is restricted to development"
-        )
-    if not x_deceptiforge_api_key:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing API key")
-
-    bound = settings.api_key_bindings.get(x_deceptiforge_api_key)
-    if bound is not None:
-        # Production-safe path: the key determines the organization; a mismatching header is denied.
-        bound_org = _parse_org(bound)
-        if x_deceptiforge_org_id is not None and _parse_org(x_deceptiforge_org_id) != bound_org:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, "organization does not match the API key"
-            )
-        return OrgContext(bound_org)
-
-    # Development shortcut only: the demo key may act for a caller-supplied organization.
-    if settings.is_development and x_deceptiforge_api_key == settings.demo_api_key:
-        if x_deceptiforge_org_id is None:
-            return OrgContext(DEMO_ORGANIZATION_ID)
-        return OrgContext(_parse_org(x_deceptiforge_org_id))
-
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid API key")
 
 
 def _parse_org(value: str) -> UUID:
@@ -64,3 +26,114 @@ def _parse_org(value: str) -> UUID:
         return UUID(value)
     except ValueError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid organization id") from None
+
+
+def _authenticate(
+    request: Request,
+    session: Session,
+    settings: Settings,
+    api_key: str | None,
+    org_id: str | None,
+) -> AuthContext:
+    request_id = getattr(request.state, "request_id", "unknown")
+
+    if not settings.auth_enabled and settings.is_development:
+        return AuthContext(DEMO_ORGANIZATION_ID, PERMISSIONS, "owner", None)
+    if not settings.auth_enabled:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "authentication bypass is restricted to development"
+        )
+    if not api_key:
+        write_audit(
+            session, action="auth", outcome="rejected", request_id=request_id, detail="missing key"
+        )
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing API key")
+
+    # Development-only static key shortcut (never enabled outside development).
+    if settings.is_development and api_key == settings.demo_api_key:
+        organization = _parse_org(org_id) if org_id else DEMO_ORGANIZATION_ID
+        return AuthContext(organization, PERMISSIONS, "owner", None)
+
+    # Env-provisioned bootstrap/service key bound to one organization (owner scope). Prefer the
+    # hashed, DB-backed keys below; this path exists to bootstrap the first admin key.
+    bound = settings.api_key_bindings.get(api_key)
+    if bound is not None:
+        bound_org = _parse_org(bound)
+        if org_id is not None and _parse_org(org_id) != bound_org:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "organization does not match the API key"
+            )
+        return AuthContext(bound_org, PERMISSIONS, "owner", None)
+
+    try:
+        context = ApiKeyService(session).authenticate(api_key)
+    except AuthError as error:
+        write_audit(
+            session, action="auth", outcome="rejected", request_id=request_id, detail=error.message
+        )
+        raise HTTPException(error.status_code, error.message) from None
+
+    if org_id is not None and _parse_org(org_id) != context.organization_id:
+        write_audit(
+            session,
+            action="authz",
+            outcome="rejected",
+            request_id=request_id,
+            organization_id=context.organization_id,
+            detail="cross-org header",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "organization does not match the API key")
+    return context
+
+
+def require_org(
+    request: Request,
+    x_deceptiforge_org_id: str | None = Header(default=None),
+    x_deceptiforge_api_key: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+    session: Session = Depends(get_db),
+) -> OrgContext:
+    context = _authenticate(
+        request, session, settings, x_deceptiforge_api_key, x_deceptiforge_org_id
+    )
+    return OrgContext(context.organization_id)
+
+
+def current_auth(
+    request: Request,
+    x_deceptiforge_org_id: str | None = Header(default=None),
+    x_deceptiforge_api_key: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+    session: Session = Depends(get_db),
+) -> AuthContext:
+    """Authenticate and return the full context (organization, role, scopes)."""
+    return _authenticate(request, session, settings, x_deceptiforge_api_key, x_deceptiforge_org_id)
+
+
+def require_scope(scope: str):  # type: ignore[no-untyped-def]
+    """Return a dependency that authenticates and requires a specific permission scope."""
+
+    def dependency(
+        request: Request,
+        x_deceptiforge_org_id: str | None = Header(default=None),
+        x_deceptiforge_api_key: str | None = Header(default=None),
+        settings: Settings = Depends(get_settings),
+        session: Session = Depends(get_db),
+    ) -> AuthContext:
+        context = _authenticate(
+            request, session, settings, x_deceptiforge_api_key, x_deceptiforge_org_id
+        )
+        if scope not in context.scopes:
+            request_id = getattr(request.state, "request_id", "unknown")
+            write_audit(
+                session,
+                action="authz",
+                outcome="rejected",
+                request_id=request_id,
+                organization_id=context.organization_id,
+                detail=f"missing {scope}",
+            )
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient permissions")
+        return context
+
+    return dependency

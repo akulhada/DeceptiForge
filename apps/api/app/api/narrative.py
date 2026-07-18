@@ -13,7 +13,8 @@ from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.models.domain.narrative import IncidentNarrative
 from app.repositories.artifacts import ArtifactRepository
-from app.security import OrgContext, require_org
+from app.security import require_scope
+from app.services.api_keys import AuthContext
 from app.services.incident_narrative import NarrativeService
 from app.services.rate_limit import rate_limiter
 
@@ -29,16 +30,16 @@ def _service(session: Session) -> NarrativeService:
 def generate_incident_narrative(
     incident_id: UUID,
     force: bool = False,
-    org: OrgContext = Depends(require_org),
+    auth: AuthContext = Depends(require_scope("narratives:write")),
     session: Session = Depends(get_db),
 ) -> IncidentNarrative:
     """Generate or reuse a narrative for an incident owned by the requesting organization."""
     if not rate_limiter.allow(
-        f"narrative:{org.organization_id}:{incident_id}",
+        f"narrative:{auth.organization_id}:{incident_id}",
         get_settings().narrative_rate_limit_per_minute,
     ):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "narrative rate limit exceeded")
-    narrative = _service(session).generate(org.organization_id, incident_id, force=force)
+    narrative = _service(session).generate(auth.organization_id, incident_id, force=force)
     if narrative is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
     return narrative
@@ -47,11 +48,11 @@ def generate_incident_narrative(
 @router.get("/incidents/{incident_id}/narrative", response_model=IncidentNarrative)
 def get_incident_narrative(
     incident_id: UUID,
-    org: OrgContext = Depends(require_org),
+    auth: AuthContext = Depends(require_scope("narratives:read")),
     session: Session = Depends(get_db),
 ) -> IncidentNarrative:
     """Return the latest narrative revision for the organization, or 404 if none exists."""
-    narrative = _service(session).latest(org.organization_id, incident_id)
+    narrative = _service(session).latest(auth.organization_id, incident_id)
     if narrative is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no narrative generated yet")
     return narrative
@@ -60,8 +61,8 @@ def get_incident_narrative(
 @router.get("/incidents/{incident_id}/narratives", response_model=list[IncidentNarrative])
 def list_incident_narratives(
     incident_id: UUID,
-    org: OrgContext = Depends(require_org),
+    auth: AuthContext = Depends(require_scope("narratives:read")),
     session: Session = Depends(get_db),
 ) -> list[IncidentNarrative]:
     """Return all narrative revisions for the incident within the requesting organization."""
-    return list(_service(session).history(org.organization_id, incident_id))
+    return list(_service(session).history(auth.organization_id, incident_id))

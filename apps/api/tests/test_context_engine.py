@@ -6,8 +6,8 @@ from app.models.domain.intelligence import (
     NamingProfile,
     NamingStyle,
     RepositoryIntelligenceProfile,
-    Separator,
     SecretLocation,
+    Separator,
 )
 from app.models.domain.organization import TechnologyEvidence
 from app.services.context_engine.engine import ContextEngine

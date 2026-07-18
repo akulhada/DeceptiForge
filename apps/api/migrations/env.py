@@ -1,4 +1,6 @@
-# Purpose: run Alembic migrations with application database settings. Responsibilities: expose SQLAlchemy metadata and configure online/offline execution. Future modules: import domain models through app.models when tables are added.
+# Purpose: run Alembic migrations with application database settings. Responsibilities: expose
+# SQLAlchemy metadata and configure online/offline execution. Future modules: import domain models
+# through app.models when tables are added.
 from __future__ import annotations
 
 from logging.config import fileConfig

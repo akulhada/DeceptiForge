@@ -44,7 +44,10 @@ def test_demo_routes_blocked_in_production_even_if_enabled(make_client) -> None:
 
 
 _BINDINGS = f'{{"prodkey": "{DEMO_ORGANIZATION_ID}"}}'
-_PROD_AUTH = {"X-DeceptiForge-API-Key": "prodkey", "X-DeceptiForge-Org-Id": str(DEMO_ORGANIZATION_ID)}
+_PROD_AUTH = {
+    "X-DeceptiForge-API-Key": "prodkey",
+    "X-DeceptiForge-Org-Id": str(DEMO_ORGANIZATION_ID),
+}
 
 
 def test_local_scan_rejected_in_production(make_client) -> None:

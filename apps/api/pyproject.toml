@@ -24,8 +24,15 @@ line-length = 100
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.flake8-bugbear]
-# FastAPI expresses dependencies as call defaults (Depends/Query/Path); these are not mutable-default bugs.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+# FastAPI expresses dependencies/params as call defaults; these are not mutable-default bugs.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "app.security.require_scope",
+]
 
 [tool.black]
 line-length = 100

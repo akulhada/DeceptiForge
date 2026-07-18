@@ -1,4 +1,5 @@
 """Extract only stable, scanner-supplied evidence for context classification."""
+
 from app.models.domain.intelligence import RepositoryIntelligenceProfile
 
 
