@@ -13,8 +13,9 @@ OAuth, or RBAC — it is an API-key/organization-id stub plus organization-scope
 
 - `AUTH_ENABLED=false` (development/demo only) → bypass to the demo organization, so the local
   dashboard works without headers.
-- `AUTH_ENABLED=true` → require `X-DeceptiForge-API-Key` (equal to `DEMO_API_KEY`) and a valid
-  `X-DeceptiForge-Org-Id`. Missing/invalid key → `401`; missing/invalid org id → `400`.
+- `AUTH_ENABLED=true` → require an API key from `API_KEY_BINDINGS` (JSON map of key to organization
+  UUID). The key determines the organization; a mismatching `X-DeceptiForge-Org-Id` is rejected.
+  Missing/invalid key → `401`; mismatching organization → `403`.
 
 This is a placeholder, not production-grade identity. There are no accounts, sessions, or roles.
 
@@ -91,13 +92,29 @@ never be exposed on a production-like deployment, even if `DEMO_ENABLED` is set 
 (`AUTH_ENABLED=false`) is likewise restricted to development; in a production environment a disabled
 auth flag is rejected with `401` rather than silently bypassed.
 
+## Stabilization sprint (fixed)
+
+- Alert deduplication and event counting now persist across requests (the alerting pipeline is
+  seeded from stored alerts; the deterministic alert id merges the same row).
+- Incident reconstruction groups on strong keys only (trace/decoy/placement/correlation) — unrelated
+  traces sharing a monitor are never merged — and is bounded to recent alerts.
+- Incident writes upsert only the affected organization's incidents (no global delete/reinsert).
+- Monitoring values, request bodies, and serialized artifacts have size limits (413); monitoring and
+  narrative have per-organization in-process rate limits.
+- API keys bind to exactly one organization; a shared key can no longer act as an arbitrary org.
+- Global exception handlers return safe, `x-request-id`-correlated responses; CORS fails closed and
+  refuses wildcard-with-credentials; the container runs non-root without auto-migrations.
+
+See [Deployment](Deployment.md) for env, migrations, and container guidance.
+
 ## Remaining work (production hardening)
 
-- Real identity/tenant provisioning; replace the demo-org default and API-key stub. Full auth,
-  API-key rotation, and RBAC are production requirements, not implemented here.
+- Real identity/OAuth/RBAC and key rotation; replace the API-key-to-org binding stub.
 - Repository integrations (GitHub/GitLab app installs, repository ids) instead of local-path
   scanning, which stays development-only.
-- Durable monitor ingestion and deduplication (current monitoring/alerting rebuild per request).
-- Rate limiting beyond the per-incident reuse/cooldown; audit history retention policy.
-- Tokenizer-accurate budgeting if prompts grow.
-- CI/CD and deployment hardening.
+- Durable/async monitor ingestion and deduplication (current ingest is synchronous per request).
+- **Distributed** rate limiting (the current limiter is single-process only) and edge/reverse-proxy
+  body/connection limits.
+- Scheduled retention/cleanup (only narrative-revision pruning is implemented; event retention is a
+  documented target).
+- Tokenizer-accurate budgeting; production monitoring/log aggregation; dependency lockfile; CI/CD.

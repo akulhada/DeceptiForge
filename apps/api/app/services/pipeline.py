@@ -29,6 +29,8 @@ from app.services.monitoring import MonitoringInstrumentationEngine
 from app.services.placement_reasoning import PlacementReasoningEngine
 from app.services.repository_intelligence import LocalRepositoryScanner
 
+_RECONSTRUCTION_ALERT_LIMIT = 1000
+
 
 class PipelineError(Exception):
     """Raised when a use case is invoked against a missing prerequisite artifact."""
@@ -123,14 +125,19 @@ class PipelineService:
         if event is None:
             return None, None
         self._repo.add_detection_event(self._org, event)
-        alert = AlertingPipeline().ingest(event, None)
+        # Seed dedup state from persisted alerts so repeated detections across separate requests
+        # update one alert (event_count, last_seen) instead of creating duplicates.
+        alerting = AlertingPipeline(existing=self._repo.alerts_for_organization(self._org))
+        alert = alerting.ingest(event, None)
         if alert is not None:
             self._repo.add_alert(self._org, alert)
-            # Reconstruct from this organization's alerts only, and replace only this
-            # organization's incidents so other tenants' data is never touched.
-            self._repo.replace_incidents_for_organization(
+            # Reconstruct from a bounded set of this organization's recent alerts, and upsert only
+            # this organization's incidents so other tenants' data is never touched.
+            self._repo.upsert_incidents_for_organization(
                 self._org,
-                self._incidents.reconstruct(self._repo.alerts_for_organization(self._org)),
+                self._incidents.reconstruct(
+                    self._repo.alerts_for_organization(self._org, limit=_RECONSTRUCTION_ALERT_LIMIT)
+                ),
             )
         return event, alert
 

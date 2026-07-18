@@ -17,7 +17,8 @@ The API owns persistence. Browser applications communicate with it through expli
 
 `routes` composes HTTP routers, `api` will contain handlers, `services` will hold use-case orchestration, and `repositories` will contain non-trivial persistence queries. SQLAlchemy models and Pydantic schemas remain separate so database representation does not become the public API contract.
 
-No business models, migrations, or feature routes exist yet. The first feature should be delivered as one vertical slice across schema, model, repository only if justified, service, route, and tests.
+The current deterministic pipeline is delivered as vertical slices across domain models, migrations,
+repositories, services, routes, and tests. New features should preserve these boundaries.
 
 ## Security posture
 

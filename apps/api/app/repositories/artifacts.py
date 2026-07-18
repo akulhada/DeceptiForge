@@ -35,11 +35,23 @@ from app.models.records import (
 )
 
 
+class ArtifactTooLargeError(Exception):
+    """Raised when a serialized artifact exceeds the configured maximum size."""
+
+
 class ArtifactRepository:
     """Organization-scoped persistence gateway for the pipeline artifacts."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, max_artifact_bytes: int | None = None) -> None:
         self._session = session
+        self._max_artifact_bytes = max_artifact_bytes
+
+    def _guard_size(self, serialized: str) -> str:
+        if self._max_artifact_bytes is not None and len(serialized.encode("utf-8")) > (
+            self._max_artifact_bytes
+        ):
+            raise ArtifactTooLargeError("serialized artifact exceeds the maximum size")
+        return serialized
 
     # -- repositories ---------------------------------------------------------------------------
 
@@ -54,7 +66,7 @@ class ArtifactRepository:
             organization_id=organization_id,
             name=name,
             root_path=root_path,
-            profile=profile.model_dump_json(),
+            profile=self._guard_size(profile.model_dump_json()),
         )
         self._session.add(record)
         self._session.flush()
@@ -91,7 +103,7 @@ class ArtifactRepository:
         record = ContextProfileRecord(
             organization_id=organization_id,
             repository_id=repository_id,
-            data=context.model_dump_json(),
+            data=self._guard_size(context.model_dump_json()),
         )
         self._session.add(record)
         self._session.flush()
@@ -111,7 +123,7 @@ class ArtifactRepository:
         record = PlacementPlanRecord(
             organization_id=organization_id,
             repository_id=repository_id,
-            data=plan.model_dump_json(),
+            data=self._guard_size(plan.model_dump_json()),
         )
         self._session.add(record)
         self._session.flush()
@@ -131,7 +143,7 @@ class ArtifactRepository:
         record = DecoyPlanRecord(
             organization_id=organization_id,
             repository_id=repository_id,
-            data=plan.model_dump_json(),
+            data=self._guard_size(plan.model_dump_json()),
         )
         self._session.add(record)
         self._session.flush()
@@ -163,7 +175,7 @@ class ArtifactRepository:
                 organization_id=organization_id,
                 decoy_plan_id=decoy_plan_id,
                 decoy_id=report.decoy_id,
-                data=report.model_dump_json(),
+                data=self._guard_size(report.model_dump_json()),
             )
         )
         self._session.flush()
@@ -188,7 +200,7 @@ class ArtifactRepository:
                 organization_id=organization_id,
                 trace_identifier=event.trace_identifier,
                 decoy_id=event.decoy_id,
-                data=event.model_dump_json(),
+                data=self._guard_size(event.model_dump_json()),
             )
         )
         self._session.flush()
@@ -217,18 +229,31 @@ class ArtifactRepository:
                 organization_id=organization_id,
                 trace_identifier=alert.trace_identifier,
                 decoy_id=alert.decoy_id,
-                data=alert.model_dump_json(),
+                data=self._guard_size(alert.model_dump_json()),
             )
         )
         self._session.flush()
 
-    def alerts_for_organization(self, organization_id: UUID) -> tuple[NormalizedAlert, ...]:
-        rows = self._session.scalars(
+    def alerts_for_organization(
+        self, organization_id: UUID, limit: int | None = None
+    ) -> tuple[NormalizedAlert, ...]:
+        if limit is None:
+            rows = self._session.scalars(
+                select(AlertRecord)
+                .where(AlertRecord.organization_id == organization_id)
+                .order_by(AlertRecord.created_at)
+            ).all()
+            return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
+        # Bound the working set to the most recent alerts, returned chronologically.
+        recent = self._session.scalars(
             select(AlertRecord)
             .where(AlertRecord.organization_id == organization_id)
-            .order_by(AlertRecord.created_at)
+            .order_by(AlertRecord.created_at.desc())
+            .limit(limit)
         ).all()
-        return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
+        return tuple(
+            NormalizedAlert.model_validate_json(row.data) for row in reversed(recent)
+        )
 
     def alerts_for_decoys(
         self, organization_id: UUID, decoy_ids: set[UUID]
@@ -247,19 +272,20 @@ class ArtifactRepository:
 
     # -- incidents ----------------------------------------------------------------------------
 
-    def replace_incidents_for_organization(
+    def upsert_incidents_for_organization(
         self, organization_id: UUID, incidents: tuple[ReconstructedIncident, ...]
     ) -> None:
-        """Replace only this organization's incidents; other organizations are untouched."""
-        self._session.execute(
-            delete(IncidentRecord).where(IncidentRecord.organization_id == organization_id)
-        )
+        """Upsert this organization's incidents by id, without a global delete/reinsert.
+
+        Only the incidents produced by reconstructing this organization's alerts are written;
+        rows are merged by their deterministic id, and other organizations are never touched.
+        """
         for incident in incidents:
-            self._session.add(
+            self._session.merge(
                 IncidentRecord(
                     id=incident.incident_id,
                     organization_id=organization_id,
-                    data=incident.model_dump_json(),
+                    data=self._guard_size(incident.model_dump_json()),
                 )
             )
         self._session.flush()
@@ -296,9 +322,27 @@ class ArtifactRepository:
                 revision_number=narrative.revision_number,
                 context_hash=narrative.source_context_hash,
                 status=narrative.status.value,
-                data=narrative.model_dump_json(),
+                data=self._guard_size(narrative.model_dump_json()),
             )
         )
+        self._session.flush()
+
+    def prune_narrative_revisions(
+        self, organization_id: UUID, incident_id: UUID, keep: int
+    ) -> None:
+        """Retain only the newest ``keep`` narrative revisions for an incident."""
+        if keep <= 0:
+            return
+        records = self._session.scalars(
+            select(NarrativeRevisionRecord)
+            .where(
+                NarrativeRevisionRecord.organization_id == organization_id,
+                NarrativeRevisionRecord.incident_id == incident_id,
+            )
+            .order_by(NarrativeRevisionRecord.revision_number.desc())
+        ).all()
+        for record in records[keep:]:
+            self._session.delete(record)
         self._session.flush()
 
     def latest_narrative(

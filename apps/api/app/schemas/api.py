@@ -20,8 +20,8 @@ MonitoringSurface = Literal["file", "repository", "database", "text"]
 
 
 class ScanRequest(BaseModel):
-    path: str = Field(min_length=1)
-    name: str | None = None
+    path: str = Field(min_length=1, max_length=4096)
+    name: str | None = Field(default=None, max_length=256)
 
 
 class RepositoryRef(BaseModel):
@@ -35,8 +35,9 @@ class DecoyPlanRef(BaseModel):
 class MonitoringEventRequest(BaseModel):
     decoy_plan_id: UUID
     surface: MonitoringSurface
-    location: str = Field(min_length=1)
-    value: str = Field(min_length=1)
+    location: str = Field(min_length=1, max_length=2048)
+    # A generous character bound; the endpoint enforces the exact byte limit and returns 413.
+    value: str = Field(min_length=1, max_length=1_000_000)
 
 
 class ScanResponse(BaseModel):

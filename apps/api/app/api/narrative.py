@@ -15,12 +15,14 @@ from app.models.domain.narrative import IncidentNarrative
 from app.repositories.artifacts import ArtifactRepository
 from app.security import OrgContext, require_org
 from app.services.incident_narrative import NarrativeService
+from app.services.rate_limit import rate_limiter
 
 router = APIRouter(tags=["incidents"])
 
 
 def _service(session: Session) -> NarrativeService:
-    return NarrativeService(ArtifactRepository(session), get_settings())
+    settings = get_settings()
+    return NarrativeService(ArtifactRepository(session, settings.max_artifact_bytes), settings)
 
 
 @router.post("/incidents/{incident_id}/narrative", response_model=IncidentNarrative)
@@ -31,6 +33,11 @@ def generate_incident_narrative(
     session: Session = Depends(get_db),
 ) -> IncidentNarrative:
     """Generate or reuse a narrative for an incident owned by the requesting organization."""
+    if not rate_limiter.allow(
+        f"narrative:{org.organization_id}:{incident_id}",
+        get_settings().narrative_rate_limit_per_minute,
+    ):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "narrative rate limit exceeded")
     narrative = _service(session).generate(org.organization_id, incident_id, force=force)
     if narrative is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")

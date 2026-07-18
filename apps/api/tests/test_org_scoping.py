@@ -135,10 +135,10 @@ def test_incident_reconstruction_and_replace_are_org_scoped() -> None:
     repo.add_alert(org_b, alert_b)
     engine = IncidentReconstructionEngine()
 
-    repo.replace_incidents_for_organization(
+    repo.upsert_incidents_for_organization(
         org_a, engine.reconstruct(repo.alerts_for_organization(org_a))
     )
-    repo.replace_incidents_for_organization(
+    repo.upsert_incidents_for_organization(
         org_b, engine.reconstruct(repo.alerts_for_organization(org_b))
     )
 
@@ -148,7 +148,7 @@ def test_incident_reconstruction_and_replace_are_org_scoped() -> None:
     assert incidents_a[0].involved_decoy_ids == (alert_a.decoy_id,)
 
     # Reconstructing A again must not delete B's incident.
-    repo.replace_incidents_for_organization(
+    repo.upsert_incidents_for_organization(
         org_a, engine.reconstruct(repo.alerts_for_organization(org_a))
     )
     assert len(repo.incidents_for_organization(org_b)) == 1

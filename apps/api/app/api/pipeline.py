@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.models.domain.intelligence import RepositoryIntelligenceProfile
-from app.repositories.artifacts import ArtifactRepository
+from app.repositories.artifacts import ArtifactRepository, ArtifactTooLargeError
 from app.schemas.api import (
     AlertListResponse,
     DecoyPlanRef,
@@ -28,12 +28,14 @@ from app.schemas.api import (
 )
 from app.security import OrgContext, require_org
 from app.services.pipeline import PipelineError, PipelineService
+from app.services.rate_limit import rate_limiter
 
 router = APIRouter()
 
 
 def _service(session: Session, org: OrgContext) -> PipelineService:
-    return PipelineService(ArtifactRepository(session), org.organization_id)
+    repository = ArtifactRepository(session, get_settings().max_artifact_bytes)
+    return PipelineService(repository, org.organization_id)
 
 
 @router.post("/repositories/scan", response_model=ScanResponse, tags=["repositories"])
@@ -108,6 +110,15 @@ def ingest_monitoring_event(
     org: OrgContext = Depends(require_org),
     session: Session = Depends(get_db),
 ) -> MonitoringEventResponse:
+    settings = get_settings()
+    if len(body.value.encode("utf-8")) > settings.monitoring_max_value_bytes:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "monitoring value exceeds the maximum size"
+        )
+    if not rate_limiter.allow(
+        f"monitor:{org.organization_id}", settings.monitoring_rate_limit_per_minute
+    ):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "monitoring rate limit exceeded")
     event, alert = _guard(
         lambda: _service(session, org).ingest_event(
             body.decoy_plan_id, body.surface, body.location, body.value
@@ -131,8 +142,12 @@ def list_incidents(
 
 
 def _guard[Result](action: Callable[[], Result]) -> Result:
-    """Run a use case, converting missing-prerequisite errors into HTTP 409."""
+    """Run a use case, mapping known service errors to safe HTTP responses."""
     try:
         return action()
+    except ArtifactTooLargeError as error:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "artifact exceeds the maximum size"
+        ) from error
     except PipelineError as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error

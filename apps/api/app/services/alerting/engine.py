@@ -15,9 +15,17 @@ from app.services.alerting.scoring import AlertingConfig, AlertSeverityScorer
 
 
 class AlertingPipeline:
-    def __init__(self, scorer: AlertSeverityScorer | None = None) -> None:
+    def __init__(
+        self,
+        scorer: AlertSeverityScorer | None = None,
+        existing: tuple[NormalizedAlert, ...] = (),
+    ) -> None:
         self._scorer = scorer or AlertSeverityScorer()
-        self._alerts: dict[str, NormalizedAlert] = {}
+        # Seed prior alerts so deduplication and event counting survive across requests when the
+        # caller loads persisted alerts (keyed by the same deduplication key).
+        self._alerts: dict[str, NormalizedAlert] = {
+            alert.deduplication_key: alert for alert in existing
+        }
 
     def ingest(
         self,

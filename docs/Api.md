@@ -36,7 +36,8 @@ scan ─► profile
 
 `POST /monitoring/events` rebuilds the monitoring engine from the stored decoy plan and its accepted
 validation reports, scans the submitted `value` for a decoy's trace identifier, and — on a hit —
-persists a raw detection event, a normalized alert, and re-reconstructs incidents from all alerts.
+persists a raw detection event, a normalized alert, and re-reconstructs incidents from that
+organization's bounded recent alerts.
 
 Surfaces for `/monitoring/events`: `file`, `repository`, `database`, `text`.
 
@@ -96,4 +97,5 @@ counts, detection result, and the reconstructed incident.
   production deployment must constrain and authorize the scan source.
 - Monitoring and alerting engines are stateful and are rebuilt per request from persisted artifacts;
   deduplication and tripwire state therefore live only within a single request.
-- No authentication or tenancy yet; alerts and incidents are global.
+- All routes require the organization/API-key boundary; production API keys must be bound through
+  `API_KEY_BINDINGS`. The current identity layer is still a stub, not OAuth/RBAC.

@@ -43,10 +43,16 @@ def test_demo_routes_blocked_in_production_even_if_enabled(make_client) -> None:
         assert client.post("/demo/run").status_code == 404
 
 
+_BINDINGS = f'{{"prodkey": "{DEMO_ORGANIZATION_ID}"}}'
+_PROD_AUTH = {"X-DeceptiForge-API-Key": "prodkey", "X-DeceptiForge-Org-Id": str(DEMO_ORGANIZATION_ID)}
+
+
 def test_local_scan_rejected_in_production(make_client) -> None:
-    with make_client(demo_enabled=False, auth_enabled=True, app_env="production") as client:
+    with make_client(
+        demo_enabled=False, auth_enabled=True, app_env="production", api_key_bindings=_BINDINGS
+    ) as client:
         response = client.post(
-            "/repositories/scan", json={"path": str(_FIXTURE_PATH)}, headers=_AUTH
+            "/repositories/scan", json={"path": str(_FIXTURE_PATH)}, headers=_PROD_AUTH
         )
         assert response.status_code == 403
 
@@ -58,8 +64,10 @@ def test_local_scan_allowed_in_development(make_client) -> None:
 
 
 def test_local_scan_remains_blocked_in_production_demo_mode(make_client) -> None:
-    with make_client(demo_enabled=True, auth_enabled=True, app_env="production") as client:
+    with make_client(
+        demo_enabled=True, auth_enabled=True, app_env="production", api_key_bindings=_BINDINGS
+    ) as client:
         response = client.post(
-            "/repositories/scan", json={"path": str(_FIXTURE_PATH)}, headers=_AUTH
+            "/repositories/scan", json={"path": str(_FIXTURE_PATH)}, headers=_PROD_AUTH
         )
         assert response.status_code == 403

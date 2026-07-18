@@ -29,16 +29,25 @@ def build_client(
     app_env: str = "development",
     auth_enabled: bool = False,
     demo_api_key: str = "local-development-key",
+    api_key_bindings: str = "{}",
+    cors_origins: str | None = None,
+    cors_allow_credentials: bool = False,
 ) -> Iterator[TestClient]:
     overrides = {
         "DEMO_ENABLED": "true" if demo_enabled else "false",
         "APP_ENV": app_env,
         "AUTH_ENABLED": "true" if auth_enabled else "false",
         "DEMO_API_KEY": demo_api_key,
+        "API_KEY_BINDINGS": api_key_bindings,
+        "CORS_ORIGINS": cors_origins if cors_origins is not None else "[]",
+        "CORS_ALLOW_CREDENTIALS": "true" if cors_allow_credentials else "false",
     }
     previous = {key: os.environ.get(key) for key in overrides}
     os.environ.update(overrides)
     get_settings.cache_clear()
+    from app.services.rate_limit import rate_limiter
+
+    rate_limiter.clear()
 
     from app.main import create_app
 
