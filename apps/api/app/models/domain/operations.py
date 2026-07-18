@@ -1,4 +1,7 @@
-# Purpose: model security observations, incidents, timelines, and coverage. Responsibilities: define immutable operational facts and assessments without collection, correlation, or remediation behavior. Future modules: add evidence providers and workflow state in separate aggregates.
+# Purpose: model security observations, incidents, timelines, and coverage. Responsibilities:
+# define immutable operational facts and assessments without collection, correlation, or
+# remediation behavior. Future modules: add evidence providers and workflow state in separate
+# aggregates.
 from __future__ import annotations
 
 from datetime import datetime
@@ -139,9 +142,11 @@ class TimelineEvent(DomainModel):
     """An immutable observed action in security chronology.
 
     Purpose: provide the canonical fact record for detection and investigation.
-    Fields: action, source, timestamp, target, optional actor/decoy references, confidence, and safe attributes.
+    Fields: action, source, timestamp, target, optional actor/decoy references, confidence, and
+    safe attributes.
     Relationships: may be referenced by Alert and embedded in an Incident timeline snapshot.
-    Future extensibility: add correlation IDs and external event IDs without altering action semantics.
+    Future extensibility: add correlation IDs and external event IDs without altering action
+    semantics.
     """
 
     id: TimelineEventId
@@ -161,7 +166,8 @@ class Alert(DomainModel):
     """A normalized detection requiring review or correlation.
 
     Purpose: preserve one actionable detection independent of incident workflow.
-    Fields: severity, source, timestamp, confidence, trigger type, detection method, and event relation.
+    Fields: severity, source, timestamp, confidence, trigger type, detection method, and event
+    relation.
     Relationships: belongs to Organization; may reference a Decoy, TimelineEvent, and Incident.
     Future extensibility: add acknowledgement workflow in a separate operational aggregate.
     """
@@ -185,8 +191,10 @@ class Incident(DomainModel):
 
     Purpose: capture the assessed security event without implementing response workflow.
     Fields: timeline, root cause, affected assets, risk, summary, evidence, and recommendations.
-    Relationships: belongs to Organization; may include Alerts and Decoys through referenced timeline data.
-    Future extensibility: add status, ownership, and remediation tasks as separate workflow aggregates.
+    Relationships: belongs to Organization; may include Alerts and Decoys through referenced
+    timeline data.
+    Future extensibility: add status, ownership, and remediation tasks as separate workflow
+    aggregates.
     """
 
     id: IncidentId
@@ -304,6 +312,14 @@ class NormalizedAlert(DomainModel):
     escalation_hints: tuple[str, ...] = ()
 
 
+class IncidentLifecycle(StrEnum):
+    OPEN = "open"
+    UPDATED = "updated"
+    RESOLVED = "resolved"
+    STALE = "stale"
+    SUPERSEDED = "superseded"
+
+
 class IncidentType(StrEnum):
     AI_PASTE_LEAK = "ai_paste_leak"
     REPOSITORY_EXPOSURE = "repository_exposure"
@@ -338,11 +354,13 @@ class ReconstructedIncident(DomainModel):
     incident_id: UUID
     title: str
     status: AlertStatus = AlertStatus.OPEN
+    lifecycle: IncidentLifecycle = IncidentLifecycle.OPEN
     severity: Severity
     confidence: float = Field(ge=0, le=1)
     incident_type: IncidentType
     first_seen: datetime
     last_seen: datetime
+    updated_at: datetime | None = None
     involved_alert_ids: tuple[UUID, ...] = Field(min_length=1)
     involved_decoy_ids: tuple[UUID, ...] = Field(min_length=1)
     involved_trace_ids: tuple[str, ...] = Field(min_length=1)

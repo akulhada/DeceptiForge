@@ -65,6 +65,21 @@ def test_deduplication_window_and_new_location_behavior() -> None:
     assert separate is not None and len(pipeline.alerts()) == 2
 
 
+def test_later_episode_gets_a_new_alert_identity() -> None:
+    start = datetime.now(UTC)
+    pipeline = AlertingPipeline()
+    first = event(at=start)
+    first_alert = pipeline.ingest(first, None, AlertingConfig(deduplication_window_seconds=60))
+    later = first.model_copy(
+        update={"event_id": uuid4(), "timestamp": start + timedelta(minutes=2)}
+    )
+    later_alert = pipeline.ingest(later, None, AlertingConfig(deduplication_window_seconds=60))
+
+    assert first_alert is not None and later_alert is not None
+    assert first_alert.alert_id != later_alert.alert_id
+    assert len(pipeline.alerts()) == 2
+
+
 def test_invalid_event_is_rejected_and_confidence_affects_severity() -> None:
     pipeline = AlertingPipeline()
     assert pipeline.ingest(event(confidence=0.4), None) is None

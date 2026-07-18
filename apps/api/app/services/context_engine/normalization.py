@@ -1,4 +1,5 @@
 """Normalize scanner evidence without changing its source semantics."""
+
 from app.models.domain.intelligence import NamingCategory
 from app.services.context_engine.features import ContextFeatures
 

@@ -1,6 +1,5 @@
 """In-memory normalization, enrichment, and time-window deduplication of raw events."""
 
-from datetime import timedelta
 from uuid import NAMESPACE_URL, uuid5
 
 from app.models.domain.operations import (
@@ -21,10 +20,10 @@ class AlertingPipeline:
         existing: tuple[NormalizedAlert, ...] = (),
     ) -> None:
         self._scorer = scorer or AlertSeverityScorer()
-        # Seed prior alerts so deduplication and event counting survive across requests when the
-        # caller loads persisted alerts (keyed by the same deduplication key).
+        # Seed prior alerts by their episode-specific identity. More than one alert may share a
+        # deduplication key when the same tripwire is observed in separate time windows.
         self._alerts: dict[str, NormalizedAlert] = {
-            alert.deduplication_key: alert for alert in existing
+            str(alert.alert_id): alert for alert in existing
         }
 
     def ingest(
@@ -39,20 +38,39 @@ class AlertingPipeline:
             return None
         entry = tripwire or self._fallback(event)
         key = self._key(event)
-        existing = self._alerts.get(key)
+        existing = self._matching_alert(key, event, config)
         if existing and abs((event.timestamp - existing.last_seen).total_seconds()) <= (
             config.deduplication_window_seconds
         ):
             updated = self._update(existing, event, entry, config, health)
-            self._alerts[key] = updated
+            self._alerts[str(updated.alert_id)] = updated
             return updated
         alert = self._create(event, entry, key, config, health)
-        self._alerts[key] = alert
+        self._alerts[str(alert.alert_id)] = alert
         return alert
 
     def alerts(self) -> tuple[NormalizedAlert, ...]:
         return tuple(
             sorted(self._alerts.values(), key=lambda alert: (alert.first_seen, str(alert.alert_id)))
+        )
+
+    def _matching_alert(
+        self, key: str, event: RawDetectionEvent, config: AlertingConfig
+    ) -> NormalizedAlert | None:
+        """Find the closest previous alert for this surface within the deduplication window."""
+        candidates = (
+            alert for alert in self._alerts.values() if alert.deduplication_key == key
+        )
+        matching = (
+            alert
+            for alert in candidates
+            if abs((event.timestamp - alert.last_seen).total_seconds())
+            <= config.deduplication_window_seconds
+        )
+        return min(
+            matching,
+            key=lambda alert: abs((event.timestamp - alert.last_seen).total_seconds()),
+            default=None,
         )
 
     @staticmethod
@@ -94,8 +112,11 @@ class AlertingPipeline:
         health: tuple[MonitorHealthMetadata, ...],
     ) -> NormalizedAlert:
         severity = self._scorer.severity(event, entry.decoy_type, 1.0, 1)
+        # The deduplication key describes the detection surface; the time bucket distinguishes
+        # separate episodes on that same surface so a later alert cannot overwrite the first row.
+        episode = int(event.timestamp.timestamp() // max(1, config.deduplication_window_seconds))
         return NormalizedAlert(
-            alert_id=uuid5(NAMESPACE_URL, key),
+            alert_id=uuid5(NAMESPACE_URL, f"{key}:{episode}"),
             trace_identifier=event.trace_identifier,
             decoy_id=event.decoy_id,
             severity=severity,

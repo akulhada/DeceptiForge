@@ -1,4 +1,5 @@
 """Thin orchestration over independently testable context layers."""
+
 from app.models.domain.intelligence import OrganizationContextProfile, RepositoryIntelligenceProfile
 from app.services.context_engine.assembly import ContextProfileAssembler
 from app.services.context_engine.classification import ContextClassifier

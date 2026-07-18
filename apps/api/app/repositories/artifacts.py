@@ -4,6 +4,7 @@
 # Dependencies: SQLAlchemy session and the persistence records.
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -18,6 +19,7 @@ from app.models.domain.intelligence import (
 )
 from app.models.domain.narrative import IncidentNarrative
 from app.models.domain.operations import (
+    IncidentLifecycle,
     NormalizedAlert,
     RawDetectionEvent,
     ReconstructedIncident,
@@ -71,6 +73,19 @@ class ArtifactRepository:
         self._session.add(record)
         self._session.flush()
         return record.id
+
+    def repositories_for_organization(
+        self, organization_id: UUID
+    ) -> tuple[tuple[UUID, str, RepositoryIntelligenceProfile], ...]:
+        rows = self._session.scalars(
+            select(RepositoryRecord)
+            .where(RepositoryRecord.organization_id == organization_id)
+            .order_by(RepositoryRecord.created_at.desc())
+        ).all()
+        return tuple(
+            (row.id, row.name, RepositoryIntelligenceProfile.model_validate_json(row.profile))
+            for row in rows
+        )
 
     def get_profile(
         self, organization_id: UUID, repository_id: UUID
@@ -205,6 +220,16 @@ class ArtifactRepository:
         )
         self._session.flush()
 
+    def detection_events_for_organization(
+        self, organization_id: UUID
+    ) -> tuple[RawDetectionEvent, ...]:
+        rows = self._session.scalars(
+            select(DetectionEventRecord)
+            .where(DetectionEventRecord.organization_id == organization_id)
+            .order_by(DetectionEventRecord.created_at)
+        ).all()
+        return tuple(RawDetectionEvent.model_validate_json(row.data) for row in rows)
+
     def detection_events_for_decoys(
         self, organization_id: UUID, decoy_ids: set[UUID]
     ) -> tuple[RawDetectionEvent, ...]:
@@ -251,9 +276,7 @@ class ArtifactRepository:
             .order_by(AlertRecord.created_at.desc())
             .limit(limit)
         ).all()
-        return tuple(
-            NormalizedAlert.model_validate_json(row.data) for row in reversed(recent)
-        )
+        return tuple(NormalizedAlert.model_validate_json(row.data) for row in reversed(recent))
 
     def alerts_for_decoys(
         self, organization_id: UUID, decoy_ids: set[UUID]
@@ -299,6 +322,33 @@ class ArtifactRepository:
             .order_by(IncidentRecord.created_at)
         ).all()
         return tuple(ReconstructedIncident.model_validate_json(row.data) for row in rows)
+
+    def retire_stale_incidents(
+        self, organization_id: UUID, now: datetime, stale_after_seconds: int
+    ) -> int:
+        """Mark this organization's incidents stale when not updated within the window.
+
+        Non-destructive: incidents are re-tagged (lifecycle=stale), never deleted, and other
+        organizations are untouched.
+        """
+        cutoff = now - timedelta(seconds=stale_after_seconds)
+        retired = 0
+        for incident in self.incidents_for_organization(organization_id):
+            if incident.lifecycle is IncidentLifecycle.STALE or incident.last_seen >= cutoff:
+                continue
+            updated = incident.model_copy(
+                update={"lifecycle": IncidentLifecycle.STALE, "updated_at": now}
+            )
+            self._session.merge(
+                IncidentRecord(
+                    id=updated.incident_id,
+                    organization_id=organization_id,
+                    data=self._guard_size(updated.model_dump_json()),
+                )
+            )
+            retired += 1
+        self._session.flush()
+        return retired
 
     def get_incident(
         self, organization_id: UUID, incident_id: UUID

@@ -44,6 +44,7 @@ per-step status, then shows a weighted coverage estimate. A run is exportable as
 - [Development](docs/Development.md)
 - [Contributing](docs/Contributing.md)
 - [Folder structure](docs/FolderStructure.md)
+- [Production readiness](docs/ProductionReadiness.md) · [Security model](docs/SecurityModel.md) · [Preflight checklist](docs/checklists/ProductionPreflight.md)
 - [Dashboard](docs/Dashboard.md) · [Pipeline API](docs/Api.md) · [Incident narrative](docs/IncidentNarrative.md) · [Production boundary](docs/ProductionBoundary.md)
 
 ## Production Hardening Roadmap

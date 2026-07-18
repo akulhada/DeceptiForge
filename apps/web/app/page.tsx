@@ -11,6 +11,7 @@ import { useDemoRun } from '@/hooks/useDemoRun';
 import { Button } from '@/components/ui/button';
 import { DemoRunButton } from '@/components/dashboard/DemoRunButton';
 import { RunProgress } from '@/components/dashboard/RunProgress';
+import { TenantDashboard } from '@/components/dashboard/TenantDashboard';
 import { ErrorState, LoadingState } from '@/components/dashboard/states';
 import {
   AlertsSection,
@@ -22,6 +23,11 @@ import {
   RepositoryProfileSection,
   ValidationSection,
 } from '@/components/dashboard/sections';
+
+// Demo mode is opt-in and development-only. Production builds always use the authenticated tenant
+// read path, even when a deployment forgets to define NEXT_PUBLIC_DEMO_MODE.
+const DEMO_MODE =
+  process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 const NAV = [
   ['overview', 'Overview'],
@@ -35,6 +41,13 @@ const NAV = [
 ] as const;
 
 export default function DashboardPage() {
+  if (!DEMO_MODE) {
+    return <TenantDashboard />;
+  }
+  return <DemoDashboard />;
+}
+
+function DemoDashboard() {
   const { state, loading, error, setState, refetch } = useDashboardData();
   const { seed, simulate, seeding, simulating, actionError } = useDemoFlow(setState);
   const { run, running, error: runError, runDemo } = useDemoRun(setState);
