@@ -23,6 +23,10 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI expresses dependencies as call defaults (Depends/Query/Path); these are not mutable-default bugs.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+
 [tool.black]
 line-length = 100
 target-version = ["py312"]
