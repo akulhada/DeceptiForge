@@ -1,10 +1,31 @@
 from app.models.domain.intelligence import NamingCategory, NamingStyle, Separator
+from app.services.repository_intelligence.analyzers import (
+    AnalyzerContribution,
+    CicdAnalyzer,
+    LanguageAnalyzer,
+)
+from app.services.repository_intelligence.evidence import FileEntry, RepositoryEvidence
 from app.services.repository_intelligence.naming import (
     NamingCorpus,
     NamingPatternInferenceEngine,
     NamingSourceFile,
 )
 from app.services.repository_intelligence.scanner import LocalRepositoryScanner
+
+
+def _evidence(*files: FileEntry, fragments: tuple[str, ...] = ()) -> RepositoryEvidence:
+    counts: dict[str, int] = {}
+    for entry in files:
+        counts[entry.suffix] = counts.get(entry.suffix, 0) + 1
+    return RepositoryEvidence(
+        root_path="/repo",
+        repository_name="repo",
+        is_git_repository=True,
+        files=files,
+        extension_counts=counts,
+        text_fragments=fragments,
+        truncated=False,
+    )
 
 
 def test_inferrs_repository_naming_conventions() -> None:
@@ -64,3 +85,54 @@ def test_scans_a_local_repository_without_retaining_source_content(tmp_path) -> 
     assert profile.naming_profile is not None
     assert profile.secret_locations[0].path == ".env.example"
     assert "not-a-real-key" not in profile.model_dump_json()
+
+
+def test_detects_cicd_docker_and_terraform_in_one_pass(tmp_path) -> None:
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    (tmp_path / ".github" / "workflows" / "ci.yml").write_text("name: ci", encoding="utf-8")
+    (tmp_path / "Dockerfile").write_text("FROM python:3.12", encoding="utf-8")
+    (tmp_path / "infra").mkdir()
+    (tmp_path / "infra" / "main.tf").write_text('provider "aws" {}', encoding="utf-8")
+
+    profile = LocalRepositoryScanner().scan(tmp_path)
+
+    assert [item.name for item in profile.cicd] == ["GitHub Actions"]
+    assert profile.infrastructure.docker_files == ("Dockerfile",)
+    assert profile.infrastructure.terraform_files == ("infra/main.tf",)
+    assert any(item.name == "AWS" for item in profile.cloud_providers)
+
+
+def test_analyzers_are_independently_unit_testable() -> None:
+    evidence = _evidence(
+        FileEntry(path=".github/workflows/ci.yml", name="ci.yml", suffix=".yml"),
+        FileEntry(path="Jenkinsfile", name="Jenkinsfile", suffix=""),
+        FileEntry(path="app/main.py", name="main.py", suffix=".py"),
+    )
+
+    cicd = CicdAnalyzer().analyze(evidence)
+    languages = LanguageAnalyzer().analyze(evidence)
+
+    assert {item.name for item in cicd.cicd} == {"GitHub Actions", "Jenkins"}
+    assert cicd.confidence is not None and cicd.confidence.analyzer == "cicd"
+    assert [item.name for item in languages.languages] == ["Python"]
+
+
+def test_scanner_pipeline_is_extensible_with_a_custom_analyzer(tmp_path) -> None:
+    (tmp_path / "app.py").write_text("print('x')", encoding="utf-8")
+
+    class TaggingAnalyzer:
+        name = "tagging"
+
+        def analyze(self, evidence: RepositoryEvidence) -> AnalyzerContribution:
+            from app.models.domain.organization import TechnologyEvidence
+
+            return AnalyzerContribution(
+                mcp_configurations=(
+                    TechnologyEvidence(name="custom-tag", confidence=1.0, evidence=("test",)),
+                )
+            )
+
+    profile = LocalRepositoryScanner(analyzers=(TaggingAnalyzer(),)).scan(tmp_path)
+
+    assert [item.name for item in profile.mcp_configurations] == ["custom-tag"]
+    assert profile.languages == ()
