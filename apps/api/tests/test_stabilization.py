@@ -95,6 +95,21 @@ def test_thousand_duplicate_events_produce_one_alert() -> None:
     assert pipeline.alerts()[0].event_count == 1000
 
 
+def test_out_of_order_duplicate_preserves_alert_time_bounds() -> None:
+    start = datetime.now(UTC)
+    pipeline = AlertingPipeline()
+    first = _event("DFG-ORDER", MonitorType.REPOSITORY, "src/x.py").model_copy(
+        update={"timestamp": start + timedelta(seconds=30)}
+    )
+    duplicate = first.model_copy(update={"event_id": uuid4(), "timestamp": start})
+    pipeline.ingest(first, None)
+    updated = pipeline.ingest(duplicate, None)
+    assert updated is not None
+    assert updated.event_count == 2
+    assert updated.first_seen == start
+    assert updated.last_seen == start + timedelta(seconds=30)
+
+
 # ---- finding 2: monitoring payload limit ---------------------------------------------------------
 
 
