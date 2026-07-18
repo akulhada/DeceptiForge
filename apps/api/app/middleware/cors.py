@@ -22,8 +22,8 @@ def configure_cors(
     origin_list = [origin for origin in origins if origin]
     if not origin_list:
         return
-    if allow_credentials and "*" in origin_list:
-        raise ValueError("CORS cannot allow credentials with a wildcard origin")
+    if "*" in origin_list:
+        raise ValueError("CORS wildcard origins are not allowed; configure an explicit allow-list")
 
     application.add_middleware(
         CORSMiddleware,

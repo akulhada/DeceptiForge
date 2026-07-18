@@ -40,8 +40,8 @@ class AlertingPipeline:
         entry = tripwire or self._fallback(event)
         key = self._key(event)
         existing = self._alerts.get(key)
-        if existing and event.timestamp - existing.last_seen <= timedelta(
-            seconds=config.deduplication_window_seconds
+        if existing and abs((event.timestamp - existing.last_seen).total_seconds()) <= (
+            config.deduplication_window_seconds
         ):
             updated = self._update(existing, event, entry, config, health)
             self._alerts[key] = updated
@@ -143,7 +143,8 @@ class AlertingPipeline:
         )[-5:]
         return alert.model_copy(
             update={
-                "last_seen": event.timestamp,
+                "first_seen": min(alert.first_seen, event.timestamp),
+                "last_seen": max(alert.last_seen, event.timestamp),
                 "event_count": count,
                 "severity": severity,
                 "confidence": max(alert.confidence, event.confidence),
