@@ -967,6 +967,8 @@ export interface IncidentNarrativeBody {
 export interface IncidentNarrative {
   readonly narrative_id: string;
   readonly incident_id: string;
+  readonly organization_id: string;
+  readonly revision_number: number;
   readonly source: NarrativeSource;
   readonly status: NarrativeStatus;
   readonly model: string | null;

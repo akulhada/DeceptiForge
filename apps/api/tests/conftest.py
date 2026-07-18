@@ -24,12 +24,20 @@ from app.models import records as _records  # noqa: F401  (register tables)
 
 @contextmanager
 def build_client(
-    *, demo_enabled: bool = True, app_env: str = "development"
+    *,
+    demo_enabled: bool = True,
+    app_env: str = "development",
+    auth_enabled: bool = False,
+    demo_api_key: str = "local-development-key",
 ) -> Iterator[TestClient]:
-    previous_demo_enabled = os.environ.get("DEMO_ENABLED")
-    previous_app_env = os.environ.get("APP_ENV")
-    os.environ["DEMO_ENABLED"] = "true" if demo_enabled else "false"
-    os.environ["APP_ENV"] = app_env
+    overrides = {
+        "DEMO_ENABLED": "true" if demo_enabled else "false",
+        "APP_ENV": app_env,
+        "AUTH_ENABLED": "true" if auth_enabled else "false",
+        "DEMO_API_KEY": demo_api_key,
+    }
+    previous = {key: os.environ.get(key) for key in overrides}
+    os.environ.update(overrides)
     get_settings.cache_clear()
 
     from app.main import create_app
@@ -58,14 +66,11 @@ def build_client(
             yield test_client
     finally:
         application.dependency_overrides.clear()
-        if previous_demo_enabled is None:
-            os.environ.pop("DEMO_ENABLED", None)
-        else:
-            os.environ["DEMO_ENABLED"] = previous_demo_enabled
-        if previous_app_env is None:
-            os.environ.pop("APP_ENV", None)
-        else:
-            os.environ["APP_ENV"] = previous_app_env
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         get_settings.cache_clear()
 
 

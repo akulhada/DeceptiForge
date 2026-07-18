@@ -36,6 +36,7 @@ function NarrativeView({ narrative }: { narrative: IncidentNarrative }) {
         <Badge tone={fallback ? 'warning' : 'info'}>
           {fallback ? 'Deterministic fallback' : `Model: ${narrative.model ?? 'openai'}`}
         </Badge>
+        <Badge tone="neutral">rev {narrative.revision_number}</Badge>
         <span className="text-[11px] text-slate-500">
           Generated from minimized incident context · prompt {narrative.prompt_version}
         </span>

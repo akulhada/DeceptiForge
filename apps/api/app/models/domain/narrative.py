@@ -88,6 +88,8 @@ class IncidentNarrative(DomainModel):
 
     narrative_id: UUID
     incident_id: UUID
+    organization_id: UUID
+    revision_number: int = Field(default=1, ge=1)
     source: NarrativeSource
     status: NarrativeStatus
     model: str | None = None

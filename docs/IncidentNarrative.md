@@ -15,8 +15,12 @@ or any security decision — it only writes prose from already-computed facts.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/incidents/{incident_id}/narrative` | Generate (or regenerate) and persist a narrative |
-| GET | `/incidents/{incident_id}/narrative` | Return a previously generated narrative (404 if none) |
+| POST | `/incidents/{incident_id}/narrative[?force=true]` | Generate or reuse; appends a revision |
+| GET | `/incidents/{incident_id}/narrative` | Latest narrative revision (404 if none) |
+| GET | `/incidents/{incident_id}/narratives` | All narrative revisions |
+
+All narrative endpoints are **organization-scoped** and require the auth boundary; generations are
+**revisioned** and reused under a cooldown. See [ProductionBoundary.md](ProductionBoundary.md).
 
 Response is an `IncidentNarrative`: ids, `source` (`model`/`fallback`), `status`, `model`,
 `prompt_version`, `source_context_hash`, `created_at`, a `body` (executive/analyst summary, likely

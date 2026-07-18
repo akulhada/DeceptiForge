@@ -9,6 +9,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from app.config.constants import DEMO_ORGANIZATION_ID
 from app.config.settings import Settings
 from app.models.domain.narrative import (
     IncidentNarrative,
@@ -45,8 +46,12 @@ class IncidentNarrativeGenerator:
         self._client = client
         self._builder = builder or NarrativeContextBuilder()
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._organization_id = DEMO_ORGANIZATION_ID
 
-    def generate(self, incident: ReconstructedIncident) -> IncidentNarrative:
+    def generate(
+        self, incident: ReconstructedIncident, organization_id: UUID
+    ) -> IncidentNarrative:
+        self._organization_id = organization_id
         context = self._builder.build(incident)
         digest = context_hash(context)
         client = self._resolve_client()
@@ -126,6 +131,7 @@ class IncidentNarrativeGenerator:
         return IncidentNarrative(
             narrative_id=self._narrative_id(incident.incident_id, digest),
             incident_id=incident.incident_id,
+            organization_id=self._organization_id,
             source=source,
             status=status,
             model=model,

@@ -7,6 +7,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from app.config.constants import DEMO_ORGANIZATION_ID
 from app.config.settings import Settings
 from app.models.domain.narrative import NarrativeSource, NarrativeStatus, TokenUsage
 from app.models.domain.operations import (
@@ -147,7 +148,9 @@ def test_default_token_budget_compacts_long_deterministic_text() -> None:
 
 
 def test_fallback_when_openai_not_configured() -> None:
-    narrative = IncidentNarrativeGenerator(_settings(openai_api_key=None)).generate(_incident())
+    narrative = IncidentNarrativeGenerator(_settings(openai_api_key=None)).generate(
+        _incident(), DEMO_ORGANIZATION_ID
+    )
 
     assert narrative.source is NarrativeSource.FALLBACK
     assert narrative.status is NarrativeStatus.FALLBACK_DISABLED
@@ -158,7 +161,7 @@ def test_fallback_when_openai_not_configured() -> None:
 def test_model_success_produces_generated_narrative() -> None:
     narrative = IncidentNarrativeGenerator(
         _settings(openai_api_key="sk-test"), client=_OkClient()
-    ).generate(_incident())
+    ).generate(_incident(), DEMO_ORGANIZATION_ID)
 
     assert narrative.source is NarrativeSource.MODEL
     assert narrative.status is NarrativeStatus.GENERATED
@@ -169,10 +172,10 @@ def test_model_success_produces_generated_narrative() -> None:
 def test_model_failure_and_invalid_output_fall_back() -> None:
     failed = IncidentNarrativeGenerator(
         _settings(openai_api_key="sk-test"), client=_RaiseClient()
-    ).generate(_incident())
+    ).generate(_incident(), DEMO_ORGANIZATION_ID)
     invalid = IncidentNarrativeGenerator(
         _settings(openai_api_key="sk-test"), client=_BadClient()
-    ).generate(_incident())
+    ).generate(_incident(), DEMO_ORGANIZATION_ID)
 
     assert failed.status is NarrativeStatus.FALLBACK_ERROR and failed.error
     assert invalid.status is NarrativeStatus.FALLBACK_INVALID

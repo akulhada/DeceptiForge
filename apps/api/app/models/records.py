@@ -7,9 +7,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.config.constants import DEMO_ORGANIZATION_ID
 from app.database.base import Base
 
 
@@ -21,6 +22,7 @@ class RepositoryRecord(Base):
     __tablename__ = "repositories"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     name: Mapped[str] = mapped_column(String(256))
     root_path: Mapped[str] = mapped_column(String(2048))
     profile: Mapped[str] = mapped_column(Text)
@@ -78,6 +80,7 @@ class AlertRecord(Base):
     __tablename__ = "alerts"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     trace_identifier: Mapped[str] = mapped_column(String(128), index=True)
     decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True)
     data: Mapped[str] = mapped_column(Text)
@@ -88,13 +91,21 @@ class IncidentRecord(Base):
     __tablename__ = "incidents"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
-class NarrativeRecord(Base):
-    __tablename__ = "incident_narratives"
+class NarrativeRevisionRecord(Base):
+    """One immutable narrative generation. Regeneration appends a revision, never overwrites."""
 
-    incident_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    __tablename__ = "narrative_revisions"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
+    incident_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    revision_number: Mapped[int] = mapped_column(Integer)
+    context_hash: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32))
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

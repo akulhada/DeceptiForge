@@ -28,7 +28,7 @@ from app.models.records import (
     DecoyPlanRecord,
     DetectionEventRecord,
     IncidentRecord,
-    NarrativeRecord,
+    NarrativeRevisionRecord,
     PlacementPlanRecord,
     RepositoryRecord,
     ValidationReportRecord,
@@ -201,26 +201,63 @@ class ArtifactRepository:
         ).all()
         return tuple(ReconstructedIncident.model_validate_json(row.data) for row in rows)
 
-    def get_incident(self, incident_id: UUID) -> ReconstructedIncident | None:
+    def get_incident(
+        self, organization_id: UUID, incident_id: UUID
+    ) -> ReconstructedIncident | None:
         record = self._session.get(IncidentRecord, incident_id)
-        if record is None:
+        if record is None or record.organization_id != organization_id:
             return None
         return ReconstructedIncident.model_validate_json(record.data)
 
-    def upsert_narrative(self, narrative: IncidentNarrative) -> None:
-        self._session.merge(
-            NarrativeRecord(
+    def next_revision_number(self, organization_id: UUID, incident_id: UUID) -> int:
+        latest = self._latest_revision_record(organization_id, incident_id)
+        return 1 if latest is None else latest.revision_number + 1
+
+    def add_narrative_revision(self, narrative: IncidentNarrative) -> None:
+        self._session.add(
+            NarrativeRevisionRecord(
+                organization_id=narrative.organization_id,
                 incident_id=narrative.incident_id,
+                revision_number=narrative.revision_number,
+                context_hash=narrative.source_context_hash,
+                status=narrative.status.value,
                 data=narrative.model_dump_json(),
             )
         )
         self._session.flush()
 
-    def get_narrative(self, incident_id: UUID) -> IncidentNarrative | None:
-        record = self._session.get(NarrativeRecord, incident_id)
+    def latest_narrative(
+        self, organization_id: UUID, incident_id: UUID
+    ) -> IncidentNarrative | None:
+        record = self._latest_revision_record(organization_id, incident_id)
         if record is None:
             return None
         return IncidentNarrative.model_validate_json(record.data)
+
+    def list_narratives(
+        self, organization_id: UUID, incident_id: UUID
+    ) -> tuple[IncidentNarrative, ...]:
+        rows = self._session.scalars(
+            select(NarrativeRevisionRecord)
+            .where(
+                NarrativeRevisionRecord.organization_id == organization_id,
+                NarrativeRevisionRecord.incident_id == incident_id,
+            )
+            .order_by(NarrativeRevisionRecord.revision_number)
+        ).all()
+        return tuple(IncidentNarrative.model_validate_json(row.data) for row in rows)
+
+    def _latest_revision_record(
+        self, organization_id: UUID, incident_id: UUID
+    ) -> NarrativeRevisionRecord | None:
+        return self._session.scalars(
+            select(NarrativeRevisionRecord)
+            .where(
+                NarrativeRevisionRecord.organization_id == organization_id,
+                NarrativeRevisionRecord.incident_id == incident_id,
+            )
+            .order_by(NarrativeRevisionRecord.revision_number.desc())
+        ).first()
 
     def _latest(self, model: Any, repository_id: UUID) -> Any:
         return self._session.scalars(

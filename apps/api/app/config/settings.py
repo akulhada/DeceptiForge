@@ -17,7 +17,10 @@ class Settings(BaseSettings):
     database_url: PostgresDsn
     cors_origins: list[str] = Field(default_factory=list)
     demo_enabled: bool = False
+    auth_enabled: bool = True
+    demo_api_key: str | None = None
     incident_narrative_enabled: bool = True
+    narrative_cooldown_seconds: int = 30
     openai_api_key: str | None = None
     openai_incident_model: str = "gpt-4o-mini"
 

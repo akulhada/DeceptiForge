@@ -1,7 +1,7 @@
-# Purpose: expose optional GPT incident-narrative endpoints.
-# Responsibilities: generate a narrative on demand from a stored deterministic incident and return
-#   a previously generated one. It never mutates incident data and always returns a narrative
-#   (fallback when GPT is unavailable). Dependencies: the generator, repository, and settings.
+# Purpose: expose optional, organization-scoped GPT incident-narrative endpoints.
+# Responsibilities: require an organization context, fetch incidents only within that organization,
+#   and return/append narrative revisions. It never mutates incident data. Dependencies: the
+#   narrative service, repository, settings, and the org auth boundary.
 from __future__ import annotations
 
 from uuid import UUID
@@ -13,31 +13,48 @@ from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.models.domain.narrative import IncidentNarrative
 from app.repositories.artifacts import ArtifactRepository
-from app.services.incident_narrative import IncidentNarrativeGenerator
+from app.security import OrgContext, require_org
+from app.services.incident_narrative import NarrativeService
 
 router = APIRouter(tags=["incidents"])
 
 
+def _service(session: Session) -> NarrativeService:
+    return NarrativeService(ArtifactRepository(session), get_settings())
+
+
 @router.post("/incidents/{incident_id}/narrative", response_model=IncidentNarrative)
 def generate_incident_narrative(
-    incident_id: UUID, session: Session = Depends(get_db)
+    incident_id: UUID,
+    force: bool = False,
+    org: OrgContext = Depends(require_org),
+    session: Session = Depends(get_db),
 ) -> IncidentNarrative:
-    """Generate (or regenerate) a narrative for a stored incident and persist it."""
-    repository = ArtifactRepository(session)
-    incident = repository.get_incident(incident_id)
-    if incident is None:
+    """Generate or reuse a narrative for an incident owned by the requesting organization."""
+    narrative = _service(session).generate(org.organization_id, incident_id, force=force)
+    if narrative is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
-    narrative = IncidentNarrativeGenerator(get_settings()).generate(incident)
-    repository.upsert_narrative(narrative)
     return narrative
 
 
 @router.get("/incidents/{incident_id}/narrative", response_model=IncidentNarrative)
 def get_incident_narrative(
-    incident_id: UUID, session: Session = Depends(get_db)
+    incident_id: UUID,
+    org: OrgContext = Depends(require_org),
+    session: Session = Depends(get_db),
 ) -> IncidentNarrative:
-    """Return a previously generated narrative, or 404 if none exists yet."""
-    narrative = ArtifactRepository(session).get_narrative(incident_id)
+    """Return the latest narrative revision for the organization, or 404 if none exists."""
+    narrative = _service(session).latest(org.organization_id, incident_id)
     if narrative is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no narrative generated yet")
     return narrative
+
+
+@router.get("/incidents/{incident_id}/narratives", response_model=list[IncidentNarrative])
+def list_incident_narratives(
+    incident_id: UUID,
+    org: OrgContext = Depends(require_org),
+    session: Session = Depends(get_db),
+) -> list[IncidentNarrative]:
+    """Return all narrative revisions for the incident within the requesting organization."""
+    return list(_service(session).history(org.organization_id, incident_id))
