@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -23,6 +23,7 @@ from app.models.domain.operations import (
     NormalizedAlert,
     Severity,
 )
+from app.models.records import SecurityAuditRecord
 from app.repositories.artifacts import ArtifactRepository
 from app.services.api_keys import ApiKeyService, AuthError, hash_key
 from app.services.incident_reconstruction import IncidentReconstructionEngine
@@ -219,6 +220,51 @@ def test_tenant_endpoints_require_authentication(make_client) -> None:
     with make_client(demo_enabled=False, auth_enabled=True, app_env="production") as client:
         assert client.get("/whoami").status_code == 401
         assert client.get("/repositories").status_code == 401
+
+
+def test_rejected_authentication_is_persisted_to_the_security_audit(make_client) -> None:
+    with make_client(demo_enabled=False, auth_enabled=True, app_env="production") as client:
+        response = client.get("/whoami", headers={"X-Request-Id": "rejected-auth-test"})
+        assert response.status_code == 401
+
+        session = client.app_session()
+        try:
+            audit = session.scalars(
+                select(SecurityAuditRecord).where(
+                    SecurityAuditRecord.request_id == "rejected-auth-test"
+                )
+            ).one()
+        finally:
+            session.close()
+
+    assert audit.action == "auth"
+    assert audit.outcome == "rejected"
+    assert audit.detail == "missing key"
+
+
+def test_cors_allows_required_monitoring_headers(make_client) -> None:
+    with make_client(
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="production",
+        cors_origins='["https://dashboard.example.test"]',
+    ) as client:
+        response = client.options(
+            "/monitoring/events",
+            headers={
+                "Origin": "https://dashboard.example.test",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": (
+                    "X-DeceptiForge-API-Key, X-DeceptiForge-Org-Id, "
+                    "X-DeceptiForge-Nonce, X-DeceptiForge-Timestamp"
+                ),
+            },
+        )
+
+    assert response.status_code == 200
+    allowed = response.headers["access-control-allow-headers"].lower()
+    assert "x-deceptiforge-nonce" in allowed
+    assert "x-deceptiforge-timestamp" in allowed
 
 
 def test_admin_can_create_list_and_revoke_keys(client) -> None:

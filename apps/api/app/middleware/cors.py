@@ -8,7 +8,13 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 _ALLOWED_METHODS = ["GET", "POST", "OPTIONS"]
-_ALLOWED_HEADERS = ["content-type", "x-deceptiforge-api-key", "x-deceptiforge-org-id"]
+_ALLOWED_HEADERS = [
+    "content-type",
+    "x-deceptiforge-api-key",
+    "x-deceptiforge-org-id",
+    "x-deceptiforge-nonce",
+    "x-deceptiforge-timestamp",
+]
 
 
 def configure_cors(

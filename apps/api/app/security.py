@@ -21,10 +21,37 @@ class OrgContext:
     organization_id: UUID
 
 
-def _parse_org(value: str) -> UUID:
+def _record_rejection(
+    session: Session,
+    *,
+    action: str,
+    request_id: str,
+    organization_id: UUID | None = None,
+    detail: str,
+) -> None:
+    """Persist a rejected security decision before its request transaction is rolled back."""
+    write_audit(
+        session,
+        action=action,
+        outcome="rejected",
+        request_id=request_id,
+        organization_id=organization_id,
+        detail=detail,
+    )
+    session.commit()
+
+
+def _parse_org(value: str, *, session: Session | None = None, request_id: str = "unknown") -> UUID:
     try:
         return UUID(value)
     except ValueError:
+        if session is not None:
+            _record_rejection(
+                session,
+                action="authz",
+                request_id=request_id,
+                detail="invalid organization id",
+            )
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid organization id") from None
 
 
@@ -44,22 +71,34 @@ def _authenticate(
             status.HTTP_401_UNAUTHORIZED, "authentication bypass is restricted to development"
         )
     if not api_key:
-        write_audit(
-            session, action="auth", outcome="rejected", request_id=request_id, detail="missing key"
-        )
+        _record_rejection(session, action="auth", request_id=request_id, detail="missing key")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing API key")
 
     # Development-only static key shortcut (never enabled outside development).
     if settings.is_development and api_key == settings.demo_api_key:
-        organization = _parse_org(org_id) if org_id else DEMO_ORGANIZATION_ID
+        organization = (
+            _parse_org(org_id, session=session, request_id=request_id)
+            if org_id
+            else DEMO_ORGANIZATION_ID
+        )
         return AuthContext(organization, PERMISSIONS, "owner", None)
 
     # Env-provisioned bootstrap/service key bound to one organization (owner scope). Prefer the
     # hashed, DB-backed keys below; this path exists to bootstrap the first admin key.
     bound = settings.api_key_bindings.get(api_key)
     if bound is not None:
-        bound_org = _parse_org(bound)
-        if org_id is not None and _parse_org(org_id) != bound_org:
+        bound_org = _parse_org(bound, session=session, request_id=request_id)
+        if (
+            org_id is not None
+            and _parse_org(org_id, session=session, request_id=request_id) != bound_org
+        ):
+            _record_rejection(
+                session,
+                action="authz",
+                request_id=request_id,
+                organization_id=bound_org,
+                detail="cross-org header",
+            )
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, "organization does not match the API key"
             )
@@ -68,16 +107,16 @@ def _authenticate(
     try:
         context = ApiKeyService(session).authenticate(api_key)
     except AuthError as error:
-        write_audit(
-            session, action="auth", outcome="rejected", request_id=request_id, detail=error.message
-        )
+        _record_rejection(session, action="auth", request_id=request_id, detail=error.message)
         raise HTTPException(error.status_code, error.message) from None
 
-    if org_id is not None and _parse_org(org_id) != context.organization_id:
-        write_audit(
+    if (
+        org_id is not None
+        and _parse_org(org_id, session=session, request_id=request_id) != context.organization_id
+    ):
+        _record_rejection(
             session,
             action="authz",
-            outcome="rejected",
             request_id=request_id,
             organization_id=context.organization_id,
             detail="cross-org header",
@@ -125,10 +164,9 @@ def require_scope(scope: str):  # type: ignore[no-untyped-def]
         )
         if scope not in context.scopes:
             request_id = getattr(request.state, "request_id", "unknown")
-            write_audit(
+            _record_rejection(
                 session,
                 action="authz",
-                outcome="rejected",
                 request_id=request_id,
                 organization_id=context.organization_id,
                 detail=f"missing {scope}",

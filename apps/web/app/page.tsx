@@ -13,10 +13,6 @@ import { DemoRunButton } from '@/components/dashboard/DemoRunButton';
 import { RunProgress } from '@/components/dashboard/RunProgress';
 import { TenantDashboard } from '@/components/dashboard/TenantDashboard';
 import { ErrorState, LoadingState } from '@/components/dashboard/states';
-
-// Demo mode (local development) calls /demo/*. Set NEXT_PUBLIC_DEMO_MODE=false for a staging build
-// so the dashboard uses the authenticated tenant read path and never touches demo routes.
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 import {
   AlertsSection,
   DecoySection,
@@ -27,6 +23,11 @@ import {
   RepositoryProfileSection,
   ValidationSection,
 } from '@/components/dashboard/sections';
+
+// Demo mode is opt-in and development-only. Production builds always use the authenticated tenant
+// read path, even when a deployment forgets to define NEXT_PUBLIC_DEMO_MODE.
+const DEMO_MODE =
+  process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 const NAV = [
   ['overview', 'Overview'],
