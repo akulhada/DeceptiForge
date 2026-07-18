@@ -1,4 +1,5 @@
 """Rule-based organization and operational classification."""
+
 from app.models.domain.intelligence import (
     DocumentationCulture,
     OrganizationArchetype,
@@ -22,13 +23,19 @@ class ContextClassification:
         self.archetype = (
             OrganizationArchetype.CLOUD_NATIVE_PLATFORM
             if cloud
-            else OrganizationArchetype.DATA_SERVICE
-            if data
-            else OrganizationArchetype.DEVELOPER_TOOLING
-            if developer
-            else OrganizationArchetype.APPLICATION_SERVICE
-            if technologies
-            else OrganizationArchetype.UNKNOWN
+            else (
+                OrganizationArchetype.DATA_SERVICE
+                if data
+                else (
+                    OrganizationArchetype.DEVELOPER_TOOLING
+                    if developer
+                    else (
+                        OrganizationArchetype.APPLICATION_SERVICE
+                        if technologies
+                        else OrganizationArchetype.UNKNOWN
+                    )
+                )
+            )
         )
         signals = sum(
             bool(value)
@@ -44,21 +51,21 @@ class ContextClassification:
         self.maturity = (
             StackMaturity.MATURE
             if signals >= 5
-            else StackMaturity.ESTABLISHED
-            if signals >= 3
-            else StackMaturity.EXPERIMENTAL
-            if signals
-            else StackMaturity.UNKNOWN
+            else (
+                StackMaturity.ESTABLISHED
+                if signals >= 3
+                else StackMaturity.EXPERIMENTAL if signals else StackMaturity.UNKNOWN
+            )
         )
         docs = len(profile.documentation)
         self.documentation = (
             DocumentationCulture.STRUCTURED
             if docs >= 3
-            else DocumentationCulture.OPERATIONAL
-            if docs >= 2
-            else DocumentationCulture.LIGHT
-            if docs
-            else DocumentationCulture.NONE
+            else (
+                DocumentationCulture.OPERATIONAL
+                if docs >= 2
+                else DocumentationCulture.LIGHT if docs else DocumentationCulture.NONE
+            )
         )
 
 

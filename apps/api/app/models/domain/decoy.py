@@ -1,4 +1,7 @@
-# Purpose: model compositional decoy assets and their quality assessments. Responsibilities: define typed payload shapes, placement evidence, and believability scores without generation or deployment behavior. Future modules: add secure content storage and feature-specific payload metadata.
+# Purpose: model compositional decoy assets and their quality assessments. Responsibilities: define
+# typed payload shapes, placement evidence, and believability scores without generation or
+# deployment behavior. Future modules: add secure content storage and feature-specific payload
+# metadata.
 from __future__ import annotations
 
 from enum import StrEnum
@@ -105,8 +108,10 @@ class DecoyPayloadBase(DomainModel):
 
     Purpose: establish the minimum safe contract every decoy material form shares.
     Fields: a discriminating kind and protected content reference.
-    Relationships: embedded by Decoy; concrete payloads refine the discriminator and add shape metadata.
-    Future extensibility: introduce a new payload kind as a new concrete class, never as nullable fields here.
+    Relationships: embedded by Decoy; concrete payloads refine the discriminator and add shape
+    metadata.
+    Future extensibility: introduce a new payload kind as a new concrete class, never as nullable
+    fields here.
     """
 
     kind: DecoyKind
@@ -230,7 +235,8 @@ class AgentAssetPayload(DecoyPayloadBase):
     Purpose: represent an instruction, tool, memory, or skill artifact safely.
     Fields: asset kind, display name, description, and protected content reference.
     Relationships: composed by Decoy when kind is agent_asset.
-    Future extensibility: add agent-runtime compatibility metadata once a target runtime is approved.
+    Future extensibility: add agent-runtime compatibility metadata once a target runtime is
+    approved.
     """
 
     kind: Literal[DecoyKind.AGENT_ASSET] = DecoyKind.AGENT_ASSET
@@ -257,8 +263,10 @@ class Decoy(DomainModel):
 
     Purpose: provide one durable identity and lifecycle for all decoy forms.
     Fields: ownership IDs, profile context, state, typed payload, and schema revision.
-    Relationships: belongs to Organization, may reference Repository/Profile, and has Placement and Believability records.
-    Future extensibility: add deployment references and retirement reasons without changing payload semantics.
+    Relationships: belongs to Organization, may reference Repository/Profile, and has Placement and
+    Believability records.
+    Future extensibility: add deployment references and retirement reasons without changing payload
+    semantics.
     """
 
     id: DecoyId

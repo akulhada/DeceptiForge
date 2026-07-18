@@ -11,7 +11,12 @@ import { useDemoRun } from '@/hooks/useDemoRun';
 import { Button } from '@/components/ui/button';
 import { DemoRunButton } from '@/components/dashboard/DemoRunButton';
 import { RunProgress } from '@/components/dashboard/RunProgress';
+import { TenantDashboard } from '@/components/dashboard/TenantDashboard';
 import { ErrorState, LoadingState } from '@/components/dashboard/states';
+
+// Demo mode (local development) calls /demo/*. Set NEXT_PUBLIC_DEMO_MODE=false for a staging build
+// so the dashboard uses the authenticated tenant read path and never touches demo routes.
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 import {
   AlertsSection,
   DecoySection,
@@ -35,6 +40,13 @@ const NAV = [
 ] as const;
 
 export default function DashboardPage() {
+  if (!DEMO_MODE) {
+    return <TenantDashboard />;
+  }
+  return <DemoDashboard />;
+}
+
+function DemoDashboard() {
   const { state, loading, error, setState, refetch } = useDashboardData();
   const { seed, simulate, seeding, simulating, actionError } = useDemoFlow(setState);
   const { run, running, error: runError, runDemo } = useDemoRun(setState);

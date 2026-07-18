@@ -2,11 +2,12 @@
 
 from dataclasses import dataclass
 from datetime import timedelta
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from app.models.domain.operations import (
     DetectionSource,
     GptSummaryContextBundle,
+    IncidentLifecycle,
     IncidentType,
     NormalizedAlert,
     ReconstructedIncident,
@@ -24,7 +25,10 @@ class IncidentConfig:
 
 class IncidentReconstructionEngine:
     def reconstruct(
-        self, alerts: tuple[NormalizedAlert, ...], config: IncidentConfig | None = None
+        self,
+        alerts: tuple[NormalizedAlert, ...],
+        config: IncidentConfig | None = None,
+        organization_id: UUID | None = None,
     ) -> tuple[ReconstructedIncident, ...]:
         config = config or IncidentConfig()
         ordered = sorted(alerts, key=lambda item: (item.first_seen, str(item.alert_id)))
@@ -38,7 +42,7 @@ class IncidentReconstructionEngine:
                     break
             else:
                 groups.append([alert])
-        return tuple(self._build(group) for group in groups)
+        return tuple(self._build(group, config, organization_id) for group in groups)
 
     @staticmethod
     def _related(
@@ -57,7 +61,12 @@ class IncidentReconstructionEngine:
             for item in group
         )
 
-    def _build(self, alerts: list[NormalizedAlert]) -> ReconstructedIncident:
+    def _build(
+        self,
+        alerts: list[NormalizedAlert],
+        config: IncidentConfig,
+        organization_id: UUID | None,
+    ) -> ReconstructedIncident:
         alerts = sorted(alerts, key=lambda item: (item.first_seen, str(item.alert_id)))
         kind = self._kind(alerts)
         timeline = tuple(
@@ -79,15 +88,23 @@ class IncidentReconstructionEngine:
         hypothesis = self._hypothesis(kind)
         actions = self._actions(kind)
         traces = tuple(sorted({alert.trace_identifier for alert in alerts}))
-        key = ":".join(traces)
+        first_seen = alerts[0].first_seen
+        last_seen = max(alert.last_seen for alert in alerts)
+        # Incident identity includes the organization, the correlation keys, the incident kind, and
+        # a time bucket so the SAME trace in a separate episode (a later window) is a NEW incident,
+        # while repeated detections within the window keep updating the same incident.
+        bucket = int(first_seen.timestamp() // config.correlation_window_seconds)
+        identity = f"{organization_id}:{':'.join(traces)}:{kind.value}:{bucket}"
         return ReconstructedIncident(
-            incident_id=uuid5(NAMESPACE_URL, key),
+            incident_id=uuid5(NAMESPACE_URL, identity),
             title=f"{kind.value.replace('_', ' ').title()} detection",
             severity=severity,
+            lifecycle=IncidentLifecycle.OPEN,
+            updated_at=last_seen,
             confidence=round(sum(alert.confidence for alert in alerts) / len(alerts), 3),
             incident_type=kind,
-            first_seen=alerts[0].first_seen,
-            last_seen=max(alert.last_seen for alert in alerts),
+            first_seen=first_seen,
+            last_seen=last_seen,
             involved_alert_ids=tuple(alert.alert_id for alert in alerts),
             involved_decoy_ids=tuple(sorted({alert.decoy_id for alert in alerts}, key=str)),
             involved_trace_ids=traces,

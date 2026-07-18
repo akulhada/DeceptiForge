@@ -34,6 +34,22 @@ class Settings(BaseSettings):
     narrative_rate_limit_per_minute: int = 10
     narrative_revision_retention_count: int = 20
     monitoring_event_retention_days: int = 30
+    incident_stale_after_seconds: int = 86_400
+    monitoring_timestamp_skew_seconds: int = 300
+    # Rate limiting: "app" uses the in-process limiter (single worker only); "gateway" delegates to
+    # an edge/reverse-proxy. Production with "app" requires REDIS_URL (distributed store).
+    rate_limit_mode: str = "app"
+    redis_url: str | None = None
+
+    def validate_runtime(self) -> None:
+        """Fail fast on unsafe production configuration."""
+        if self.is_development:
+            return
+        if self.rate_limit_mode == "app" and self.redis_url is None:
+            raise RuntimeError(
+                "production app-level rate limiting requires REDIS_URL, "
+                "or set RATE_LIMIT_MODE=gateway to delegate to the edge"
+            )
 
     @property
     def openai_configured(self) -> bool:

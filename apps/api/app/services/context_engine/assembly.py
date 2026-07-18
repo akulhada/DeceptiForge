@@ -1,4 +1,5 @@
 """Assemble the public immutable context profile from prior deterministic layers."""
+
 from app.models.domain.intelligence import ContextReasoning, OrganizationContextProfile
 from app.services.context_engine.classification import ContextClassification
 from app.services.context_engine.normalization import NormalizedContext
@@ -39,13 +40,15 @@ class ContextProfileAssembler:
             ai_exposure_risk=scores.ai_risk,
             database_sensitivity_confidence=scores.database_confidence,
             documentation_culture=classification.documentation,
-            operational_complexity="high"
-            if len(profile.services) >= 3 or bool(profile.infrastructure.kubernetes_files)
-            else "moderate"
-            if profile.services or profile.infrastructure.docker_files
-            else "low"
-            if context.features.evidence_count
-            else "unknown",
+            operational_complexity=(
+                "high"
+                if len(profile.services) >= 3 or bool(profile.infrastructure.kubernetes_files)
+                else (
+                    "moderate"
+                    if profile.services or profile.infrastructure.docker_files
+                    else "low" if context.features.evidence_count else "unknown"
+                )
+            ),
             security_posture_hints=tuple(item.category for item in profile.risk_areas),
             technologies=(*profile.languages, *profile.frameworks, *profile.technologies),
             naming_profile=profile.naming_profile,

@@ -1,0 +1,6 @@
+# Purpose: local-development-only overrides (auto-applied by `docker compose`).
+# Responsibilities: publish PostgreSQL to the host for local tooling. Never use in production.
+services:
+  postgres:
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'

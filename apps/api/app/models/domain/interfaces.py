@@ -1,4 +1,6 @@
-# Purpose: declare core engine and monitor interfaces. Responsibilities: define dependency boundaries without implementations, prompts, monitoring code, or routing. Future modules: implement these protocols in infrastructure adapters and application services.
+# Purpose: declare core engine and monitor interfaces. Responsibilities: define dependency
+# boundaries without implementations, prompts, monitoring code, or routing. Future modules:
+# implement these protocols in infrastructure adapters and application services.
 from __future__ import annotations
 
 from typing import Protocol

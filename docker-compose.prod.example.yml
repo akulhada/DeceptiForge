@@ -1,0 +1,34 @@
+# Purpose: production-shaped compose example. Responsibilities: show a private-network database,
+# no host port publishing, and migrations run as a separate release step (not the API container).
+# Copy and adapt; supply secrets via your orchestrator, not this file.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}   # inject from a secrets manager
+    # No host ports: reachable only on the internal network. Enable TLS and restricted DB roles.
+    networks: [internal]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  api:
+    build: { context: ./apps/api }
+    environment:
+      APP_ENV: production
+      AUTH_ENABLED: 'true'
+      DEMO_ENABLED: 'false'
+      RATE_LIMIT_MODE: gateway        # or set REDIS_URL for app-level limiting
+      CORS_ORIGINS: '["https://dashboard.example.com"]'
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    networks: [internal, edge]
+    depends_on: { postgres: { condition: service_healthy } }
+    # Run `alembic upgrade head` as a one-off release step BEFORE rolling out (not at startup).
+
+networks:
+  internal: { internal: true }
+  edge: {}
+
+volumes:
+  postgres-data:

@@ -17,6 +17,7 @@ from app.routes.router import build_api_router
 def create_app() -> FastAPI:
     """Create the API without binding it to a deployment environment."""
     settings = get_settings()
+    settings.validate_runtime()
     application = FastAPI(title=settings.app_name, debug=settings.is_development)
     configure_cors(
         application, settings.cors_origins, allow_credentials=settings.cors_allow_credentials

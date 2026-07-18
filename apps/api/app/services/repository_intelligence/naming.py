@@ -1,4 +1,5 @@
 """Bounded lexical naming-convention inference; no source content is persisted."""
+
 from __future__ import annotations
 
 import ast
@@ -194,9 +195,11 @@ class NamingPatternInferenceEngine:
                 ),
                 None,
             )
-            (match if match is not None else clusters.append([token])).append(
-                token
-            ) if match is not None else None
+            (
+                (match if match is not None else clusters.append([token])).append(token)
+                if match is not None
+                else None
+            )
         return tuple(
             VocabularyTerm(value=cluster[0], support=sum(counts[value] for value in cluster))
             for cluster in clusters

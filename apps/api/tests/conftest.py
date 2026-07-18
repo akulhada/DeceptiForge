@@ -41,6 +41,9 @@ def build_client(
         "API_KEY_BINDINGS": api_key_bindings,
         "CORS_ORIGINS": cors_origins if cors_origins is not None else "[]",
         "CORS_ALLOW_CREDENTIALS": "true" if cors_allow_credentials else "false",
+        # Tests exercise production settings; delegate rate limiting to the edge so create_app
+        # does not require REDIS_URL.
+        "RATE_LIMIT_MODE": "gateway",
     }
     previous = {key: os.environ.get(key) for key in overrides}
     os.environ.update(overrides)
@@ -72,6 +75,8 @@ def build_client(
     application.dependency_overrides[get_db] = override_get_db
     try:
         with TestClient(application) as test_client:
+            # Expose the test session factory so tests can seed rows (e.g. API keys).
+            test_client.app_session = testing_session  # type: ignore[attr-defined]
             yield test_client
     finally:
         application.dependency_overrides.clear()
