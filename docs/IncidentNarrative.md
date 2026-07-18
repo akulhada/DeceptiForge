@@ -24,7 +24,8 @@ sequence, evidence, next actions, caveats, confidence notes), optional `token_us
 
 ## What is sent to GPT
 
-Only the minimized `IncidentNarrativeContext`:
+Only the minimized `IncidentNarrativeContext`. Monitoring evidence is represented by a redacted
+trace-observed marker; raw observed excerpts are not sent to GPT or copied into fallback narratives:
 
 - incident id, type, severity, confidence, first/last seen
 - affected surfaces, involved decoy/placement **counts**, trace ids

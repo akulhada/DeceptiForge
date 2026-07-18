@@ -56,7 +56,7 @@ class IncidentNarrativeGenerator:
                 incident,
                 context,
                 digest,
-                fallback_body(incident),
+                fallback_body(context),
                 NarrativeSource.FALLBACK,
                 NarrativeStatus.FALLBACK_DISABLED,
             )
@@ -73,10 +73,10 @@ class IncidentNarrativeGenerator:
                 incident,
                 context,
                 digest,
-                fallback_body(incident),
+                fallback_body(context),
                 NarrativeSource.FALLBACK,
                 NarrativeStatus.FALLBACK_ERROR,
-                error=str(error)[:1000],
+                error=f"model request failed ({type(error).__name__})",
             )
 
         try:
@@ -86,7 +86,7 @@ class IncidentNarrativeGenerator:
                 incident,
                 context,
                 digest,
-                fallback_body(incident),
+                fallback_body(context),
                 NarrativeSource.FALLBACK,
                 NarrativeStatus.FALLBACK_INVALID,
                 error="model output failed schema validation",

@@ -110,7 +110,8 @@ def test_context_is_minimized_and_excludes_raw_payloads() -> None:
     serialized = context.model_dump_json()
 
     assert all(len(step.evidence_excerpt) <= 120 for step in context.timeline)
-    assert "S" * 121 not in serialized  # full 200-char excerpt never leaves the boundary
+    assert "S" not in serialized
+    assert "surrounding content redacted" in serialized
     assert "payload" not in serialized
 
 
@@ -128,6 +129,21 @@ def test_token_budget_truncates_low_priority_timeline() -> None:
     assert context.truncation_notes
     assert len(context.timeline) <= 2
     assert context.severity and context.recommended_actions  # preserved
+
+
+def test_default_token_budget_compacts_long_deterministic_text() -> None:
+    incident = _incident().model_copy(
+        update={
+            "root_cause_hypothesis": "R" * 10_000,
+            "recommended_actions": ("A" * 2_000,) * 10,
+            "correlation_reasons": ("C" * 2_000,) * 10,
+        }
+    )
+
+    context = NarrativeContextBuilder().build(incident)
+
+    assert len(context.model_dump_json()) // 4 <= 1_500
+    assert context.truncated is True
 
 
 def test_fallback_when_openai_not_configured() -> None:

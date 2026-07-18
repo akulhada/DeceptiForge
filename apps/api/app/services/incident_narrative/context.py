@@ -18,6 +18,7 @@ _TOKEN_BUDGET = 1500
 _STANDING_CAVEAT = (
     "Decoy interaction indicates possible unauthorized access, not confirmed data loss."
 )
+_REDACTED_EVIDENCE = "Decoy trace observed; surrounding content redacted."
 
 
 def _clip(text: str, limit: int) -> str:
@@ -45,7 +46,7 @@ class NarrativeContextBuilder:
                 timestamp=event.timestamp,
                 monitor_type=event.monitor_type.value,
                 summary=_clip(event.summary, _SUMMARY_LIMIT),
-                evidence_excerpt=_clip(event.evidence.excerpt, _EXCERPT_LIMIT),
+                evidence_excerpt=_REDACTED_EVIDENCE,
                 confidence=event.confidence,
             )
             for event in incident.timeline[: self._max_timeline]
@@ -63,7 +64,7 @@ class NarrativeContextBuilder:
             involved_placement_count=len(incident.involved_placement_ids),
             involved_trace_ids=incident.involved_trace_ids,
             timeline=timeline,
-            evidence_excerpts=tuple(_clip(item.excerpt, _EXCERPT_LIMIT) for item in evidence),
+            evidence_excerpts=tuple(_REDACTED_EVIDENCE for _ in evidence),
             evidence_digests=tuple(item.digest for item in evidence),
             root_cause_hypothesis=incident.root_cause_hypothesis,
             recommended_actions=incident.recommended_actions,
@@ -94,6 +95,26 @@ class NarrativeContextBuilder:
                 update={
                     "evidence_excerpts": context.evidence_excerpts[:1],
                     "evidence_digests": context.evidence_digests[:1],
+                    "truncated": True,
+                    "truncation_notes": tuple(notes),
+                }
+            )
+        if self._estimate_tokens(context) > self._budget:
+            notes.append("context text compacted to preserve the input budget")
+            context = context.model_copy(
+                update={
+                    "affected_surfaces": context.affected_surfaces[:5],
+                    "involved_trace_ids": context.involved_trace_ids[:3],
+                    "root_cause_hypothesis": _clip(context.root_cause_hypothesis, 400),
+                    "recommended_actions": tuple(
+                        _clip(action, 180) for action in context.recommended_actions[:5]
+                    ),
+                    "false_positive_notes": tuple(
+                        _clip(note, 180) for note in context.false_positive_notes[:3]
+                    ),
+                    "correlation_reasons": tuple(
+                        _clip(reason, 180) for reason in context.correlation_reasons[:3]
+                    ),
                     "truncated": True,
                     "truncation_notes": tuple(notes),
                 }
