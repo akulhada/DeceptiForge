@@ -3,7 +3,7 @@
 //   the dashboard, and report action errors. Dependencies: the API client.
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { api, ApiError } from '@/services/api';
 import type { DemoState } from '@/services/types';
@@ -20,9 +20,12 @@ export function useDemoFlow(onState: (next: DemoState) => void): DemoFlow {
   const [seeding, setSeeding] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const actionInFlight = useRef(false);
 
   const run = useCallback(
     async (action: () => Promise<DemoState>, setPending: (value: boolean) => void) => {
+      if (actionInFlight.current) return;
+      actionInFlight.current = true;
       setPending(true);
       setActionError(null);
       try {
@@ -31,6 +34,7 @@ export function useDemoFlow(onState: (next: DemoState) => void): DemoFlow {
         setActionError(caught instanceof ApiError ? caught.message : 'Demo action failed.');
       } finally {
         setPending(false);
+        actionInFlight.current = false;
       }
     },
     [onState],

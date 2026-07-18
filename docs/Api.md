@@ -82,10 +82,18 @@ python -m scripts.demo /path/to/repo
 Runs the full pipeline against an in-memory SQLite database and prints the scan summary, decoy
 counts, detection result, and the reconstructed incident.
 
+## Demo mode and safety gating
+
+- `DEMO_ENABLED` (default **false**) gates the `/demo/*` routes. They mount only when it is true —
+  never through `APP_ENV` naming alone.
+- `POST /repositories/scan` accepts a server-side path and is therefore restricted: it returns
+  **403** unless `APP_ENV=development`. `DEMO_ENABLED` only exposes fixed-fixture demo routes;
+  production must supply a repository id / integration handle instead of a raw path (future work).
+
 ## Notes and limits
 
-- `POST /repositories/scan` reads an arbitrary local path. This is acceptable for a local hackathon
-  demo only; a production deployment must constrain and authorize the scan root.
+- `POST /repositories/scan` reads a local path only in development (see gating above); a
+  production deployment must constrain and authorize the scan source.
 - Monitoring and alerting engines are stateful and are rebuilt per request from persisted artifacts;
   deduplication and tripwire state therefore live only within a single request.
 - No authentication or tenancy yet; alerts and incidents are global.

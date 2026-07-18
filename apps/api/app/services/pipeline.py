@@ -23,7 +23,7 @@ from app.repositories.artifacts import ArtifactRepository
 from app.services.alerting import AlertingPipeline
 from app.services.believability import BelievabilitySafetyEngine
 from app.services.context_engine import ContextEngine
-from app.services.decoy_generation import DecoyGenerationPlanner
+from app.services.decoy_generation import DecoyGenerationConfig, DecoyGenerationPlanner
 from app.services.incident_reconstruction import IncidentReconstructionEngine
 from app.services.monitoring import MonitoringInstrumentationEngine
 from app.services.placement_reasoning import PlacementReasoningEngine
@@ -72,13 +72,15 @@ class PipelineService:
         plan_id = self._repo.add_placement_plan(repository_id, plan)
         return plan_id, context_id, plan
 
-    def generate(self, repository_id: UUID) -> tuple[UUID, DecoyGenerationPlan]:
+    def generate(
+        self, repository_id: UUID, config: DecoyGenerationConfig | None = None
+    ) -> tuple[UUID, DecoyGenerationPlan]:
         profile = self._require_profile(repository_id)
         context = self._repo.latest_context(repository_id)
         plan = self._repo.latest_placement_plan(repository_id)
         if context is None or plan is None:
             raise PipelineError("placement plan must be created before generating decoys")
-        generated = self._decoys.generate(profile, context, plan)
+        generated = self._decoys.generate(profile, context, plan, config)
         decoy_plan_id = self._repo.add_decoy_plan(repository_id, generated)
         return decoy_plan_id, generated
 

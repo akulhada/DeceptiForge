@@ -17,7 +17,7 @@ interface DashboardData {
 }
 
 export function useDashboardData(): DashboardData {
-  const [state, setState] = useState<DemoState | null>(null);
+  const [state, setDashboardState] = useState<DemoState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +25,7 @@ export function useDashboardData(): DashboardData {
     setLoading(true);
     setError(null);
     try {
-      setState(await api.getState());
+      setDashboardState(await api.getState());
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Failed to load dashboard data.');
     } finally {
@@ -36,6 +36,11 @@ export function useDashboardData(): DashboardData {
   useEffect(() => {
     void refetch();
   }, [refetch]);
+
+  const setState = useCallback((next: DemoState) => {
+    setDashboardState(next);
+    setError(null);
+  }, []);
 
   return { state, loading, error, setState, refetch };
 }

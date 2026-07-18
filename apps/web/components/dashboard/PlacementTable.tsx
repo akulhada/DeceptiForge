@@ -9,7 +9,11 @@ function pct(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-export function PlacementTable({ recommendations }: { recommendations: PlacementRecommendation[] }) {
+export function PlacementTable({
+  recommendations,
+}: {
+  recommendations: readonly PlacementRecommendation[];
+}) {
   return (
     <Table>
       <THead>

@@ -4,7 +4,7 @@ import { SeverityBadge } from './SeverityBadge';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import type { Alert } from '@/services/types';
 
-export function AlertTable({ alerts }: { alerts: Alert[] }) {
+export function AlertTable({ alerts }: { alerts: readonly Alert[] }) {
   return (
     <Table>
       <THead>

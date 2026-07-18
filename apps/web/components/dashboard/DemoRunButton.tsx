@@ -19,13 +19,15 @@ export function DemoRunButton({
   simulating: boolean;
   canSimulate: boolean;
 }) {
+  const pending = seeding || simulating;
+
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="secondary" onClick={onSeed} disabled={seeding}>
+      <Button variant="secondary" onClick={onSeed} disabled={pending}>
         <Play className="h-4 w-4" />
         {seeding ? 'Seeding…' : 'Seed demo data'}
       </Button>
-      <Button onClick={onSimulate} disabled={simulating || !canSimulate}>
+      <Button onClick={onSimulate} disabled={pending || !canSimulate}>
         <ShieldAlert className="h-4 w-4" />
         {simulating ? 'Simulating…' : 'Simulate detection'}
       </Button>

@@ -20,13 +20,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       ...init,
+      cache: 'no-store',
       headers: { 'content-type': 'application/json', ...init?.headers },
     });
   } catch {
     throw new ApiError(`Cannot reach the API at ${BASE_URL}. Is it running?`, 0);
   }
   if (!response.ok) {
-    throw new ApiError(`Request to ${path} failed (${response.status}).`, response.status);
+    const body: unknown = await response.json().catch(() => null);
+    const detail =
+      typeof body === 'object' && body !== null && 'detail' in body && typeof body.detail === 'string'
+        ? body.detail
+        : `Request to ${path} failed (${response.status}).`;
+    throw new ApiError(detail, response.status);
   }
   return (await response.json()) as T;
 }

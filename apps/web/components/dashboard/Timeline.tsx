@@ -3,7 +3,7 @@
 import { EvidenceExcerpt } from './EvidenceExcerpt';
 import type { TimelineEntry } from '@/services/types';
 
-export function Timeline({ entries }: { entries: TimelineEntry[] }) {
+export function Timeline({ entries }: { entries: readonly TimelineEntry[] }) {
   return (
     <ol className="relative space-y-4 border-l border-slate-800 pl-5">
       {entries.map((entry) => (

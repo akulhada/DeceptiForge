@@ -1,10 +1,12 @@
-# Purpose: configure API tests with an isolated in-memory database.
-# Responsibilities: satisfy settings validation, bind SQLAlchemy to SQLite, and override the
-#   request-scoped session so tests never touch PostgreSQL. Dependencies: FastAPI test client.
+# Purpose: configure API tests with an isolated in-memory database and per-test settings.
+# Responsibilities: satisfy settings validation, bind SQLAlchemy to SQLite, override the
+#   request-scoped session, and build the app under a chosen DEMO_ENABLED/APP_ENV so gating and
+#   scan-hardening can be exercised. Dependencies: FastAPI test client.
 from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://unused:unused@localhost/deceptiforge")
 
@@ -14,14 +16,25 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config.settings import get_settings
 from app.database.base import Base
 from app.dependencies import get_db
-from app.main import app
 from app.models import records as _records  # noqa: F401  (register tables)
 
 
-@pytest.fixture
-def client() -> Iterator[TestClient]:
+@contextmanager
+def build_client(
+    *, demo_enabled: bool = True, app_env: str = "development"
+) -> Iterator[TestClient]:
+    previous_demo_enabled = os.environ.get("DEMO_ENABLED")
+    previous_app_env = os.environ.get("APP_ENV")
+    os.environ["DEMO_ENABLED"] = "true" if demo_enabled else "false"
+    os.environ["APP_ENV"] = app_env
+    get_settings.cache_clear()
+
+    from app.main import create_app
+
+    application = create_app()
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -39,7 +52,30 @@ def client() -> Iterator[TestClient]:
         finally:
             session.close()
 
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
+    application.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(application) as test_client:
+            yield test_client
+    finally:
+        application.dependency_overrides.clear()
+        if previous_demo_enabled is None:
+            os.environ.pop("DEMO_ENABLED", None)
+        else:
+            os.environ["DEMO_ENABLED"] = previous_demo_enabled
+        if previous_app_env is None:
+            os.environ.pop("APP_ENV", None)
+        else:
+            os.environ["APP_ENV"] = previous_app_env
+        get_settings.cache_clear()
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    with build_client(demo_enabled=True) as test_client:
         yield test_client
-    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def make_client():
+    """Factory for building a client under specific settings (as a context manager)."""
+    return build_client

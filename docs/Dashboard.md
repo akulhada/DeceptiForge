@@ -26,7 +26,7 @@ It reads one aggregate endpoint (`GET /demo/state`) and drives the story with tw
 Terminal 1 — API (Postgres):
 
 ```sh
-cp apps/api/.env.example apps/api/.env      # CORS_ORIGINS already allows http://localhost:3000
+cp apps/api/.env.example apps/api/.env      # sets DEMO_ENABLED=true and CORS for http://localhost:3000
 docker compose up -d postgres               # from the repo root
 cd apps/api
 pip install -e '.[dev]'
@@ -84,7 +84,10 @@ _Overview and incident screenshots go here for the submission._
 
 ## Notes
 
+- The `/demo/*` routes and the demo actions require `DEMO_ENABLED=true`; they never mount in a
+  default (production) configuration.
 - Demo endpoints scan a bundled fixture at `apps/api/app/demo/acme-payments`; the dataset is
-  deterministic, so the demo is repeatable.
+  deterministic, so the demo is repeatable. Dashboard state is scoped to the current fixture
+  generation, so a reseed starts a clean story even though prior artifacts remain in the database.
 - The demo intentionally generates a small decoy set for a clear, stable story; richer multi-surface
   decoys are a later enhancement.

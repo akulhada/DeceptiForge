@@ -1,20 +1,22 @@
 // Purpose: render severity and decision values with consistent security-console colors.
-// Responsibilities: map severity/decision vocabularies to badge tones. Dependencies: Badge.
+// Responsibilities: map the shared Severity/Decision enums to badge tones. Dependencies: Badge.
 import { Badge } from '@/components/ui/badge';
-import type { Decision, Severity } from '@/services/types';
+import { Decision, Severity } from '@/services/types';
 
-const SEVERITY_TONE: Record<Severity, 'neutral' | 'info' | 'warning' | 'danger'> = {
-  info: 'neutral',
-  low: 'info',
-  medium: 'warning',
-  high: 'danger',
-  critical: 'danger',
+type Tone = 'neutral' | 'info' | 'warning' | 'danger' | 'success';
+
+const SEVERITY_TONE: Record<Severity, Tone> = {
+  [Severity.Info]: 'neutral',
+  [Severity.Low]: 'info',
+  [Severity.Medium]: 'warning',
+  [Severity.High]: 'danger',
+  [Severity.Critical]: 'danger',
 };
 
-const DECISION_TONE: Record<Decision, 'success' | 'warning' | 'danger'> = {
-  accept: 'success',
-  warn: 'warning',
-  reject: 'danger',
+const DECISION_TONE: Record<Decision, Tone> = {
+  [Decision.Accept]: 'success',
+  [Decision.Warn]: 'warning',
+  [Decision.Reject]: 'danger',
 };
 
 export function SeverityBadge({ severity }: { severity: Severity }) {

@@ -47,7 +47,7 @@ export default function DashboardPage() {
             onSimulate={simulate}
             seeding={seeding}
             simulating={simulating}
-            canSimulate={Boolean(state?.decoy_plan_id)}
+            canSimulate={(state?.overview.accepted_decoys ?? 0) > 0}
           />
         </div>
         <nav className="mx-auto flex max-w-7xl gap-4 overflow-x-auto px-6 pb-2 text-xs text-slate-400">

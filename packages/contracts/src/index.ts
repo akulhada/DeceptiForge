@@ -714,3 +714,222 @@ export interface BrowserMonitor {
 export interface DatabaseMonitor {
   observe(payload: Uint8Array): Promise<TimelineEvent | null>;
 }
+
+// ---- Demo dashboard aggregate contract ----
+// Shape of the /demo/state payload. Fields mirror the demo API; enums are reused so the frontend
+// stops re-declaring weak string unions and cannot drift from the backend vocabulary.
+
+export interface DemoTechnologyEvidence {
+  readonly name: string;
+  readonly confidence: number;
+  readonly evidence: readonly string[];
+}
+
+export interface DemoNamingConvention {
+  readonly category: NamingCategory;
+  readonly style: NamingStyle;
+  readonly separator: string;
+  readonly confidence: number;
+  readonly samples: readonly string[];
+}
+
+export interface DemoNamingProfile {
+  readonly naming_style: readonly DemoNamingConvention[];
+  readonly common_prefixes: readonly string[];
+  readonly common_suffixes: readonly string[];
+  readonly confidence: number;
+}
+
+export interface DemoRiskArea {
+  readonly category: string;
+  readonly severity: Severity;
+  readonly description: string;
+  readonly paths: readonly string[];
+}
+
+export interface DemoRepositoryProfileSummary {
+  readonly repository_name: string;
+  readonly file_count: number;
+  readonly is_git_repository: boolean;
+  readonly languages: readonly DemoTechnologyEvidence[];
+  readonly frameworks: readonly DemoTechnologyEvidence[];
+  readonly services: readonly DemoTechnologyEvidence[];
+  readonly package_managers: readonly DemoTechnologyEvidence[];
+  readonly databases: readonly DemoTechnologyEvidence[];
+  readonly cloud_providers: readonly DemoTechnologyEvidence[];
+  readonly cicd: readonly DemoTechnologyEvidence[];
+  readonly documentation: readonly DemoTechnologyEvidence[];
+  readonly mcp_configurations: readonly DemoTechnologyEvidence[];
+  readonly infrastructure: {
+    readonly docker_files: readonly string[];
+    readonly kubernetes_files: readonly string[];
+    readonly terraform_files: readonly string[];
+  };
+  readonly naming_profile: DemoNamingProfile | null;
+  readonly secret_locations: readonly { readonly path: string; readonly patterns: readonly string[] }[];
+  readonly risk_areas: readonly DemoRiskArea[];
+  readonly truncated: boolean;
+}
+
+export interface DemoContextSummary {
+  readonly organization_archetype: string;
+  readonly stack_maturity: string;
+  readonly documentation_culture: string;
+  readonly operational_complexity: string;
+  readonly ai_exposure_risk: number;
+  readonly database_sensitivity_confidence: number;
+  readonly environment_naming_conventions: readonly string[];
+  readonly likely_sensitive_asset_types: readonly string[];
+  readonly confidence: number;
+}
+
+export interface DemoPlacementSummary {
+  readonly target_type: PlacementTargetType;
+  readonly target_location: string;
+  readonly placement_priority: number;
+  readonly confidence: number;
+  readonly risk_score: number;
+  readonly expected_detection_quality: number;
+  readonly expected_attacker_agent_visibility: number;
+  readonly expected_false_positive_risk: number;
+  readonly future_asset_type_recommendation: DecoyKind;
+  readonly reasoning: readonly string[];
+}
+
+export interface DemoPlacementPlanSummary {
+  readonly recommendations: readonly DemoPlacementSummary[];
+  readonly rejected_candidates: readonly {
+    readonly target_type: string;
+    readonly target_location: string;
+    readonly rejection_reasons: readonly string[];
+  }[];
+}
+
+export interface DemoDecoySummary {
+  readonly decoy_id: string;
+  readonly decoy_type: DecoyKind;
+  readonly target_location: string;
+  readonly target_placement_id: string;
+  readonly template_id: DecoyTemplateId;
+  readonly payload: Record<string, unknown>;
+  readonly safety_metadata: {
+    readonly contains_real_credentials: boolean;
+    readonly contains_real_customer_data: boolean;
+    readonly safe_for_demo: boolean;
+    readonly authentication_capability: string;
+  };
+  readonly trigger_metadata: { readonly trace_identifier: string; readonly monitoring_status: string };
+  readonly validation: {
+    readonly valid: boolean;
+    readonly checks: readonly string[];
+    readonly reasons: readonly string[];
+  };
+  readonly explanation: readonly string[];
+}
+
+export interface DemoDecoyPlanSummary {
+  readonly repository_name: string;
+  readonly assets: readonly DemoDecoySummary[];
+  readonly rejected_candidates: readonly {
+    readonly target_location: string;
+    readonly reasons: readonly string[];
+  }[];
+}
+
+export interface DemoValidationSummary {
+  readonly decoy_id: string;
+  readonly overall_believability_score: number;
+  readonly overall_safety_score: number;
+  readonly decision: BelievabilityDecision;
+  readonly breakdown: Record<string, number>;
+  readonly explainability_notes: readonly string[];
+  readonly failed_checks: readonly string[];
+  readonly warnings: readonly string[];
+  readonly recommended_fixes: readonly string[];
+}
+
+export interface DemoMonitoringEventSummary {
+  readonly event_id: string;
+  readonly trace_identifier: string;
+  readonly decoy_id: string;
+  readonly monitor_type: MonitorType;
+  readonly observed_location: string;
+  readonly observed_value_excerpt: string;
+  readonly timestamp: string;
+  readonly confidence: number;
+  readonly severity_suggestion: Severity;
+  readonly detection_method: DetectionMethod;
+}
+
+export interface DemoAlertSummary {
+  readonly alert_id: string;
+  readonly trace_identifier: string;
+  readonly decoy_id: string;
+  readonly severity: Severity;
+  readonly title: string;
+  readonly summary: string;
+  readonly source_monitor: MonitorType;
+  readonly confidence: number;
+  readonly event_count: number;
+  readonly first_seen: string;
+  readonly last_seen: string;
+  readonly recommended_actions: readonly string[];
+}
+
+export interface DemoTimelineEntry {
+  readonly sequence: number;
+  readonly timestamp: string;
+  readonly source: string;
+  readonly monitor_type: MonitorType;
+  readonly summary: string;
+  readonly confidence: number;
+  readonly evidence: { readonly excerpt: string; readonly digest: string; readonly location: string };
+}
+
+export interface DemoIncidentSummary {
+  readonly incident_id: string;
+  readonly title: string;
+  readonly severity: Severity;
+  readonly incident_type: string;
+  readonly confidence: number;
+  readonly first_seen: string;
+  readonly last_seen: string;
+  readonly involved_decoy_ids: readonly string[];
+  readonly involved_trace_ids: readonly string[];
+  readonly affected_surfaces: readonly string[];
+  readonly timeline: readonly DemoTimelineEntry[];
+  readonly root_cause_hypothesis: string;
+  readonly recommended_actions: readonly string[];
+}
+
+export interface DemoCoverageSummary {
+  readonly repository: number;
+  readonly database: number;
+  readonly document: number;
+  readonly ai: number;
+  readonly overall: number;
+}
+
+export interface DemoOverviewSummary {
+  readonly total_decoys: number;
+  readonly accepted_decoys: number;
+  readonly active_tripwires: number;
+  readonly monitor_events: number;
+  readonly alerts: number;
+  readonly incidents: number;
+  readonly coverage: DemoCoverageSummary;
+}
+
+export interface DemoState {
+  readonly repository_id: string | null;
+  readonly decoy_plan_id: string | null;
+  readonly profile: DemoRepositoryProfileSummary | null;
+  readonly context: DemoContextSummary | null;
+  readonly placement_plan: DemoPlacementPlanSummary | null;
+  readonly decoy_plan: DemoDecoyPlanSummary | null;
+  readonly reports: readonly DemoValidationSummary[];
+  readonly events: readonly DemoMonitoringEventSummary[];
+  readonly alerts: readonly DemoAlertSummary[];
+  readonly incidents: readonly DemoIncidentSummary[];
+  readonly overview: DemoOverviewSummary;
+}

@@ -27,7 +27,7 @@ import type {
   ValidationReport,
 } from '@/services/types';
 
-const names = (items: TechnologyEvidence[]): string[] => items.map((item) => item.name);
+const names = (items: readonly TechnologyEvidence[]): string[] => items.map((item) => item.name);
 const pct = (value: number): string => `${Math.round(value * 100)}%`;
 
 function CoverageBar({ label, value }: { label: string; value: number }) {
@@ -196,7 +196,7 @@ export function DecoySection({ plan }: { plan: DecoyPlan | null }) {
   );
 }
 
-export function ValidationSection({ reports }: { reports: ValidationReport[] }) {
+export function ValidationSection({ reports }: { reports: readonly ValidationReport[] }) {
   return (
     <Section
       id="validation"
@@ -245,7 +245,7 @@ export function ValidationSection({ reports }: { reports: ValidationReport[] }) 
   );
 }
 
-export function MonitoringSection({ events }: { events: DetectionEvent[] }) {
+export function MonitoringSection({ events }: { events: readonly DetectionEvent[] }) {
   return (
     <Section
       id="monitoring"
@@ -299,7 +299,7 @@ export function MonitoringSection({ events }: { events: DetectionEvent[] }) {
   );
 }
 
-export function AlertsSection({ alerts }: { alerts: Alert[] }) {
+export function AlertsSection({ alerts }: { alerts: readonly Alert[] }) {
   return (
     <Section
       id="alerts"
@@ -320,7 +320,7 @@ export function AlertsSection({ alerts }: { alerts: Alert[] }) {
   );
 }
 
-export function IncidentsSection({ incidents }: { incidents: Incident[] }) {
+export function IncidentsSection({ incidents }: { incidents: readonly Incident[] }) {
   return (
     <Section
       id="incidents"

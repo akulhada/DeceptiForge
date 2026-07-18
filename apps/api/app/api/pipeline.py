@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.models.domain.intelligence import RepositoryIntelligenceProfile
 from app.repositories.artifacts import ArtifactRepository
@@ -36,6 +37,14 @@ def _service(session: Session) -> PipelineService:
 
 @router.post("/repositories/scan", response_model=ScanResponse, tags=["repositories"])
 def scan_repository(body: ScanRequest, session: Session = Depends(get_db)) -> ScanResponse:
+    # Scanning a caller-supplied server path is only acceptable in local development. Demo routes
+    # use a fixed bundled fixture internally; DEMO_ENABLED must not reopen this arbitrary-read
+    # surface. Production requires repository-id or integration-handle sources.
+    if not get_settings().allows_local_path_scan:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "local filesystem scanning is disabled; provide a repository integration instead",
+        )
     repository_id, profile = _service(session).scan(body.path, body.name)
     return ScanResponse(repository_id=repository_id, profile=profile)
 

@@ -97,6 +97,18 @@ class ArtifactRepository:
             return None
         return record.id, RepositoryIntelligenceProfile.model_validate_json(record.profile)
 
+    def latest_repository_at_path(
+        self, root_path: str
+    ) -> tuple[UUID, RepositoryIntelligenceProfile] | None:
+        record = self._session.scalars(
+            select(RepositoryRecord)
+            .where(RepositoryRecord.root_path == root_path)
+            .order_by(RepositoryRecord.created_at.desc())
+        ).first()
+        if record is None:
+            return None
+        return record.id, RepositoryIntelligenceProfile.model_validate_json(record.profile)
+
     def latest_decoy_plan(self, repository_id: UUID) -> tuple[UUID, DecoyGenerationPlan] | None:
         record = self._latest(DecoyPlanRecord, repository_id)
         if record is None:
@@ -106,6 +118,16 @@ class ArtifactRepository:
     def all_detection_events(self) -> tuple[RawDetectionEvent, ...]:
         rows = self._session.scalars(
             select(DetectionEventRecord).order_by(DetectionEventRecord.created_at)
+        ).all()
+        return tuple(RawDetectionEvent.model_validate_json(row.data) for row in rows)
+
+    def detection_events_for_decoys(self, decoy_ids: set[UUID]) -> tuple[RawDetectionEvent, ...]:
+        if not decoy_ids:
+            return ()
+        rows = self._session.scalars(
+            select(DetectionEventRecord)
+            .where(DetectionEventRecord.decoy_id.in_(decoy_ids))
+            .order_by(DetectionEventRecord.created_at)
         ).all()
         return tuple(RawDetectionEvent.model_validate_json(row.data) for row in rows)
 
@@ -151,6 +173,16 @@ class ArtifactRepository:
 
     def all_alerts(self) -> tuple[NormalizedAlert, ...]:
         rows = self._session.scalars(select(AlertRecord).order_by(AlertRecord.created_at)).all()
+        return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
+
+    def alerts_for_decoys(self, decoy_ids: set[UUID]) -> tuple[NormalizedAlert, ...]:
+        if not decoy_ids:
+            return ()
+        rows = self._session.scalars(
+            select(AlertRecord)
+            .where(AlertRecord.decoy_id.in_(decoy_ids))
+            .order_by(AlertRecord.created_at)
+        ).all()
         return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
 
     def replace_incidents(self, incidents: tuple[ReconstructedIncident, ...]) -> None:

@@ -29,7 +29,7 @@ export function Section({
   );
 }
 
-export function TagList({ items, empty = '—' }: { items: string[]; empty?: string }) {
+export function TagList({ items, empty = '—' }: { items: readonly string[]; empty?: string }) {
   if (items.length === 0) return <span className="text-xs text-slate-600">{empty}</span>;
   return (
     <div className="flex flex-wrap gap-1.5">
