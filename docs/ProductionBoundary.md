@@ -77,6 +77,7 @@ curl -sX POST localhost:8000/incidents/<id>/narrative \
 ## Remaining work (production hardening)
 
 - Real identity/tenant provisioning; replace the demo-org default and API-key stub.
-- Organization-scope the remaining pipeline artifacts and the `/alerts` `/incidents` list routes.
+- Organization-scope the remaining pipeline artifacts (decoy plans, validation reports, monitor
+  events, context, and placement) before exposing them to multiple tenants.
 - Rate limiting beyond the per-incident reuse/cooldown.
 - Tokenizer-accurate budgeting if prompts grow.

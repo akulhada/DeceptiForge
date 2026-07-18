@@ -125,11 +125,19 @@ class PipelineService:
             self._repo.replace_incidents(self._incidents.reconstruct(self._repo.all_alerts()))
         return event, alert
 
-    def alerts(self) -> tuple[NormalizedAlert, ...]:
-        return self._repo.all_alerts()
+    def alerts(self, organization_id: UUID | None = None) -> tuple[NormalizedAlert, ...]:
+        return (
+            self._repo.all_alerts()
+            if organization_id is None
+            else self._repo.alerts_for_organization(organization_id)
+        )
 
-    def incidents(self) -> tuple[ReconstructedIncident, ...]:
-        return self._repo.all_incidents()
+    def incidents(self, organization_id: UUID | None = None) -> tuple[ReconstructedIncident, ...]:
+        return (
+            self._repo.all_incidents()
+            if organization_id is None
+            else self._repo.incidents_for_organization(organization_id)
+        )
 
     def _require_profile(self, repository_id: UUID) -> RepositoryIntelligenceProfile:
         profile = self._repo.get_profile(repository_id)

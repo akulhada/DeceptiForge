@@ -3,6 +3,8 @@
 #   the dashboard renders from a single fetch. Dependencies: domain models for embedded results.
 from __future__ import annotations
 
+from datetime import datetime
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -13,6 +15,7 @@ from app.models.domain.intelligence import (
     PlacementPlan,
     RepositoryIntelligenceProfile,
 )
+from app.models.domain.narrative import IncidentNarrative
 from app.models.domain.operations import (
     NormalizedAlert,
     RawDetectionEvent,
@@ -54,3 +57,51 @@ class DemoState(BaseModel):
     alerts: tuple[NormalizedAlert, ...]
     incidents: tuple[ReconstructedIncident, ...]
     overview: DemoOverview
+
+
+class CoverageSummary(BaseModel):
+    """Lightweight, weighted deception-coverage estimate for the demo dashboard.
+
+    Not enterprise coverage analytics; each dimension is a 0..1 signal and overall is their
+    weighted average.
+    """
+
+    repository: float
+    placement: float
+    decoy_activation: float
+    monitoring: float
+    alerting: float
+    incident: float
+    ai_narrative: float
+    overall: float
+
+
+class DemoRunStepStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
+class DemoRunStep(BaseModel):
+    key: str
+    label: str
+    status: DemoRunStepStatus
+    note: str | None = None
+
+
+class DemoRunStatus(StrEnum):
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
+class DemoRun(BaseModel):
+    """One end-to-end demo execution: ordered step statuses plus the resulting artifacts."""
+
+    run_id: UUID
+    created_at: datetime
+    status: DemoRunStatus
+    steps: tuple[DemoRunStep, ...]
+    coverage: CoverageSummary
+    narrative: IncidentNarrative | None
+    state: DemoState

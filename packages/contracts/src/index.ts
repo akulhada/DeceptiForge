@@ -934,6 +934,48 @@ export interface DemoState {
   readonly overview: DemoOverviewSummary;
 }
 
+// ---- Demo orchestration (one-click run) ----
+
+export interface CoverageSummary {
+  readonly repository: number;
+  readonly placement: number;
+  readonly decoy_activation: number;
+  readonly monitoring: number;
+  readonly alerting: number;
+  readonly incident: number;
+  readonly ai_narrative: number;
+  readonly overall: number;
+}
+
+export enum DemoRunStepStatus {
+  Pending = 'pending',
+  Running = 'running',
+  Complete = 'complete',
+  Failed = 'failed',
+}
+
+export interface DemoRunStep {
+  readonly key: string;
+  readonly label: string;
+  readonly status: DemoRunStepStatus;
+  readonly note: string | null;
+}
+
+export enum DemoRunStatus {
+  Complete = 'complete',
+  Failed = 'failed',
+}
+
+export interface DemoRun {
+  readonly run_id: string;
+  readonly created_at: string;
+  readonly status: DemoRunStatus;
+  readonly steps: readonly DemoRunStep[];
+  readonly coverage: CoverageSummary;
+  readonly narrative: IncidentNarrative | null;
+  readonly state: DemoState;
+}
+
 // ---- GPT incident narrative (optional, never overrides deterministic incident data) ----
 
 export enum NarrativeSource {

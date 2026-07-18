@@ -13,6 +13,7 @@ from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.models.domain.intelligence import RepositoryIntelligenceProfile
 from app.repositories.artifacts import ArtifactRepository
+from app.security import OrgContext, require_org
 from app.schemas.api import (
     AlertListResponse,
     DecoyPlanRef,
@@ -98,13 +99,17 @@ def ingest_monitoring_event(
 
 
 @router.get("/alerts", response_model=AlertListResponse, tags=["alerts"])
-def list_alerts(session: Session = Depends(get_db)) -> AlertListResponse:
-    return AlertListResponse(alerts=_service(session).alerts())
+def list_alerts(
+    org: OrgContext = Depends(require_org), session: Session = Depends(get_db)
+) -> AlertListResponse:
+    return AlertListResponse(alerts=_service(session).alerts(org.organization_id))
 
 
 @router.get("/incidents", response_model=IncidentListResponse, tags=["incidents"])
-def list_incidents(session: Session = Depends(get_db)) -> IncidentListResponse:
-    return IncidentListResponse(incidents=_service(session).incidents())
+def list_incidents(
+    org: OrgContext = Depends(require_org), session: Session = Depends(get_db)
+) -> IncidentListResponse:
+    return IncidentListResponse(incidents=_service(session).incidents(org.organization_id))
 
 
 def _guard[Result](action: Callable[[], Result]) -> Result:

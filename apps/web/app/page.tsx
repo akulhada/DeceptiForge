@@ -3,10 +3,14 @@
 //   sections as one scrollable security-console story. Dependencies: dashboard hooks and sections.
 'use client';
 
+import { Play } from 'lucide-react';
+
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useDemoFlow } from '@/hooks/useDemoFlow';
+import { useDemoRun } from '@/hooks/useDemoRun';
 import { Button } from '@/components/ui/button';
 import { DemoRunButton } from '@/components/dashboard/DemoRunButton';
+import { RunProgress } from '@/components/dashboard/RunProgress';
 import { ErrorState, LoadingState } from '@/components/dashboard/states';
 import {
   AlertsSection,
@@ -33,6 +37,7 @@ const NAV = [
 export default function DashboardPage() {
   const { state, loading, error, setState, refetch } = useDashboardData();
   const { seed, simulate, seeding, simulating, actionError } = useDemoFlow(setState);
+  const { run, running, error: runError, runDemo } = useDemoRun(setState);
 
   return (
     <div className="min-h-screen">
@@ -42,13 +47,19 @@ export default function DashboardPage() {
             <h1 className="text-lg font-semibold text-slate-100">DeceptiForge</h1>
             <p className="text-xs text-slate-500">Context-aware deception platform · demo console</p>
           </div>
-          <DemoRunButton
-            onSeed={seed}
-            onSimulate={simulate}
-            seeding={seeding}
-            simulating={simulating}
-            canSimulate={(state?.overview.accepted_decoys ?? 0) > 0}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => void runDemo()} disabled={running}>
+              <Play className="h-4 w-4" />
+              {running ? 'Running demo…' : 'Run DeceptiForge Demo'}
+            </Button>
+            <DemoRunButton
+              onSeed={seed}
+              onSimulate={simulate}
+              seeding={seeding}
+              simulating={simulating}
+              canSimulate={(state?.overview.accepted_decoys ?? 0) > 0}
+            />
+          </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-4 overflow-x-auto px-6 pb-2 text-xs text-slate-400">
           {NAV.map(([id, label]) => (
@@ -60,11 +71,13 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-10 px-6 py-8">
-        {actionError ? (
+        {actionError || runError ? (
           <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-4 py-2 text-sm text-red-300">
-            {actionError}
+            {actionError ?? runError}
           </div>
         ) : null}
+
+        {run ? <RunProgress run={run} /> : null}
 
         {loading && state === null ? (
           <LoadingState />

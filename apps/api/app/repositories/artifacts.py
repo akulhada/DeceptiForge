@@ -177,6 +177,14 @@ class ArtifactRepository:
         rows = self._session.scalars(select(AlertRecord).order_by(AlertRecord.created_at)).all()
         return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
 
+    def alerts_for_organization(self, organization_id: UUID) -> tuple[NormalizedAlert, ...]:
+        rows = self._session.scalars(
+            select(AlertRecord)
+            .where(AlertRecord.organization_id == organization_id)
+            .order_by(AlertRecord.created_at)
+        ).all()
+        return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
+
     def alerts_for_decoys(self, decoy_ids: set[UUID]) -> tuple[NormalizedAlert, ...]:
         if not decoy_ids:
             return ()
@@ -195,9 +203,35 @@ class ArtifactRepository:
             )
         self._session.flush()
 
+    def reset_all(self) -> None:
+        """Delete every stored artifact. Demo-only; used by the demo reset endpoint."""
+        for record in (
+            NarrativeRevisionRecord,
+            IncidentRecord,
+            AlertRecord,
+            DetectionEventRecord,
+            ValidationReportRecord,
+            DecoyPlanRecord,
+            PlacementPlanRecord,
+            ContextProfileRecord,
+            RepositoryRecord,
+        ):
+            self._session.execute(delete(record))
+        self._session.flush()
+
     def all_incidents(self) -> tuple[ReconstructedIncident, ...]:
         rows = self._session.scalars(
             select(IncidentRecord).order_by(IncidentRecord.created_at)
+        ).all()
+        return tuple(ReconstructedIncident.model_validate_json(row.data) for row in rows)
+
+    def incidents_for_organization(
+        self, organization_id: UUID
+    ) -> tuple[ReconstructedIncident, ...]:
+        rows = self._session.scalars(
+            select(IncidentRecord)
+            .where(IncidentRecord.organization_id == organization_id)
+            .order_by(IncidentRecord.created_at)
         ).all()
         return tuple(ReconstructedIncident.model_validate_json(row.data) for row in rows)
 

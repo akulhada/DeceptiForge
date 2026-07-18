@@ -30,9 +30,38 @@ pnpm test
 pnpm format:check
 ```
 
+## Demo
+
+With `DEMO_ENABLED=true` (development/demo only), open the dashboard and click **Run DeceptiForge
+Demo**. It runs the full pipeline — repository analysis → context → placements → decoys →
+validation → tripwires → detection → alert → incident → optional AI summary → coverage — with
+per-step status, then shows a weighted coverage estimate. A run is exportable as Markdown/JSON. See
+[Dashboard](docs/Dashboard.md) and [Pipeline API](docs/Api.md).
+
 ## Documentation
 
 - [Architecture](docs/Architecture.md)
 - [Development](docs/Development.md)
 - [Contributing](docs/Contributing.md)
 - [Folder structure](docs/FolderStructure.md)
+- [Dashboard](docs/Dashboard.md) · [Pipeline API](docs/Api.md) · [Incident narrative](docs/IncidentNarrative.md) · [Production boundary](docs/ProductionBoundary.md)
+
+## Production Hardening Roadmap
+
+The current build is a hackathon MVP. **Local-path repository scanning and all `/demo/*` routes are
+development/demo-only** (gated by `DEMO_ENABLED`/`AUTH_ENABLED`, off by default). The following are
+explicitly future work, not solved here:
+
+- **Auth & authorization** — the API-key/org-id boundary is a stub, not user management/OAuth/RBAC.
+- **Real tenant isolation** — only repositories, alerts, incidents, and narratives are org-scoped;
+  remaining artifacts and list routes need scoping.
+- **Repository integrations** — replace local filesystem paths with GitHub/GitLab app installs and
+  repository ids; never accept arbitrary server paths in production.
+- **Durable monitor ingestion & dedup** — current monitoring/alerting rebuild per request; needs a
+  durable queue and persistent deduplication.
+- **Repository-scoped incident persistence** — incidents currently filter by involved decoys as a
+  fallback; add an incident scoping column.
+- **GPT rate limiting & audit history** — beyond the per-incident reuse/cooldown and revisions.
+- **Full Coverage Engine** — the current coverage is a lightweight demo estimate, not a measured
+  protected-vs-attack-surface metric.
+- **CI/CD & deployment hardening** — pipelines, secrets management, migrations, and observability.

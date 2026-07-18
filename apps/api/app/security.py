@@ -30,8 +30,14 @@ def require_org(
     When AUTH_ENABLED is false (development/demo only) the demo organization is returned so the
     local demo works without headers. Otherwise a valid API key and organization id are required.
     """
-    if not settings.auth_enabled:
+    if not settings.auth_enabled and settings.is_development:
         return OrgContext(DEMO_ORGANIZATION_ID)
+
+    if not settings.auth_enabled:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "authentication bypass is restricted to development",
+        )
 
     if settings.demo_api_key is None or x_deceptiforge_api_key != settings.demo_api_key:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or missing API key")

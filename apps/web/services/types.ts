@@ -4,6 +4,8 @@
 // Dependencies: the workspace contracts package.
 export {
   BelievabilityDecision as Decision,
+  DemoRunStatus,
+  DemoRunStepStatus,
   NarrativeSource,
   NarrativeStatus,
   Severity,
@@ -29,4 +31,7 @@ export type {
   DemoOverviewSummary as Overview,
   IncidentNarrative,
   IncidentNarrativeBody,
+  CoverageSummary,
+  DemoRun,
+  DemoRunStep,
 } from '@deceptiforge/contracts';
