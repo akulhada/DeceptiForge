@@ -34,7 +34,15 @@ def ready(
     ok = database["status"] == "ok" and redis["status"] in {"ok", "not_required"}
     if not ok:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return {"status": "ok" if ok else "degraded", "database": database, "redis": redis}
+    return {
+        "status": "ok" if ok else "degraded",
+        "database": database,
+        "redis": redis,
+        # Safe enforcement flags only — never secrets, signatures, or signing material.
+        "monitor_signatures_enforced": settings.monitor_signature_required,
+        "replay_backend": settings.replay_backend,
+        "rate_limit_backend": settings.rate_limit_backend,
+    }
 
 
 def _database_health(session: Session) -> dict[str, str]:

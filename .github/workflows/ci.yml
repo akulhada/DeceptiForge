@@ -1,7 +1,9 @@
 # Purpose: continuous integration for the DeceptiForge monorepo.
-# Responsibilities: run backend quality gates (ruff, mypy, pytest) with a Redis service for
-#   integration tests, validate migrations, run frontend lint/typecheck/tests, build the API image
-#   and assert it runs as non-root, and scan for secrets. Versions are pinned for reproducibility.
+# Responsibilities: run backend quality gates (ruff, mypy, pytest) with live PostgreSQL and Redis
+#   services, validate migrations up/down against real PostgreSQL, run Redis-backed distributed
+#   control integration tests, run frontend lint/typecheck/tests/build, build the API image and
+#   assert it runs as UID 10001 and does not auto-run migrations, and scan for secrets. Action
+#   versions run on the current (Node 24) runtime; project runtimes are pinned.
 name: CI
 
 on:
@@ -14,13 +16,25 @@ permissions:
 
 env:
   PYTHON_VERSION: '3.12'
-  NODE_VERSION: '22.13.0'
-  PNPM_VERSION: '9.15.4'
+  NODE_VERSION: '24'
+  # pnpm version is the single source of truth in package.json (packageManager); do not duplicate.
+  POSTGRES_VERSION: '16'
+  GITLEAKS_VERSION: '8.21.2'
 
 jobs:
   backend:
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: deceptiforge_ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d deceptiforge_ci" --health-interval 5s
+          --health-timeout 3s --health-retries 15
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
@@ -30,67 +44,116 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+    env:
+      DATABASE_URL: postgresql+psycopg://ci:ci-test-only@localhost:5432/deceptiforge_ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
         run: pip install -e '.[dev]'
+      - name: Diagnostics (safe)
+        run: |
+          echo "python: $(python --version)"
+          echo "pip: $(pip --version)"
+          echo "alembic: $(alembic --version)"
+          echo "database_url set: ${DATABASE_URL:+yes}"
+          echo "redis reachable: $(redis-cli -h localhost ping 2>/dev/null || echo no)"
+          echo "postgres reachable: $(pg_isready -h localhost -p 5432 >/dev/null 2>&1 && echo yes || echo no)"
       - name: Ruff
         run: ruff check app tests
       - name: MyPy
         run: mypy app
       - name: Pytest (unit + fakeredis integration)
-        run: pytest
+        run: pytest -vv --maxfail=1
       - name: Pytest (real Redis integration)
         env:
           REDIS_TEST_URL: redis://localhost:6379/0
-        run: pytest -k redis_integration
-      - name: Validate migrations
-        env:
-          DATABASE_URL: postgresql+psycopg://unused:unused@localhost/unused
+        run: pytest -vv -k redis_integration
+      - name: Migrations — offline SQL render (dialect check)
         run: alembic upgrade head --sql > /dev/null
+      - name: Migrations — apply to live PostgreSQL
+        run: alembic upgrade head
+      - name: Migrations — current revision
+        run: alembic current
+      - name: Migrations — downgrade one and re-apply (rollback check)
+        run: |
+          alembic downgrade -1
+          alembic upgrade head
+      - name: Migrations — assert key tables exist
+        env:
+          PGPASSWORD: ci-test-only
+        run: |
+          for t in api_keys monitor_credentials security_audit reconstruction_jobs incidents alerts; do
+            psql -h localhost -U ci -d deceptiforge_ci -tAc \
+              "SELECT to_regclass('public.$t')" | grep -qx "$t" || { echo "missing table: $t"; exit 1; }
+          done
 
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
+      - name: Enable Corepack (pnpm from packageManager — single source of truth)
+        run: corepack enable
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
       - name: Test
         run: pnpm test
+      - name: Build (web dashboard — the deployable production artifact)
+        run: pnpm --filter @deceptiforge/web build
 
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build API image
         run: docker build -t deceptiforge-api ./apps/api
-      - name: Assert container runs as non-root
+      - name: Assert container runs as UID 10001 (non-root)
         run: |
           uid="$(docker run --rm deceptiforge-api id -u)"
           echo "container uid=$uid"
-          test "$uid" != "0"
+          test "$uid" = "10001"
+      - name: Assert default command does not run migrations
+        run: |
+          cmd="$(docker inspect --format '{{json .Config.Cmd}}' deceptiforge-api)"
+          echo "cmd=$cmd"
+          echo "$cmd" | grep -q uvicorn
+          echo "$cmd" | grep -qiv alembic
+      - name: Health check (container liveness)
+        run: |
+          docker run -d --name df-api \
+            -e APP_ENV=development \
+            -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
+            -p 8000:8000 deceptiforge-api
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then echo "healthy"; break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8000/health
+          docker rm -f df-api
 
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Gitleaks (pinned CLI, redacted)
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1

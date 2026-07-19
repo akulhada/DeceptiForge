@@ -81,6 +81,49 @@ when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled
 Keep PostgreSQL and Redis on a private, non-published network. Do not publish their host ports in
 production. Only the API (behind the edge/ingress) is reachable externally.
 
+## Supported runtimes (pinned in CI)
+
+| Runtime | Version |
+| --- | --- |
+| Python | 3.12 |
+| Node | 24 (repo supports ≥ 22.13) |
+| pnpm | from `packageManager` in `package.json` (single source of truth) |
+| PostgreSQL | 16 |
+| Redis | 7 |
+
+## CI validation and local limitations
+
+Some checks require services that were not available locally; they are delegated to CI and must not
+be reported as locally passed.
+
+**Verified locally**: ruff, mypy (on Python 3.13/3.14), the full pytest suite (SQLite +
+fakeredis, plus real-Redis integration against a local Redis), Alembic **offline SQL generation**
+of both upgrade and downgrade chains (PostgreSQL dialect), and `docker compose config` validation.
+
+Offline SQL generation proves the migration operations render for the PostgreSQL dialect and the
+revision chain is linear; it does **not** prove they apply against a real database, that UUID
+defaults execute, or that unique constraints/indexes behave at runtime.
+
+**Delegated to CI** (`.github/workflows/ci.yml`):
+
+- **Live PostgreSQL migrations** — CI runs an ephemeral PostgreSQL 16 service and executes
+  `alembic upgrade head` → `alembic current` → `alembic downgrade -1` → `alembic upgrade head`, then
+  asserts the key tables exist. Local validation used offline SQL generation only because no local
+  PostgreSQL server was available.
+- **Docker runtime** — CI builds the API image, asserts the container runs as **UID 10001**
+  (non-root), asserts the default command is `uvicorn` (migrations are **not** auto-run), and probes
+  `/health`. Docker was not run locally because the Docker daemon was unavailable.
+- **Redis distributed controls** — CI runs a Redis 7 service; the `redis_integration` tests prove
+  cross-instance rate-limit sharing and cross-instance nonce rejection.
+- **Secret scanning** — gitleaks (pinned CLI) scans tracked files and history with a documented
+  allowlist for test fixtures (`.gitleaks.toml`).
+
+## Inspecting CI failures
+
+Backend gates are split into named steps (Ruff, MyPy, Pytest, each migration step) so the failing
+gate is obvious in the Actions log. A safe diagnostics step prints tool versions and PostgreSQL /
+Redis reachability — never secrets, passwords, keys, signatures, or raw environment contents.
+
 ## Errors and correlation
 
 Every response carries `x-request-id`. Unexpected errors return a safe body

@@ -1,8 +1,24 @@
 # Signed monitoring ingestion (`monitor-signature-v1`)
 
 Monitoring ingestion can require an HMAC-SHA256 signature so a captured request cannot be replayed
-or modified. Enable with `MONITOR_SIGNATURE_REQUIRED=true` (production) once monitor credentials are
-provisioned.
+or modified. Enable with `MONITOR_SIGNATURE_REQUIRED=true` once monitor credentials are provisioned.
+
+## Enforcement policy (by environment)
+
+The global default is `MONITOR_SIGNATURE_REQUIRED=false` for **migration compatibility** — existing
+authenticated deployments that have not yet provisioned monitor credentials keep working while they
+roll signing out. Startup validation is environment-aware:
+
+| `APP_ENV` | Signatures | Behavior |
+| --- | --- | --- |
+| `development` | may be `false` | allowed (migration-friendly) |
+| `test` | explicit | set per test scenario |
+| `staging` | must be `true` | **startup fails** if disabled |
+| `production` | must be `true` | **startup fails** if disabled |
+
+The readiness endpoint reports `monitor_signatures_enforced` (a boolean flag only — never secrets,
+signatures, nonces, or signing material). The production Compose example sets
+`MONITOR_SIGNATURE_REQUIRED=true`.
 
 ## Provisioning a credential
 

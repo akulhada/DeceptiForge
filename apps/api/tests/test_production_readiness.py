@@ -112,7 +112,10 @@ def test_viewer_cannot_write_and_read_only_key_cannot_ingest(make_client) -> Non
 
 def test_monitor_replay_and_timestamp_are_enforced(make_client) -> None:
     org = str(uuid4())
-    with make_client(demo_enabled=False, auth_enabled=True, app_env="production") as client:
+    # Replay/timestamp enforcement is gated on AUTH_ENABLED, independent of signing. Use an
+    # auth-enabled development client so unsigned ingestion reaches the replay guard (production
+    # requires signatures, which this test is not exercising).
+    with make_client(demo_enabled=False, auth_enabled=True, app_env="development") as client:
         service_key = _seed_key(client, org, "service")
         base = {"X-DeceptiForge-API-Key": service_key, "X-DeceptiForge-Org-Id": org}
         body = {

@@ -1,0 +1,24 @@
+# Purpose: gitleaks configuration for CI secret scanning.
+# Responsibilities: scan the repository and history for real secrets while allowlisting clearly
+#   documented, non-sensitive test/example placeholders. This does not weaken scanning of source or
+#   configuration — only known fixtures and example templates are exempted.
+title = "DeceptiForge gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders and test fixtures (not real secrets)."
+paths = [
+  '''\.env\.example$''',
+  '''docker-compose(\.[a-z]+)*\.ya?ml$''',
+  '''^apps/api/tests/''',
+  '''^docs/''',
+]
+regexes = [
+  # Deterministic, obviously-fake fixtures used by the test suite.
+  '''test-evidence-key-0+''',
+  '''bootstrap-secret-key''',
+  '''local-development-key''',
+  '''unused:unused''',
+]

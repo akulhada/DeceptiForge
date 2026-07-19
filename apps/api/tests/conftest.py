@@ -32,10 +32,14 @@ def build_client(
     api_key_bindings: str = "{}",
     cors_origins: str | None = None,
     cors_allow_credentials: bool = False,
-    monitor_signature_required: bool = False,
+    monitor_signature_required: bool | None = None,
     bootstrap_keys_enabled: bool | None = None,
     bootstrap_expires_at: str | None = None,
 ) -> Iterator[TestClient]:
+    # Production-like environments must enforce signatures; default the flag on there unless a test
+    # explicitly overrides it. Development defaults off (migration-friendly).
+    if monitor_signature_required is None:
+        monitor_signature_required = app_env in {"production", "staging"}
     overrides = {
         "DEMO_ENABLED": "true" if demo_enabled else "false",
         "APP_ENV": app_env,

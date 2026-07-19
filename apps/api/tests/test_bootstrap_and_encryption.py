@@ -84,6 +84,7 @@ def _prod(**overrides: object) -> Settings:
         "replay_backend": "redis",
         "redis_url": "fakeredis://bootstrap-tests",
         "evidence_encryption_mode": "local",
+        "monitor_signature_required": True,
         "api_key_bindings": {"k": _ORG},
     }
     base.update(overrides)

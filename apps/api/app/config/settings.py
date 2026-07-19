@@ -105,6 +105,13 @@ class Settings(BaseSettings):
                 "production requires an explicit EVIDENCE_ENCRYPTION_MODE (e.g. 'local' or a "
                 "documented KMS/DB-level strategy); plaintext evidence is not permitted"
             )
+        # Signed monitoring ingestion is mandatory in production-like environments (staging and
+        # production). Development keeps the migration-friendly default (may be disabled).
+        if not self.monitor_signature_required:
+            raise RuntimeError(
+                f"{self.app_env} requires MONITOR_SIGNATURE_REQUIRED=true; unsigned monitoring "
+                "ingestion is not permitted outside development"
+            )
         unrestricted_bootstrap = (
             self.bootstrap_keys_enabled
             and bool(self.api_key_bindings)
@@ -139,6 +146,11 @@ class Settings(BaseSettings):
         return self.app_env == "development"
 
     @property
+    def is_production_like(self) -> bool:
+        """Staging and production share the hardened runtime contract (no dev conveniences)."""
+        return self.app_env in {"staging", "production"}
+
+    @property
     def allows_local_path_scan(self) -> bool:
         """Only local development may accept arbitrary server filesystem paths.
 
@@ -151,6 +163,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Cache one validated settings object per process."""
-    # Pydantic Settings resolves required fields from the environment; the static checker cannot
-    # see that source and incorrectly treats DATABASE_URL as an omitted constructor argument.
-    return Settings()  # type: ignore[call-arg]
+    # Pydantic Settings resolves required fields from the environment, not constructor arguments.
+    # The empty **kwargs unpack keeps this valid across mypy/plugin versions without a version-
+    # dependent `type: ignore` (which some Python versions then flag as unused).
+    return Settings(**{})
