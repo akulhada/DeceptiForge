@@ -22,8 +22,10 @@ def create_app() -> FastAPI:
     configure_cors(
         application, settings.cors_origins, allow_credentials=settings.cors_allow_credentials
     )
-    application.add_middleware(BodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
+    # Order matters: add_middleware wraps last-added outermost. The body limit must be outermost so
+    # it counts raw bytes before any downstream middleware or routing buffers the request.
     application.add_middleware(RequestContextMiddleware)
+    application.add_middleware(BodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
     register_exception_handlers(application)
     application.include_router(build_api_router(settings))
     return application

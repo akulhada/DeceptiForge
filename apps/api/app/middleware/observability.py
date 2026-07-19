@@ -4,6 +4,7 @@
 #   paths, SQL, provider details, or raw payloads. Dependencies: FastAPI/Starlette and logging.
 from __future__ import annotations
 
+import json
 import logging
 from uuid import uuid4
 
@@ -14,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 _logger = logging.getLogger("deceptiforge")
 
@@ -30,24 +31,82 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class BodyLimitMiddleware(BaseHTTPMiddleware):
-    """Reject requests whose declared body exceeds the configured maximum."""
+class BodyLimitMiddleware:
+    """Reject oversized request bodies while streaming, without trusting Content-Length.
+
+    This is a pure-ASGI middleware so it counts bytes as they arrive on ``receive``. The moment the
+    running total exceeds the limit it sends a 413 itself, then feeds the downstream app an
+    ``http.disconnect`` so it stops reading, and swallows anything the app then tries to send. A
+    chunked or no-Content-Length request therefore cannot slip past and be buffered downstream; a
+    declared Content-Length over the limit is rejected before the app is invoked at all.
+    """
 
     def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
-        super().__init__(app)
+        self._app = app
         self._max = max_body_bytes
 
-    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
-        content_length = request.headers.get("content-length")
-        if (
-            content_length is not None
-            and content_length.isdigit()
-            and int(content_length) > self._max
-        ):
-            return _safe_response(
-                request, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "request body too large"
-            )
-        return await call_next(request)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+
+        declared = _content_length(scope)
+        if declared is not None and declared > self._max:
+            await self._reject(scope, send)
+            return
+
+        total = 0
+        rejected = False
+
+        async def counting_receive() -> Message:
+            nonlocal total, rejected
+            if rejected:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                total += len(message.get("body", b""))
+                if total > self._max:
+                    rejected = True
+                    await self._reject(scope, send)
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message: Message) -> None:
+            # Once we have sent the 413, suppress any response the app tries to produce.
+            if rejected:
+                return
+            await send(message)
+
+        await self._app(scope, counting_receive, guarded_send)
+
+    async def _reject(self, scope: Scope, send: Send) -> None:
+        request_id = _scope_request_id(scope)
+        body = json.dumps({"detail": "request body too large", "request_id": request_id}).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"x-request-id", request_id.encode()),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
+
+
+def _content_length(scope: Scope) -> int | None:
+    for name, value in scope.get("headers", []):
+        if name == b"content-length" and value.isdigit():
+            return int(value)
+    return None
+
+
+def _scope_request_id(scope: Scope) -> str:
+    for name, value in scope.get("headers", []):
+        if name == b"x-request-id":
+            return bytes(value).decode("latin-1")
+    return uuid4().hex
 
 
 def _request_id(request: Request) -> str:
