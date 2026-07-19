@@ -205,8 +205,12 @@ jobs:
         run: |
           body="$(curl -s http://localhost:8000/ready)"
           echo "$body"
+          # Reports dependency + enforcement state (monitor_signatures_enforced is a safe boolean).
           echo "$body" | grep -q '"database"'
-          echo "$body" | grep -qiv 'password\|secret\|signature'
+          echo "$body" | grep -q 'monitor_signatures_enforced'
+          # Must not leak secret material.
+          echo "$body" | grep -Eqi 'password|signing_secret|api[_-]?key' && \
+            { echo "readiness leaked secret material"; exit 1; } || true
       - name: Demo routes unavailable in this image config
         run: |
           code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/demo/seed)"
