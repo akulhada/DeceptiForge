@@ -96,6 +96,41 @@ class Settings(BaseSettings):
     )
     decoy_default_expiry_days: int = 90
     decoy_pr_detail_level: str = "standard"  # minimal | standard | full
+    # Database honey records (PostgreSQL connectors + synthetic rows). Disabled by default;
+    # must be explicitly enabled per environment so the database-writing feature never activates
+    # accidentally.
+    database_connectors_enabled: bool = False
+    database_honey_deployment_enabled: bool = False
+    database_require_tls: bool = True
+    database_connect_timeout_seconds: int = 10
+    database_statement_timeout_ms: int = 5_000
+    database_max_schema_tables: int = 2_000
+    database_max_deployment_rows: int = 25
+    database_default_expiry_days: int = 90
+    require_separate_database_approver: bool = True
+    database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
+    database_blocked_table_patterns: list[str] = Field(
+        default_factory=lambda: [
+            "password",
+            "credential",
+            "secret",
+            "token",
+            "session",
+            "auth",
+            "payment",
+            "card",
+            "bank",
+            "ssn",
+            "tax",
+            "health",
+            "outbox",
+            "event",
+            "ledger",
+            "queue",
+            "webhook",
+            "audit",
+        ]
+    )
 
     def bootstrap_active(self, now: datetime) -> bool:
         """Whether env bootstrap keys may authenticate right now."""

@@ -346,6 +346,137 @@ class DeploymentJobRecord(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class DatabaseConnectorRecord(Base):
+    """A PostgreSQL connector. The credential is stored encrypted, never in plaintext."""
+
+    __tablename__ = "database_connectors"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    engine: Mapped[str] = mapped_column(String(16), default="postgresql")
+    host_reference: Mapped[str] = mapped_column(String(512))
+    database_name: Mapped[str] = mapped_column(String(255))
+    # Encrypted credential (or secret-manager reference) + the key version used. Never plaintext.
+    secret_ciphertext: Mapped[str] = mapped_column(Text)
+    secret_key_version: Mapped[str] = mapped_column(String(32))
+    ssl_mode: Mapped[str] = mapped_column(String(16), default="require")
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    read_only_mode: Mapped[bool] = mapped_column(default=True)
+    created_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_schema_sync_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    safe_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DatabaseSchemaSnapshotRecord(Base):
+    """A captured schema snapshot (metadata only — never full table contents)."""
+
+    __tablename__ = "database_schema_snapshots"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    connector_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    database_version: Mapped[str] = mapped_column(String(128))
+    snapshot_hash: Mapped[str] = mapped_column(String(64), index=True)
+    data: Mapped[str] = mapped_column(Text)  # serialized SchemaSnapshot (metadata only)
+
+
+class DatabaseHoneyDeploymentRecord(Base):
+    """A reviewable, reversible synthetic-row deployment into one approved table."""
+
+    __tablename__ = "database_honey_deployments"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    connector_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    schema_snapshot_id: Mapped[UUID] = mapped_column(Uuid)
+    target_schema: Mapped[str] = mapped_column(String(255))
+    target_table: Mapped[str] = mapped_column(String(255))
+    decoy_type: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    approved_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    preview_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    preview_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    replaced_by_deployment_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    monitoring_activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    safe_failure_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DatabaseHoneyRecordRecord(Base):
+    """One inserted synthetic row, owned by a deployment. Unique per (deployment, fingerprint) so a
+    retried insert never duplicates. Serves as the tripwire registry (status active/retired)."""
+
+    __tablename__ = "database_honey_records"
+    __table_args__ = (
+        UniqueConstraint("deployment_id", "row_fingerprint", name="uq_honey_record_fingerprint"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=uuid4)
+    trace_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_primary_key: Mapped[str] = mapped_column(Text)  # JSON {col: value}
+    row_fingerprint: Mapped[str] = mapped_column(String(64))
+    inserted_values_encrypted: Mapped[str] = mapped_column(Text)
+    verification_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="planned")
+    inserted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DatabaseHoneyJobRecord(Base):
+    """Async database-honey work (deploy/verify/retire/rollback/rotate). One open job per type per
+    deployment (unique) prevents duplicate insertion under retries or concurrent workers."""
+
+    __tablename__ = "database_honey_jobs"
+    __table_args__ = (
+        UniqueConstraint("deployment_id", "job_type", name="uq_honey_job"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    job_type: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    correlation_id: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DatabaseHoneyAuditRecord(Base):
+    """Append-only audit for database-honey operations. Never stores credentials or full rows."""
+
+    __tablename__ = "database_honey_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    connector_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class NarrativeRevisionRecord(Base):
     """One immutable narrative generation. Regeneration appends a revision, never overwrites."""
 

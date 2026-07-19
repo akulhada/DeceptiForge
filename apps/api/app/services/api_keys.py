@@ -43,6 +43,15 @@ PERMISSIONS: frozenset[str] = frozenset(
         "decoy_deployments:execute",
         "decoy_deployments:retire",
         "decoy_deployments:rollback",
+        "database_connectors:read",
+        "database_connectors:manage",
+        "database_schema:read",
+        "database_honey:read",
+        "database_honey:create",
+        "database_honey:approve",
+        "database_honey:deploy",
+        "database_honey:retire",
+        "database_honey:rollback",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -62,6 +71,7 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "alerts:write",
             "demo:run",
             "decoy_deployments:create",
+            "database_honey:create",
         }
     ),
     "viewer": _READS,
@@ -72,6 +82,8 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "monitoring:ingest",
             "decoy_deployments:read",
             "decoy_deployments:execute",
+            "database_honey:read",
+            "database_honey:deploy",
         }
     ),
 }
