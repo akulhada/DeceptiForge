@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0004_org_scope_pipeline"
-down_revision = "0003_org_scope_and_narrative_revisions"
+down_revision = "0003_org_scope_narratives"
 branch_labels = None
 depends_on = None
 
