@@ -60,6 +60,12 @@ PERMISSIONS: frozenset[str] = frozenset(
         "ai_tripwires:deploy",
         "ai_tripwires:retire",
         "ai_tripwires:ingest",
+        "browser_sensors:read",
+        "browser_sensors:manage",
+        "browser_policy:read",
+        "browser_policy:manage",
+        "browser_events:ingest",
+        "browser_events:read",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -96,6 +102,14 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "ai_tripwires:read",
             "ai_tripwires:deploy",
             "ai_tripwires:ingest",
+        }
+    ),
+    # Browser sensor keys are provisioned per-installation at enrollment. They may fetch their
+    # scoped policy/registry and ingest signed paste events — nothing else.
+    "browser_sensor": frozenset(
+        {
+            "browser_policy:read",
+            "browser_events:ingest",
         }
     ),
 }

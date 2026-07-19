@@ -119,6 +119,17 @@ class Settings(BaseSettings):
         default_factory=lambda: ["deceptiforge_decoys"]
     )
     ai_tripwire_allowed_mcp_servers: list[str] = Field(default_factory=list)
+    # Browser AI-paste sensors. Disabled by default; explicit per-environment enablement.
+    browser_sensor_enabled: bool = False
+    browser_sensor_enrollment_ttl_seconds: int = 900
+    browser_sensor_event_queue_limit: int = 200
+    browser_sensor_policy_sync_seconds: int = 300
+    browser_sensor_trace_sync_seconds: int = 300
+    browser_sensor_allowed_domains: list[str] = Field(default_factory=list)
+    browser_sensor_require_signed_policy: bool = False
+    browser_sensor_min_extension_version: str = "0.1.0"
+    browser_sensor_max_registry_entries: int = 5_000
+    browser_sensor_max_event_metadata_bytes: int = 1_024
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [

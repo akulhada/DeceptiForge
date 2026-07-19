@@ -625,3 +625,112 @@ class NarrativeRevisionRecord(Base):
     status: Mapped[str] = mapped_column(String(32))
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BrowserSensorRecord(Base):
+    """A managed browser extension/device identity. The signing secret is stored encrypted; the
+    scoped ingest API key is a separate credential and is never reused from the dashboard."""
+
+    __tablename__ = "browser_sensors"
+    __table_args__ = (
+        UniqueConstraint("sensor_public_id", name="uq_browser_sensor_public_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    sensor_public_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    installation_id: Mapped[str] = mapped_column(String(128), index=True)
+    device_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    browser_family: Mapped[str] = mapped_column(String(32))
+    extension_version: Mapped[str] = mapped_column(String(32))
+    secret_ciphertext: Mapped[str] = mapped_column(Text)
+    secret_key_version: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    api_key_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BrowserEnrollmentTokenRecord(Base):
+    """A one-time, short-lived enrollment token. Only its hash is stored; the plaintext is shown
+    once. Consumed atomically at enrollment so it can never be replayed."""
+
+    __tablename__ = "browser_enrollment_tokens"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_browser_enrollment_token_hash"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consumed_by_sensor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BrowserAiPolicyRecord(Base):
+    """The organization's browser AI policy. One current row per organization; policy_version is
+    monotonic so a downgrade can be detected and rejected."""
+
+    __tablename__ = "browser_ai_policies"
+    __table_args__ = (
+        UniqueConstraint("organization_id", name="uq_browser_ai_policy_org"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    enabled: Mapped[bool] = mapped_column(default=False)
+    trace_match_mode: Mapped[str] = mapped_column(String(16), default="exact")
+    local_only_mode: Mapped[bool] = mapped_column(default=False)
+    event_reporting_enabled: Mapped[bool] = mapped_column(default=True)
+    show_user_notification: Mapped[bool] = mapped_column(default=True)
+    allow_pause: Mapped[bool] = mapped_column(default=True)
+    min_extension_version: Mapped[str] = mapped_column(String(32), default="0.1.0")
+    policy_version: Mapped[int] = mapped_column(Integer, default=1)
+    # JSON blob of the domain rules (domain + classification). Bounded; contains no secrets.
+    rules_data: Mapped[str] = mapped_column(Text, default="[]")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BrowserEventRecord(Base):
+    """A trusted, minimized browser paste event. Never stores pasted text, conversation, or
+    model output — only trace id, destination classification, and bounded safe metadata."""
+
+    __tablename__ = "browser_events"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    browser_sensor_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    trace_id: Mapped[str] = mapped_column(String(128), index=True)
+    destination_domain: Mapped[str] = mapped_column(String(253))
+    destination_classification: Mapped[str] = mapped_column(String(16), index=True)
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    match_method: Mapped[str] = mapped_column(String(16))
+    confidence: Mapped[float] = mapped_column()
+    extension_version: Mapped[str] = mapped_column(String(32))
+    policy_version: Mapped[int] = mapped_column(Integer)
+    excerpt_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    minimized_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    correlation_id: Mapped[str] = mapped_column(String(64), index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BrowserSensorAuditRecord(Base):
+    """Append-only browser-sensor audit. Never stores secrets, signatures, pasted text, or
+    conversation content."""
+
+    __tablename__ = "browser_sensor_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    browser_sensor_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
