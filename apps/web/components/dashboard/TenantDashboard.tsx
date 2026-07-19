@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
+import { DatabaseHoneyPanel } from '@/components/dashboard/DatabaseHoneyPanel';
 import { DeploymentsPanel } from '@/components/dashboard/DeploymentsPanel';
 import { ErrorState, LoadingState } from '@/components/dashboard/states';
 import {
@@ -72,6 +73,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             <IncidentsSection incidents={state.incidents} />
             {whoami?.scopes.includes('decoy_deployments:read') && (
               <DeploymentsPanel scopes={whoami.scopes} />
+            )}
+            {whoami?.scopes.includes('database_honey:read') && (
+              <DatabaseHoneyPanel scopes={whoami.scopes} />
             )}
           </>
         ) : null}
