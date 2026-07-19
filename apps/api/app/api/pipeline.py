@@ -29,8 +29,8 @@ from app.schemas.api import (
 from app.security import require_scope
 from app.services.api_keys import AuthContext
 from app.services.pipeline import PipelineError, PipelineService
-from app.services.rate_limit import rate_limiter
-from app.services.replay import ReplayError, replay_guard
+from app.services.rate_limit import get_rate_limiter, rate_limit_key
+from app.services.replay import ReplayError, get_replay_guard
 
 router = APIRouter()
 
@@ -54,6 +54,13 @@ def scan_repository(
             status.HTTP_403_FORBIDDEN,
             "local filesystem scanning is disabled; provide a repository integration instead",
         )
+    if not get_rate_limiter().allow(
+        rate_limit_key(
+            endpoint="repositories:scan", organization_id=auth.organization_id, actor=auth.key_id
+        ),
+        get_settings().monitoring_rate_limit_per_minute,
+    ):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "scan rate limit exceeded")
     repository_id, profile = _service(session, auth).scan(body.path, body.name)
     return ScanResponse(repository_id=repository_id, profile=profile)
 
@@ -123,11 +130,21 @@ def ingest_monitoring_event(
     # Replay protection is enforced for real (non-development-bypass) ingestion.
     if settings.auth_enabled:
         try:
-            replay_guard.check(x_deceptiforge_nonce, x_deceptiforge_timestamp)
+            get_replay_guard().check(
+                x_deceptiforge_nonce,
+                x_deceptiforge_timestamp,
+                scope=str(auth.organization_id),
+            )
         except ReplayError as error:
             raise HTTPException(error.status_code, error.message) from None
-    if not rate_limiter.allow(
-        f"monitor:{auth.organization_id}", settings.monitoring_rate_limit_per_minute
+    if not get_rate_limiter().allow(
+        rate_limit_key(
+            endpoint="monitoring:ingest",
+            organization_id=auth.organization_id,
+            actor=auth.key_id,
+            resource=body.decoy_plan_id,
+        ),
+        settings.monitoring_rate_limit_per_minute,
     ):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "monitoring rate limit exceeded")
     event, alert = _guard(

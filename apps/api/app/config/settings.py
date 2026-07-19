@@ -32,24 +32,79 @@ class Settings(BaseSettings):
     monitoring_max_value_bytes: int = 65_536
     monitoring_rate_limit_per_minute: int = 60
     narrative_rate_limit_per_minute: int = 10
+    admin_rate_limit_per_minute: int = 30
     narrative_revision_retention_count: int = 20
     monitoring_event_retention_days: int = 30
     incident_stale_after_seconds: int = 86_400
     monitoring_timestamp_skew_seconds: int = 300
-    # Rate limiting: "app" uses the in-process limiter (single worker only); "gateway" delegates to
-    # an edge/reverse-proxy. Production with "app" requires REDIS_URL (distributed store).
+    # Rate limiting: "app" uses an application-level limiter; "gateway" delegates to an
+    # edge/reverse-proxy. In "app" mode the backend below selects the store.
     rate_limit_mode: str = "app"
+    # Distributed-store selection. "memory" is single-worker only (development/tests); "redis"
+    # coordinates across replicas. Production must not silently run "memory" for app-enforced limits
+    # or for replay protection.
+    rate_limit_backend: str = "memory"
+    replay_backend: str = "memory"
     redis_url: str | None = None
+    redis_key_prefix: str = "deceptiforge"
+    redis_socket_timeout_seconds: float = 2.0
+    redis_connect_timeout_seconds: float = 2.0
+    # Behavior when a required Redis is unreachable at request time: "closed" rejects (safe default)
+    # and "open" degrades to allowing the request. Startup still fails if Redis is required + down.
+    redis_fail_mode: str = "closed"
+    # Evidence encryption boundary. "disabled" (development only) stores plaintext; production must
+    # set an explicit mode (e.g. "local" for an app-managed key, or a documented KMS strategy).
+    evidence_encryption_mode: str = "disabled"
+    evidence_encryption_key: str | None = None
+    # Bootstrap keys (API_KEY_BINDINGS) grant owner scope without a DB row. Disabled by default;
+    # a one-time bootstrap window must be explicitly opened and then closed.
+    bootstrap_keys_enabled: bool = False
+
+    @property
+    def _redis_required(self) -> bool:
+        """Whether any app subsystem needs a shared Redis store in this configuration."""
+        return (self.rate_limit_mode == "app" and self.rate_limit_backend == "redis") or (
+            self.replay_backend == "redis"
+        )
 
     def validate_runtime(self) -> None:
         """Fail fast on unsafe production configuration."""
         if self.is_development:
             return
-        if self.rate_limit_mode == "app" and self.redis_url is None:
+        if self.rate_limit_mode == "app" and self.rate_limit_backend != "redis":
             raise RuntimeError(
-                "production app-level rate limiting requires REDIS_URL, "
-                "or set RATE_LIMIT_MODE=gateway to delegate to the edge"
+                "production app-level rate limiting requires RATE_LIMIT_BACKEND=redis "
+                "(with REDIS_URL), or set RATE_LIMIT_MODE=gateway to delegate to the edge"
             )
+        if self.replay_backend != "redis":
+            raise RuntimeError(
+                "production replay protection requires REPLAY_BACKEND=redis with REDIS_URL; "
+                "in-memory replay state is not shared across workers"
+            )
+        if self._redis_required and self.redis_url is None:
+            raise RuntimeError("REDIS_URL is required when a Redis-backed backend is selected")
+        if self.evidence_encryption_mode == "disabled":
+            raise RuntimeError(
+                "production requires an explicit EVIDENCE_ENCRYPTION_MODE (e.g. 'local' or a "
+                "documented KMS/DB-level strategy); plaintext evidence is not permitted"
+            )
+        if self.bootstrap_keys_enabled and self.api_key_bindings:
+            raise RuntimeError(
+                "refusing to start: bootstrap API keys are still enabled in production; create a "
+                "DB-backed owner key, then set BOOTSTRAP_KEYS_ENABLED=false and remove "
+                "API_KEY_BINDINGS before restarting"
+            )
+        if self._redis_required:
+            self._verify_redis_reachable()
+
+    def _verify_redis_reachable(self) -> None:
+        """Ping the configured Redis so startup fails fast when a required store is down."""
+        from app.services.redis_support import RedisUnavailableError, ping_redis
+
+        try:
+            ping_redis(self)
+        except RedisUnavailableError as error:
+            raise RuntimeError(f"required Redis is unavailable at startup: {error}") from error
 
     @property
     def openai_configured(self) -> bool:

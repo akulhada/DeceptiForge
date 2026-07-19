@@ -16,7 +16,7 @@ from app.repositories.artifacts import ArtifactRepository
 from app.security import require_scope
 from app.services.api_keys import AuthContext
 from app.services.incident_narrative import NarrativeService
-from app.services.rate_limit import rate_limiter
+from app.services.rate_limit import get_rate_limiter, rate_limit_key
 
 router = APIRouter(tags=["incidents"])
 
@@ -34,8 +34,13 @@ def generate_incident_narrative(
     session: Session = Depends(get_db),
 ) -> IncidentNarrative:
     """Generate or reuse a narrative for an incident owned by the requesting organization."""
-    if not rate_limiter.allow(
-        f"narrative:{auth.organization_id}:{incident_id}",
+    if not get_rate_limiter().allow(
+        rate_limit_key(
+            endpoint="narratives:generate",
+            organization_id=auth.organization_id,
+            actor=auth.key_id,
+            resource=incident_id,
+        ),
         get_settings().narrative_rate_limit_per_minute,
     ):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "narrative rate limit exceeded")

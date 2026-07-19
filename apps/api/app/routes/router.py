@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.api.admin import router as admin_router
 from app.api.demo import router as demo_router
+from app.api.health import router as health_router
 from app.api.narrative import router as narrative_router
 from app.api.pipeline import router as pipeline_router
 from app.api.tenant import router as tenant_router
@@ -19,6 +20,7 @@ def build_api_router(settings: Settings) -> APIRouter:
     exposed on a production-like deployment, even if DEMO_ENABLED is set to true.
     """
     router = APIRouter()
+    router.include_router(health_router)
     router.include_router(pipeline_router)
     router.include_router(narrative_router)
     router.include_router(tenant_router)

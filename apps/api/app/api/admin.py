@@ -10,11 +10,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.security import require_scope
 from app.services.api_keys import ROLE_SCOPES, ApiKeyService, AuthContext, AuthError, write_audit
+from app.services.rate_limit import get_rate_limiter, rate_limit_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _rate_limit(endpoint: str, auth: AuthContext) -> None:
+    """Apply the shared distributed limit to a management endpoint."""
+    if not get_rate_limiter().allow(
+        rate_limit_key(endpoint=endpoint, organization_id=auth.organization_id, actor=auth.key_id),
+        get_settings().admin_rate_limit_per_minute,
+    ):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "admin rate limit exceeded")
 
 
 class CreateApiKeyRequest(BaseModel):
@@ -63,6 +74,7 @@ def create_api_key(
     auth: AuthContext = Depends(require_scope("admin:manage_keys")),
     session: Session = Depends(get_db),
 ) -> CreateApiKeyResponse:
+    _rate_limit("admin:api_keys:create", auth)
     if body.role not in ROLE_SCOPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown role")
     try:
@@ -97,6 +109,7 @@ def revoke_api_key(
     auth: AuthContext = Depends(require_scope("admin:manage_keys")),
     session: Session = Depends(get_db),
 ) -> None:
+    _rate_limit("admin:api_keys:revoke", auth)
     if not ApiKeyService(session).revoke(auth.organization_id, key_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "API key not found")
     write_audit(

@@ -42,15 +42,26 @@ def build_client(
         "CORS_ORIGINS": cors_origins if cors_origins is not None else "[]",
         "CORS_ALLOW_CREDENTIALS": "true" if cors_allow_credentials else "false",
         # Tests exercise production settings; delegate rate limiting to the edge so create_app
-        # does not require REDIS_URL.
+        # does not require a Redis-backed rate-limit store.
         "RATE_LIMIT_MODE": "gateway",
+        # Replay protection is exercised against an in-process fakeredis server so the Redis path is
+        # covered without an external service; the URL scheme is resolved by redis_support.
+        "REPLAY_BACKEND": "redis",
+        "REDIS_URL": "fakeredis://deceptiforge-tests",
+        # A non-disabled encryption mode is required for production startup validation.
+        "EVIDENCE_ENCRYPTION_MODE": "local",
+        "EVIDENCE_ENCRYPTION_KEY": "test-evidence-key-0000000000000000000000",
     }
     previous = {key: os.environ.get(key) for key in overrides}
     os.environ.update(overrides)
     get_settings.cache_clear()
-    from app.services.rate_limit import rate_limiter
+    from app.services.rate_limit import reset_rate_limiter
+    from app.services.redis_support import reset_clients_for_tests
+    from app.services.replay import reset_replay_guard
 
-    rate_limiter.clear()
+    reset_clients_for_tests()
+    reset_rate_limiter()
+    reset_replay_guard()
 
     from app.main import create_app
 
