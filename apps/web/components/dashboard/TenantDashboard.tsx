@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AiTripwirePanel } from '@/components/dashboard/AiTripwirePanel';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
 import { DatabaseHoneyPanel } from '@/components/dashboard/DatabaseHoneyPanel';
 import { DeploymentsPanel } from '@/components/dashboard/DeploymentsPanel';
@@ -76,6 +77,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             )}
             {whoami?.scopes.includes('database_honey:read') && (
               <DatabaseHoneyPanel scopes={whoami.scopes} />
+            )}
+            {whoami?.scopes.includes('ai_tripwires:read') && (
+              <AiTripwirePanel scopes={whoami.scopes} />
             )}
           </>
         ) : null}
