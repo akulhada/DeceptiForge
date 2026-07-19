@@ -215,6 +215,116 @@ class MonitorCredentialRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class DecoyDeploymentRecord(Base):
+    """A reviewable, reversible decoy deployment through a controlled branch + pull request."""
+
+    __tablename__ = "decoy_deployments"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    repository_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    scan_job_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    decoy_plan_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    validation_report_decision: Mapped[str] = mapped_column(String(16))
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    approved_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    target_branch: Mapped[str] = mapped_column(String(255))
+    source_branch: Mapped[str] = mapped_column(String(255))
+    pull_request_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pull_request_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    base_commit_sha: Mapped[str] = mapped_column(String(64))
+    deployed_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    preview_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Serialized DeploymentPreview (rendered change-set; inert content only, no real secrets).
+    preview_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    monitoring_activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    safe_failure_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DecoyDeploymentItemRecord(Base):
+    """One file change owned by a deployment. Hashes let retire/rollback touch only its content."""
+
+    __tablename__ = "decoy_deployment_items"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    deployment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("decoy_deployments.id"), index=True
+    )
+    decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    target_path: Mapped[str] = mapped_column(String(2048))
+    operation: Mapped[str] = mapped_column(String(16))
+    trace_identifier: Mapped[str] = mapped_column(String(128), index=True)
+    original_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    proposed_content_hash: Mapped[str] = mapped_column(String(64))
+    deployed_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Serialized rendered content + deployment marker (inert; synthetic values only).
+    content_data: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="planned")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DeploymentApprovalRecord(Base):
+    """An approve/reject decision. Separation-of-duties is enforced against requested_by."""
+
+    __tablename__ = "deployment_approvals"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    deployment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("decoy_deployments.id"), index=True
+    )
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    decision: Mapped[str] = mapped_column(String(16))
+    comment: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DeploymentAuditRecord(Base):
+    """Append-only deployment audit event. Never stores tokens, secrets, or raw repo content."""
+
+    __tablename__ = "deployment_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DeploymentJobRecord(Base):
+    """Async deployment work (execute/verify/retire/rollback). One open job per type per deployment
+    (unique) prevents duplicate PR creation under retries or concurrent workers."""
+
+    __tablename__ = "deployment_jobs"
+    __table_args__ = (
+        UniqueConstraint("deployment_id", "job_type", name="uq_deployment_job"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    job_type: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    correlation_id: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    leased_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class NarrativeRevisionRecord(Base):
     """One immutable narrative generation. Regeneration appends a revision, never overwrites."""
 

@@ -70,6 +70,32 @@ class Settings(BaseSettings):
     # and must be closed once the first DB-backed owner key exists.
     bootstrap_keys_enabled: bool = False
     bootstrap_expires_at: datetime | None = None
+    # Decoy deployment (approval + lifecycle). Disabled by default; must be explicitly enabled per
+    # environment so the repository-writing feature never activates accidentally.
+    decoy_deployment_enabled: bool = False
+    require_separate_deployment_approver: bool = True
+    decoy_max_files_per_deployment: int = 25
+    decoy_max_bytes_per_deployment: int = 262_144
+    decoy_allowed_path_prefixes: list[str] = Field(
+        default_factory=lambda: ["docs/", "runbooks/", "config/decoys/", ".deceptiforge/"]
+    )
+    decoy_protected_path_patterns: list[str] = Field(
+        default_factory=lambda: [
+            ".env",
+            "secret",
+            "credential",
+            ".pem",
+            ".key",
+            "id_rsa",
+            ".github/workflows/",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "yarn.lock",
+            "Gemfile.lock",
+        ]
+    )
+    decoy_default_expiry_days: int = 90
+    decoy_pr_detail_level: str = "standard"  # minimal | standard | full
 
     def bootstrap_active(self, now: datetime) -> bool:
         """Whether env bootstrap keys may authenticate right now."""

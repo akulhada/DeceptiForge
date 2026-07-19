@@ -37,6 +37,12 @@ PERMISSIONS: frozenset[str] = frozenset(
         "narratives:read",
         "narratives:write",
         "demo:run",
+        "decoy_deployments:read",
+        "decoy_deployments:create",
+        "decoy_deployments:approve",
+        "decoy_deployments:execute",
+        "decoy_deployments:retire",
+        "decoy_deployments:rollback",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -49,9 +55,25 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
     "owner": PERMISSIONS,
     "admin": PERMISSIONS,
     "analyst": _READS
-    | frozenset({"narratives:write", "incidents:write", "alerts:write", "demo:run"}),
+    | frozenset(
+        {
+            "narratives:write",
+            "incidents:write",
+            "alerts:write",
+            "demo:run",
+            "decoy_deployments:create",
+        }
+    ),
     "viewer": _READS,
-    "service": frozenset({"monitoring:read", "monitoring:ingest"}),
+    # Service keys execute approved deployment jobs; they cannot create or approve them.
+    "service": frozenset(
+        {
+            "monitoring:read",
+            "monitoring:ingest",
+            "decoy_deployments:read",
+            "decoy_deployments:execute",
+        }
+    ),
 }
 
 
