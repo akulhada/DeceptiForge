@@ -35,6 +35,7 @@ def build_client(
     monitor_signature_required: bool | None = None,
     bootstrap_keys_enabled: bool | None = None,
     bootstrap_expires_at: str | None = None,
+    decoy_deployment_enabled: bool = False,
 ) -> Iterator[TestClient]:
     # Production-like environments must enforce signatures; default the flag on there unless a test
     # explicitly overrides it. Development defaults off (migration-friendly).
@@ -49,6 +50,7 @@ def build_client(
         "CORS_ORIGINS": cors_origins if cors_origins is not None else "[]",
         "CORS_ALLOW_CREDENTIALS": "true" if cors_allow_credentials else "false",
         "MONITOR_SIGNATURE_REQUIRED": "true" if monitor_signature_required else "false",
+        "DECOY_DEPLOYMENT_ENABLED": "true" if decoy_deployment_enabled else "false",
         # Tests exercise production settings; delegate rate limiting to the edge so create_app
         # does not require a Redis-backed rate-limit store.
         "RATE_LIMIT_MODE": "gateway",

@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.api.admin import router as admin_router
 from app.api.demo import router as demo_router
+from app.api.deployments import router as deployments_router
 from app.api.health import router as health_router
 from app.api.narrative import router as narrative_router
 from app.api.pipeline import router as pipeline_router
@@ -25,6 +26,9 @@ def build_api_router(settings: Settings) -> APIRouter:
     router.include_router(narrative_router)
     router.include_router(tenant_router)
     router.include_router(admin_router)
+    # Decoy deployment routes mount only when the feature is explicitly enabled.
+    if settings.decoy_deployment_enabled:
+        router.include_router(deployments_router)
     if settings.demo_enabled and settings.is_development:
         router.include_router(demo_router)
     return router
