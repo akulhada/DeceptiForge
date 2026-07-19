@@ -302,6 +302,9 @@ class NormalizedAlert(DomainModel):
     last_seen: datetime
     event_count: int = Field(ge=1)
     deduplication_key: str = Field(min_length=1, max_length=512)
+    # Time-bucket index that, with the deduplication key, identifies one alert episode. A later
+    # episode on the same surface gets a new bucket and therefore a distinct alert.
+    episode_bucket: int = 0
     affected_placement_id: UUID
     affected_decoy_type: str = Field(min_length=1, max_length=128)
     evidence: tuple[AlertEvidence, ...] = Field(min_length=1, max_length=5)

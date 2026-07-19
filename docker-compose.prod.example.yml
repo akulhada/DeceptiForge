@@ -91,6 +91,21 @@ services:
       postgres: { condition: service_healthy }
     # Run `alembic upgrade head` as a one-off release step BEFORE rolling out (not at startup).
 
+  retention-cron:
+    build: { context: ./apps/api }
+    command: ['python', '-m', 'app.jobs.retention']
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_MODE: gateway
+      REPLAY_BACKEND: redis
+      EVIDENCE_ENCRYPTION_MODE: local
+      EVIDENCE_ENCRYPTION_KEY: ${EVIDENCE_ENCRYPTION_KEY:?}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
 networks:
   internal: { internal: true }
   edge: {}

@@ -125,19 +125,17 @@ class PipelineService:
         if event is None:
             return None, None
         self._repo.add_detection_event(self._org, event)
-        # Seed dedup state from persisted alerts so repeated detections across separate requests
-        # update one alert (event_count, last_seen) instead of creating duplicates.
-        alerting = AlertingPipeline(existing=self._repo.alerts_for_organization(self._org))
-        alert = alerting.ingest(event, None)
-        if alert is not None:
-            self._repo.add_alert(self._org, alert)
-            # Reconstruction is deferred off the hot path: enqueue a job keyed by this alert's
-            # strong correlation keys and return promptly. A worker reconstructs only the affected
-            # incidents via an indexed related-alert lookup, so ingestion is not O(n^2) in the
-            # alert backlog.
-            self._repo.enqueue_reconstruction(
-                self._org, alert, self._reconstruction_window_seconds
-            )
+        # Build a fresh single-event candidate (no request-time snapshot) and let the database
+        # deduplicate atomically. Concurrent duplicate ingests targeting the same episode update one
+        # alert row (event_count/first_seen/last_seen) instead of racing on a read-then-write.
+        candidate = AlertingPipeline().ingest(event, None, organization_id=self._org)
+        if candidate is None:
+            return event, None
+        alert = self._repo.upsert_alert_atomic(self._org, candidate)
+        # Reconstruction is deferred off the hot path: enqueue a job keyed by this alert's strong
+        # correlation keys and return promptly. A worker reconstructs only the affected incidents
+        # via an indexed related-alert lookup, so ingestion is not O(n^2) in the alert backlog.
+        self._repo.enqueue_reconstruction(self._org, alert, self._reconstruction_window_seconds)
         return event, alert
 
     def alerts(self) -> tuple[NormalizedAlert, ...]:

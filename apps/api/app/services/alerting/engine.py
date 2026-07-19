@@ -1,6 +1,6 @@
 """In-memory normalization, enrichment, and time-window deduplication of raw events."""
 
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from app.models.domain.operations import (
     AlertEvidence,
@@ -11,6 +11,41 @@ from app.models.domain.operations import (
     TripwireRegistryEntry,
 )
 from app.services.alerting.scoring import AlertingConfig, AlertSeverityScorer
+
+_SEVERITY_RANK = {
+    Severity.INFO: 0,
+    Severity.LOW: 1,
+    Severity.MEDIUM: 2,
+    Severity.HIGH: 3,
+    Severity.CRITICAL: 4,
+}
+
+
+def combine_alerts(existing: NormalizedAlert, candidate: NormalizedAlert) -> NormalizedAlert:
+    """Merge a fresh single-event candidate into an existing alert for the same episode.
+
+    Deterministic and commutative in the fields that matter under concurrency: event counts add,
+    first/last seen widen, severity/confidence take the maximum, and evidence/event references stay
+    bounded. Each accepted ingest is counted; genuine duplicate delivery is stopped upstream by the
+    nonce replay guard (a replayed nonce is rejected before it ever reaches this merge), so the
+    upsert never needs to guess whether an event is a retry. Used by the atomic upsert when two
+    ingests target the same episode row.
+    """
+    evidence = (*existing.evidence, *candidate.evidence)[-5:]
+    severity = max(
+        existing.severity, candidate.severity, key=lambda level: _SEVERITY_RANK[level]
+    )
+    return existing.model_copy(
+        update={
+            "event_count": existing.event_count + candidate.event_count,
+            "first_seen": min(existing.first_seen, candidate.first_seen),
+            "last_seen": max(existing.last_seen, candidate.last_seen),
+            "severity": severity,
+            "confidence": max(existing.confidence, candidate.confidence),
+            "evidence": evidence,
+            "raw_event_ids": (*existing.raw_event_ids, *candidate.raw_event_ids)[-20:],
+        }
+    )
 
 
 class AlertingPipeline:
@@ -32,6 +67,7 @@ class AlertingPipeline:
         tripwire: TripwireRegistryEntry | None,
         config: AlertingConfig | None = None,
         health: tuple[MonitorHealthMetadata, ...] = (),
+        organization_id: UUID | None = None,
     ) -> NormalizedAlert | None:
         config = config or AlertingConfig()
         if not self._valid(event):
@@ -45,7 +81,7 @@ class AlertingPipeline:
             updated = self._update(existing, event, entry, config, health)
             self._alerts[str(updated.alert_id)] = updated
             return updated
-        alert = self._create(event, entry, key, config, health)
+        alert = self._create(event, entry, key, config, health, organization_id)
         self._alerts[str(alert.alert_id)] = alert
         return alert
 
@@ -110,13 +146,15 @@ class AlertingPipeline:
         key: str,
         config: AlertingConfig,
         health: tuple[MonitorHealthMetadata, ...],
+        organization_id: UUID | None = None,
     ) -> NormalizedAlert:
         severity = self._scorer.severity(event, entry.decoy_type, 1.0, 1)
         # The deduplication key describes the detection surface; the time bucket distinguishes
         # separate episodes on that same surface so a later alert cannot overwrite the first row.
+        # The organization is folded into the id so identities never collide across tenants.
         episode = int(event.timestamp.timestamp() // max(1, config.deduplication_window_seconds))
         return NormalizedAlert(
-            alert_id=uuid5(NAMESPACE_URL, f"{key}:{episode}"),
+            alert_id=uuid5(NAMESPACE_URL, f"{organization_id}:{key}:{episode}"),
             trace_identifier=event.trace_identifier,
             decoy_id=event.decoy_id,
             severity=severity,
@@ -128,6 +166,7 @@ class AlertingPipeline:
             last_seen=event.timestamp,
             event_count=1,
             deduplication_key=key,
+            episode_bucket=episode,
             affected_placement_id=entry.placement_id,
             affected_decoy_type=entry.decoy_type,
             evidence=(
