@@ -69,3 +69,7 @@ explicitly future work, not solved here:
 - **Decoy deployment approval + lifecycle** — reviewable, reversible repository decoys through a
   controlled branch + PR, with monitoring activated only after a verified merge. Disabled by
   default; the live GitHub App adapter is not yet implemented (see `docs/DecoyDeployment.md`).
+- **Database honey records (PostgreSQL)** — approved, transactional synthetic rows as database
+  tripwires, monitored only after verification and reversible by exact owned-row deletion. Disabled
+  by default; the real connector adapter is CI-tested against an ephemeral database
+  (see `docs/DatabaseHoneyRecords.md`).

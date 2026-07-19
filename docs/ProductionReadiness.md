@@ -39,3 +39,10 @@ a finished SaaS.
 - Migrations run as a **separate** release step (never at container startup) — see
   [Deployment](Deployment.md).
 - Preflight: [ProductionPreflight](checklists/ProductionPreflight.md).
+
+## Database honey records
+
+Disabled by default. When enabled, connector secrets are encrypted at rest, TLS is required outside
+development, only approved non-sensitive tables receive rows, generated data is synthetic-only, and
+retire/rollback delete only the exact owned row. The real connector adapter is validated in CI
+against an ephemeral PostgreSQL with a synthetic schema — never customer data.

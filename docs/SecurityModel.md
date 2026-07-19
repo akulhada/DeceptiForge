@@ -65,3 +65,13 @@ PRs and remove only deployment-owned content; every action is organization-scope
 (`decoy_deployments:*`), separation-of-duties-guarded, and audited. Rendered decoy content is inert
 (synthetic values only). The feature is disabled by default (`DECOY_DEPLOYMENT_ENABLED`). The live
 GitHub App adapter is not implemented — `docs/integrations/GitHub.md`.
+
+## Database honey records (PostgreSQL)
+
+Synthetic honey rows are inserted into approved customer tables as tripwires (see
+`docs/DatabaseHoneyRecords.md`, `docs/DatabaseDeploymentSafety.md`, `docs/integrations/PostgreSQL.md`).
+Invariants: no arbitrary SQL; least-privilege TLS connections; strict table allowlist + sensitivity/
+trigger/FK rejection; deterministic synthetic-only data (no real PII/payment/credentials); human
+approval + separation of duties; transactional insert with monitoring activated only after
+verification; retire/rollback delete only the exact owned row (drift blocks deletion); connector
+secrets encrypted at rest and never returned. Disabled by default.

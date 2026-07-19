@@ -166,3 +166,10 @@ requires a live `RepositoryDeploymentClient` adapter, which is **not implemented
 `REQUIRE_SEPARATE_DEPLOYMENT_APPROVER`, `DECOY_ALLOWED_PATH_PREFIXES`, `DECOY_PROTECTED_PATH_PATTERNS`,
 `DECOY_MAX_FILES_PER_DEPLOYMENT`, `DECOY_MAX_BYTES_PER_DEPLOYMENT`, `DECOY_DEFAULT_EXPIRY_DAYS`,
 `DECOY_PR_DETAIL_LEVEL`. See `docs/DecoyDeployment.md` and `docs/DecoyLifecycle.md`.
+
+## Database honey records feature (optional)
+
+Disabled by default. Enable with `DATABASE_CONNECTORS_ENABLED=true` and
+`DATABASE_HONEY_DEPLOYMENT_ENABLED=true`, and run `python -m app.jobs.database_honey` as a separate
+service with secret-manager access to connector credentials. Keep target databases private. See
+`docs/DatabaseHoneyRecords.md` and `docs/DatabaseDeploymentSafety.md`.

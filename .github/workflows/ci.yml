@@ -98,6 +98,10 @@ jobs:
         env:
           POSTGRES_TEST_URL: postgresql+psycopg://ci:ci-test-only@localhost:5432/deceptiforge_ci
         run: pytest -vv tests/test_alert_concurrency.py
+      - name: Database honey connector integration (live PostgreSQL, synthetic schema)
+        env:
+          POSTGRES_TEST_URL: postgresql+psycopg://ci:ci-test-only@localhost:5432/deceptiforge_ci
+        run: pytest -vv tests/test_database_honey_integration.py
 
   redis-integration:
     runs-on: ubuntu-latest
