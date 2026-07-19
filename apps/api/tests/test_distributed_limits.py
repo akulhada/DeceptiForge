@@ -187,3 +187,51 @@ def test_replay_fail_open_allows_on_outage() -> None:
 def test_in_memory_limiter_still_available() -> None:
     limiter = InMemoryRateLimiter(clock=lambda: 0.0)
     assert [limiter.allow("k", 2) for _ in range(3)] == [True, True, False]
+
+
+# -- real Redis integration (opt-in via REDIS_TEST_URL; CI provides a service container) ----------
+
+
+def _redis_test_url() -> str | None:
+    import os
+
+    return os.environ.get("REDIS_TEST_URL")
+
+
+@pytest.mark.skipif(_redis_test_url() is None, reason="REDIS_TEST_URL not set")
+def test_redis_integration_two_instances_share_state() -> None:
+    import uuid
+
+    import redis
+
+    url = _redis_test_url()
+    assert url is not None
+    prefix = f"citest-{uuid.uuid4().hex}"
+    a = RedisRateLimiter(
+        redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False
+    )
+    b = RedisRateLimiter(
+        redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False
+    )
+    accepted = sum(1 for limiter in (a, b, a, b, a, b) if limiter.allow("shared", 3))
+    assert accepted == 3
+
+
+@pytest.mark.skipif(_redis_test_url() is None, reason="REDIS_TEST_URL not set")
+def test_redis_integration_nonce_rejected_across_instances() -> None:
+    import uuid
+
+    import redis
+
+    url = _redis_test_url()
+    assert url is not None
+    prefix = f"citest-{uuid.uuid4().hex}"
+    worker_a = _guard(
+        RedisReplayStore(redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False)
+    )
+    worker_b = _guard(
+        RedisReplayStore(redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False)
+    )
+    worker_a.check("ci-nonce", "1000", scope="org")
+    with pytest.raises(ReplayError):
+        worker_b.check("ci-nonce", "1000", scope="org")

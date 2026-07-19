@@ -151,4 +151,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Cache one validated settings object per process."""
-    return Settings()
+    # Pydantic Settings resolves required fields from the environment; the static checker cannot
+    # see that source and incorrectly treats DATABASE_URL as an omitted constructor argument.
+    return Settings()  # type: ignore[call-arg]

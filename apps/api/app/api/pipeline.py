@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from time import perf_counter
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -28,6 +29,7 @@ from app.schemas.api import (
 )
 from app.security import require_scope
 from app.services.api_keys import AuthContext
+from app.services.metrics import emit
 from app.services.monitor_credentials import MonitorCredentialService, MonitorSignatureError
 from app.services.pipeline import PipelineError, PipelineService
 from app.services.rate_limit import get_rate_limiter, rate_limit_key
@@ -135,10 +137,14 @@ def ingest_monitoring_event(
     x_deceptiforge_signature: str | None = Header(default=None),
 ) -> MonitoringEventResponse:
     settings = get_settings()
+    started = perf_counter()
+    request_id = getattr(request.state, "request_id", "unknown")
+    org = str(auth.organization_id)
     # Reject oversized values before any expensive matching/hashing/persistence.
     if len(body.value.encode("utf-8")) > settings.monitoring_max_value_bytes:
+        emit("monitor_ingest_rejected", reason="value_too_large", request_id=request_id)
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "monitoring value exceeds the maximum size"
+            status.HTTP_413_CONTENT_TOO_LARGE, "monitoring value exceeds the maximum size"
         )
     # Tamper-evidence: when signing is required, verify the HMAC over method/path/org/monitor/
     # timestamp/nonce/body-hash before trusting the request. This proves the body was not modified.
@@ -155,6 +161,7 @@ def ingest_monitoring_event(
                 body=raw_body,
             )
         except MonitorSignatureError as error:
+            emit("monitor_signature_failed", request_id=request_id, organization_id=org)
             raise HTTPException(error.status_code, error.message) from None
     # Replay protection is enforced for real (non-development-bypass) ingestion.
     if settings.auth_enabled:
@@ -165,6 +172,7 @@ def ingest_monitoring_event(
                 scope=str(auth.organization_id),
             )
         except ReplayError as error:
+            emit("monitor_replay_rejected", request_id=request_id, organization_id=org)
             raise HTTPException(error.status_code, error.message) from None
     if not get_rate_limiter().allow(
         rate_limit_key(
@@ -175,11 +183,19 @@ def ingest_monitoring_event(
         ),
         settings.monitoring_rate_limit_per_minute,
     ):
+        emit("rate_limit_rejected", endpoint="monitoring:ingest", organization_id=org)
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "monitoring rate limit exceeded")
     event, alert = _guard(
         lambda: _service(session, auth).ingest_event(
             body.decoy_plan_id, body.surface, body.location, body.value
         )
+    )
+    emit(
+        "monitor_ingest_accepted",
+        request_id=request_id,
+        organization_id=org,
+        detected=event is not None,
+        latency_ms=round((perf_counter() - started) * 1000, 2),
     )
     return MonitoringEventResponse(detected=event is not None, event=event, alert=alert)
 
@@ -204,7 +220,7 @@ def _guard[Result](action: Callable[[], Result]) -> Result:
         return action()
     except ArtifactTooLargeError as error:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "artifact exceeds the maximum size"
+            status.HTTP_413_CONTENT_TOO_LARGE, "artifact exceeds the maximum size"
         ) from error
     except PipelineError as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error

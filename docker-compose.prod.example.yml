@@ -1,5 +1,6 @@
-# Purpose: production-shaped compose example. Responsibilities: show a private-network database,
-# no host port publishing, and migrations run as a separate release step (not the API container).
+# Purpose: production-shaped compose example. Responsibilities: show private-network Postgres and
+# Redis (no host ports), the API replicas, separate worker/cron services for reconstruction and
+# lifecycle, and migrations run as a separate release step (not the API container).
 # Copy and adapt; supply secrets via your orchestrator, not this file.
 services:
   postgres:
@@ -13,17 +14,81 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    # No host ports: the rate-limit/replay store is reachable only on the internal network.
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build: { context: ./apps/api }
+    # Run 2+ replicas: rate limits and replay nonces are shared through Redis.
+    deploy: { replicas: 2 }
     environment:
       APP_ENV: production
       AUTH_ENABLED: 'true'
       DEMO_ENABLED: 'false'
-      RATE_LIMIT_MODE: gateway        # or set REDIS_URL for app-level limiting
       CORS_ORIGINS: '["https://dashboard.example.com"]'
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Distributed ingestion safety: Redis-backed limiting + replay are required in production.
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_MODE: app
+      RATE_LIMIT_BACKEND: redis
+      REPLAY_BACKEND: redis
+      REDIS_FAIL_MODE: closed
+      MONITOR_SIGNATURE_REQUIRED: 'true'
+      EVIDENCE_ENCRYPTION_MODE: local
+      EVIDENCE_ENCRYPTION_KEY: ${EVIDENCE_ENCRYPTION_KEY:?}   # inject from a secrets manager
+      BOOTSTRAP_KEYS_ENABLED: 'false'
     networks: [internal, edge]
-    depends_on: { postgres: { condition: service_healthy } }
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # Readiness: GET /ready reports database + Redis. Liveness: GET /health (Dockerfile HEALTHCHECK).
+    # Ingress body-size limits (defense in depth alongside the app's streaming limit):
+    #   nginx: client_max_body_size 1m;
+    #   traefik: entryPoints.web.transport.maxRequestBodyBytes
+    #   envoy: buffer / max_request_bytes; cloud gateways: request size limit = 1 MiB.
+
+  # Reconstruction worker: drains the incident-reconstruction queue off the API hot path.
+  # Wrap in a scheduler/loop in your orchestrator, or run as a periodic Job.
+  reconstruction-worker:
+    build: { context: ./apps/api }
+    command: ['python', '-m', 'app.jobs.reconstruction']
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_MODE: gateway
+      REPLAY_BACKEND: redis
+      EVIDENCE_ENCRYPTION_MODE: local
+      EVIDENCE_ENCRYPTION_KEY: ${EVIDENCE_ENCRYPTION_KEY:?}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Lifecycle/retention cron: schedule these as periodic Jobs (cron, k8s CronJob, etc.):
+  #   python -m app.jobs.retention
+  #   python -m app.jobs.incident_lifecycle
+  lifecycle-cron:
+    build: { context: ./apps/api }
+    command: ['python', '-m', 'app.jobs.incident_lifecycle']
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_MODE: gateway
+      REPLAY_BACKEND: redis
+      EVIDENCE_ENCRYPTION_MODE: local
+      EVIDENCE_ENCRYPTION_KEY: ${EVIDENCE_ENCRYPTION_KEY:?}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
     # Run `alembic upgrade head` as a one-off release step BEFORE rolling out (not at startup).
 
 networks:

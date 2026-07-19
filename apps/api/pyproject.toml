@@ -46,3 +46,8 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = [
+    # Tracked: Starlette's TestClient warns that httpx>=0.28 support is deprecated in favor of a
+    # future httpx2. This is a test-only dependency signal; revisit when httpx2 is released.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
+]

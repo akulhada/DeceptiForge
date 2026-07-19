@@ -81,11 +81,14 @@ class BodyLimitMiddleware:
 
     async def _reject(self, scope: Scope, send: Send) -> None:
         request_id = _scope_request_id(scope)
+        from app.services.metrics import emit
+
+        emit("body_size_rejected", request_id=request_id, path=scope.get("path", ""))
         body = json.dumps({"detail": "request body too large", "request_id": request_id}).encode()
         await send(
             {
                 "type": "http.response.start",
-                "status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                "status": status.HTTP_413_CONTENT_TOO_LARGE,
                 "headers": [
                     (b"content-type", b"application/json"),
                     (b"x-request-id", request_id.encode()),
@@ -132,7 +135,7 @@ def register_exception_handlers(application: FastAPI) -> None:
 
     @application.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:
-        return _safe_response(request, status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid request")
+        return _safe_response(request, status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid request")
 
     @application.exception_handler(SQLAlchemyError)
     async def _database(request: Request, exc: SQLAlchemyError) -> JSONResponse:

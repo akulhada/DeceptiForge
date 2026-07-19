@@ -1,71 +1,89 @@
-<!-- Purpose: document production-oriented deployment of the API. Responsibilities: migrations,
-required env, container behavior, limits, and remaining gaps. Future modules: expand as real
-identity, distributed limiting, and async ingestion land. -->
+<!-- Purpose: document deployment of the API for single-worker staging and multi-worker production.
+Responsibilities: migrations, required env, distributed dependencies, lifecycle workers, limits,
+ingress, and container behavior. -->
 
-# Deployment (controlled staging)
+# Deployment
 
-This is a hardened MVP, safe for controlled staging — **not** full production SaaS. Real identity,
-RBAC, key rotation, distributed rate limiting, async ingestion, and log aggregation remain future
-work.
+Two supported shapes:
+
+- **Single-worker staging** — one API process. In-memory rate limiting and replay are acceptable
+  (`RATE_LIMIT_BACKEND=memory`, `REPLAY_BACKEND=memory`), no Redis required.
+- **Multi-worker production** — two or more replicas. Rate limiting and replay **must** be
+  Redis-backed so limits and nonces are shared across workers. See `docker-compose.prod.example.yml`.
 
 ## Migrations (separate release step)
 
-The API container does **not** run migrations automatically. Run them as a one-off before rollout:
+The API container never runs migrations at startup. Run them as a one-off before rollout:
 
 ```sh
 docker run --rm -e DATABASE_URL=... <image> alembic upgrade head
-# or, on a release host:
-cd apps/api && alembic upgrade head
 ```
 
-## Container behavior
+## Lifecycle workers (separate from API replicas)
 
-- Runs as a non-root user (`appuser`, uid 10001).
-- Default command serves only (`uvicorn app.main:app`); no migrations at startup.
-- `HEALTHCHECK` probes `/docs` via the standard library.
-- No secrets are baked into the image; all secrets come from the environment at runtime.
-- Dependencies install from `pyproject` ranges (no lockfile yet — FUTURE_HARDENING: pin via a
-  lockfile / hashes).
+Cleanup and reconstruction do not run implicitly in API replicas. Deploy these as separate
+worker/cron services (see the prod compose example):
 
-## Required environment (production-like)
+| Command | Role |
+| --- | --- |
+| `python -m app.jobs.reconstruction` | drains the incident-reconstruction queue off the hot path |
+| `python -m app.jobs.retention` | purges aged events/alerts/jobs/keys, prunes narrative revisions |
+| `python -m app.jobs.incident_lifecycle` | retires stale incidents, archives resolved/stale ones |
+
+Jobs are idempotent, batched, organization-safe, and guarded by a PostgreSQL advisory lock, so
+concurrent runs are safe.
+
+## Required environment (multi-worker production)
 
 | Variable | Purpose |
 | --- | --- |
-| `APP_ENV` | `production` disables demo routes, local scanning, and auth bypass |
-| `DATABASE_URL` | PostgreSQL DSN |
-| `AUTH_ENABLED` | `true` in production (bypass rejected outside development) |
-| `API_KEY_BINDINGS` | JSON map of API key → single organization UUID |
+| `APP_ENV=production` | disables demo routes, local scanning, and auth bypass |
+| `DATABASE_URL` | PostgreSQL DSN (private network) |
+| `AUTH_ENABLED=true` | bypass rejected outside development |
+| `REDIS_URL` | required when a Redis-backed backend is selected (private network) |
+| `RATE_LIMIT_MODE` | `app` (with `RATE_LIMIT_BACKEND=redis`) or `gateway` (edge enforces) |
+| `RATE_LIMIT_BACKEND=redis` | required in `app` mode; production refuses in-memory |
+| `REPLAY_BACKEND=redis` | required in production; production refuses in-memory |
+| `REDIS_FAIL_MODE` | `closed` (reject on outage, default) or `open` (degrade to allow) |
+| `MONITOR_SIGNATURE_REQUIRED=true` | require HMAC-signed ingestion (see `monitor-signing.md`) |
+| `EVIDENCE_ENCRYPTION_MODE` | `local` (with `EVIDENCE_ENCRYPTION_KEY`) or a documented KMS strategy |
+| `BOOTSTRAP_KEYS_ENABLED` | `false` in steady state (see `bootstrap-and-encryption.md`) |
 | `CORS_ORIGINS` | explicit allow-list; empty = CORS off (fail closed) |
-| `CORS_ALLOW_CREDENTIALS` | `true` only with non-wildcard origins |
-| `DEMO_ENABLED` | must be `false` in production (demo also needs `APP_ENV=development`) |
-| `OPENAI_API_KEY` | optional; absent → deterministic narrative fallback |
 
-## API key / organization binding
+Production **fails fast at startup** on: in-memory rate-limit/replay backends, missing `REDIS_URL`
+when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled`, or unrestricted
+(no-expiry) bootstrap keys.
 
-Each API key maps to exactly one organization via `API_KEY_BINDINGS`. A request whose
-`X-DeceptiForge-Org-Id` does not match the key's bound organization is rejected (`403`). One shared
-key can no longer act as an arbitrary organization. The demo key shortcut works **only** in
-development.
+## Health / readiness
 
-## Limits (single-process MVP)
+- Liveness: `GET /health` (also the container `HEALTHCHECK`).
+- Readiness: `GET /ready` reports database and Redis dependency state; returns `503` if a required
+  dependency is down. Neither endpoint discloses connection strings or secrets.
 
-- Request body limit: `MAX_REQUEST_BODY_BYTES` (413 on exceed).
-- Monitoring value limit: `MONITORING_MAX_VALUE_BYTES` (413; not persisted).
-- Artifact size limit: `MAX_ARTIFACT_BYTES` (413 before persistence).
-- Rate limits (in-process): `MONITORING_RATE_LIMIT_PER_MINUTE`, `NARRATIVE_RATE_LIMIT_PER_MINUTE`.
-  **This limiter is per-process and does not coordinate across workers/hosts** — production needs an
-  edge/distributed limiter and a reverse proxy that enforces body/connection limits.
-- Retention: `NARRATIVE_REVISION_RETENTION_COUNT` (pruned), `MONITORING_EVENT_RETENTION_DAYS`
-  (documented target; scheduled cleanup is future work).
+## Limits and ingress
+
+- The app enforces a **streaming** request-body limit (`MAX_REQUEST_BODY_BYTES`): oversized
+  Content-Length **and** chunked/no-length bodies are rejected with `413` without buffering.
+- Also configure an ingress body-size limit as defense in depth:
+  - nginx: `client_max_body_size 1m;`
+  - Traefik: `entryPoints.web.transport.maxRequestBodyBytes`
+  - Envoy / cloud gateways: request size limit = 1 MiB.
+- Per-value monitoring limit: `MONITORING_MAX_VALUE_BYTES` (413, not persisted).
+
+## Container behavior
+
+- Runs as non-root (`appuser`, uid 10001); CI asserts this.
+- Serves only by default (`uvicorn app.main:app`); migrations are a separate step.
+- No secrets baked into the image; all secrets come from the environment at runtime.
+
+## Networking
+
+Keep PostgreSQL and Redis on a private, non-published network. Do not publish their host ports in
+production. Only the API (behind the edge/ingress) is reachable externally.
 
 ## Errors and correlation
 
 Every response carries `x-request-id`. Unexpected errors return a safe body
-(`{"detail":"internal server error","request_id":...}`) with no stack trace, filesystem path, SQL,
-provider detail, or raw payload. Structured error metadata is logged server-side.
-
-## Remaining production hardening
-
-Real identity/OAuth/RBAC and key rotation; distributed rate limiting; async/durable monitor
-ingestion and deduplication; repository integrations (no local-path scanning); scheduled retention;
-production monitoring and log aggregation; dependency lockfile.
+(`{"detail":"internal server error","request_id":...}`) with no stack trace, path, SQL, provider
+detail, or raw payload. Structured metrics/logs never include secrets, signatures, raw bodies, or
+decrypted evidence.
