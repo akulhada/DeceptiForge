@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     admin_rate_limit_per_minute: int = 30
     narrative_revision_retention_count: int = 20
     monitoring_event_retention_days: int = 30
+    alert_retention_days: int = 90
+    api_key_retention_days: int = 30
+    reconstruction_job_retention_days: int = 7
+    incident_archive_after_seconds: int = 2_592_000  # 30 days after last activity
+    retention_batch_size: int = 500
     incident_stale_after_seconds: int = 86_400
     monitoring_timestamp_skew_seconds: int = 300
     # When true, monitoring ingestion requires a valid monitor-signature-v1 HMAC signature. Kept off

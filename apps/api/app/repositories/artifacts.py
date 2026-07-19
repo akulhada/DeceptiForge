@@ -26,6 +26,7 @@ from app.models.domain.operations import (
 )
 from app.models.records import (
     AlertRecord,
+    ApiKeyRecord,
     ContextProfileRecord,
     DecoyPlanRecord,
     DetectionEventRecord,
@@ -422,6 +423,8 @@ class ArtifactRepository:
                 IncidentRecord(
                     id=incident.incident_id,
                     organization_id=organization_id,
+                    status=incident.lifecycle.value,
+                    last_seen=incident.last_seen,
                     data=self._guard_size(incident.model_dump_json()),
                 )
             )
@@ -457,6 +460,8 @@ class ArtifactRepository:
                 IncidentRecord(
                     id=updated.incident_id,
                     organization_id=organization_id,
+                    status=updated.lifecycle.value,
+                    last_seen=updated.last_seen,
                     data=self._guard_size(updated.model_dump_json()),
                 )
             )
@@ -529,6 +534,106 @@ class ArtifactRepository:
             .order_by(NarrativeRevisionRecord.revision_number)
         ).all()
         return tuple(IncidentNarrative.model_validate_json(row.data) for row in rows)
+
+    # -- retention / lifecycle ----------------------------------------------------------------
+
+    def _batched_delete(self, model: Any, id_column: Any, condition: Any, batch: int) -> int:
+        """Delete rows matching ``condition`` in bounded batches; return the total removed."""
+        total = 0
+        while True:
+            ids = self._session.scalars(select(id_column).where(condition).limit(batch)).all()
+            if not ids:
+                break
+            self._session.execute(delete(model).where(id_column.in_(ids)))
+            self._session.flush()
+            total += len(ids)
+            if len(ids) < batch:
+                break
+        return total
+
+    def purge_detection_events(self, cutoff: datetime, batch: int = 500) -> int:
+        return self._batched_delete(
+            DetectionEventRecord,
+            DetectionEventRecord.id,
+            DetectionEventRecord.created_at < cutoff,
+            batch,
+        )
+
+    def purge_alerts(self, cutoff: datetime, batch: int = 500) -> int:
+        return self._batched_delete(
+            AlertRecord, AlertRecord.id, AlertRecord.created_at < cutoff, batch
+        )
+
+    def purge_reconstruction_jobs(self, cutoff: datetime, batch: int = 500) -> int:
+        return self._batched_delete(
+            ReconstructionJobRecord,
+            ReconstructionJobRecord.id,
+            (ReconstructionJobRecord.status.in_(("done", "failed")))
+            & (ReconstructionJobRecord.created_at < cutoff),
+            batch,
+        )
+
+    def purge_expired_api_keys(self, now: datetime, cutoff: datetime, batch: int = 500) -> int:
+        """Delete keys that are revoked or expired and older than the retention cutoff."""
+        return self._batched_delete(
+            ApiKeyRecord,
+            ApiKeyRecord.id,
+            (ApiKeyRecord.created_at < cutoff)
+            & (
+                (ApiKeyRecord.status == "revoked")
+                | ((ApiKeyRecord.expires_at.is_not(None)) & (ApiKeyRecord.expires_at < now))
+            ),
+            batch,
+        )
+
+    def prune_all_narrative_revisions(self, keep: int) -> int:
+        """Keep only the newest ``keep`` revisions per (organization, incident); return pruned."""
+        if keep <= 0:
+            return 0
+        pairs = self._session.execute(
+            select(
+                NarrativeRevisionRecord.organization_id, NarrativeRevisionRecord.incident_id
+            ).distinct()
+        ).all()
+        pruned = 0
+        for organization_id, incident_id in pairs:
+            records = self._session.scalars(
+                select(NarrativeRevisionRecord)
+                .where(
+                    NarrativeRevisionRecord.organization_id == organization_id,
+                    NarrativeRevisionRecord.incident_id == incident_id,
+                )
+                .order_by(NarrativeRevisionRecord.revision_number.desc())
+            ).all()
+            for record in records[keep:]:
+                self._session.delete(record)
+                pruned += 1
+        self._session.flush()
+        return pruned
+
+    def retire_all_stale_incidents(self, now: datetime, stale_after_seconds: int) -> int:
+        """Retire stale incidents across every organization; return the count retired."""
+        org_ids = self._session.scalars(
+            select(IncidentRecord.organization_id).distinct()
+        ).all()
+        return sum(
+            self.retire_stale_incidents(org_id, now, stale_after_seconds) for org_id in org_ids
+        )
+
+    def archive_incidents(self, cutoff: datetime, batch: int = 500) -> int:
+        """Delete resolved/stale incidents whose last activity predates the archive cutoff."""
+        return self._batched_delete(
+            IncidentRecord,
+            IncidentRecord.id,
+            (
+                IncidentRecord.status.in_(
+                    (IncidentLifecycle.RESOLVED.value, IncidentLifecycle.STALE.value)
+                )
+            )
+            & (IncidentRecord.last_seen.is_not(None))
+            & (IncidentRecord.last_seen < cutoff),
+            batch,
+        )
 
     # -- maintenance --------------------------------------------------------------------------
 

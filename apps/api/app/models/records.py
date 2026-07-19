@@ -132,6 +132,11 @@ class IncidentRecord(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
+    # Lifecycle status and last-activity promoted to indexed columns for lifecycle/retention jobs.
+    status: Mapped[str | None] = mapped_column(String(16), index=True, nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
