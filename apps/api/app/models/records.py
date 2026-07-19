@@ -304,6 +304,27 @@ class DeploymentAuditRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class DeploymentTripwireRecord(Base):
+    """A persisted tripwire activation, created only after a verified merge. Unique per (deployment,
+    trace) so activation is idempotent; status flips to disabled/retired on rollback/retirement."""
+
+    __tablename__ = "deployment_tripwires"
+    __table_args__ = (
+        UniqueConstraint("deployment_id", "trace_identifier", name="uq_deployment_tripwire"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    trace_identifier: Mapped[str] = mapped_column(String(128), index=True)
+    target_path: Mapped[str] = mapped_column(String(2048))
+    commit_sha: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class DeploymentJobRecord(Base):
     """Async deployment work (execute/verify/retire/rollback). One open job per type per deployment
     (unique) prevents duplicate PR creation under retries or concurrent workers."""
