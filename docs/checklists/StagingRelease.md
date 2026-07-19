@@ -7,8 +7,13 @@ docs/bootstrap-and-encryption.md. -->
 Complete every item before deploying to controlled staging. Boxes map to CI gates where possible;
 items marked **manual** are operator responsibilities not enforceable in CI.
 
+Procedure and scripts: `scripts/staging/README.md`. Record evidence in
+`docs/checklists/StagingVerification.md`. Tagging: `docs/Deployment.md` → "Release-candidate tagging".
+
 ## CI and code
 
+- [ ] **manual** Attach the remote CI run URL for the exact release commit and confirm it is green.
+      Do not proceed on an unverified or red run.
 - [ ] CI is green on the release commit: `backend-quality`, `postgres-integration`,
       `redis-integration`, `frontend`, `production-config`, `docker`, `secret-scan`.
 - [ ] `production-config` proves the exact production-like `Settings.validate_runtime()` passes and

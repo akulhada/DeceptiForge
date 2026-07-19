@@ -17,7 +17,33 @@ The API container never runs migrations at startup. Run them as a one-off before
 
 ```sh
 docker run --rm -e DATABASE_URL=... <image> alembic upgrade head
+# or, from a release host with the staging environment sourced:
+scripts/staging/migrate.sh
 ```
+
+## Controlled staging: scripts and procedure
+
+See `scripts/staging/README.md`. Order: `preflight.sh` → `migrate.sh` → deploy the prod-shaped
+topology → `verify_runtime.sh` (+ `smoke_test.sh`). `rollback.sh` performs an image-only rollback
+and never touches the database. Record evidence in `docs/checklists/StagingVerification.md`; gate the
+go/no-go with `docs/checklists/StagingRelease.md`. Configure the environment from
+`.env.staging.example` (placeholders only; render real secrets from your secret manager).
+
+## Release-candidate tagging
+
+Tag the exact commit only after the remote CI run for that commit is green (all jobs). Do not tag a
+commit whose CI is red or unverified.
+
+```sh
+git switch main
+git pull origin main
+git status                 # must be clean
+# Confirm the remote CI run for this commit is green (attach the URL to the verification record).
+git tag -a v0.1.0-rc1 -m "DeceptiForge controlled staging candidate"
+git push origin v0.1.0-rc1
+```
+
+If `v0.1.0-rc1` already exists, do not overwrite it — use the next number (`-rc2`, …).
 
 ## Lifecycle workers (separate from API replicas)
 
