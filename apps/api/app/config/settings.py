@@ -1,6 +1,7 @@
 # Purpose: load validated application configuration.
 # Responsibilities: define the API's current environment contract.
 # Future modules: add settings alongside their integration owner.
+from datetime import datetime
 from functools import lru_cache
 
 from pydantic import Field, PostgresDsn
@@ -65,8 +66,16 @@ class Settings(BaseSettings):
     evidence_encryption_mode: str = "disabled"
     evidence_encryption_key: str | None = None
     # Bootstrap keys (API_KEY_BINDINGS) grant owner scope without a DB row. Disabled by default;
-    # a one-time bootstrap window must be explicitly opened and then closed.
+    # a one-time bootstrap window must be explicitly opened, is time-boxed via BOOTSTRAP_EXPIRES_AT,
+    # and must be closed once the first DB-backed owner key exists.
     bootstrap_keys_enabled: bool = False
+    bootstrap_expires_at: datetime | None = None
+
+    def bootstrap_active(self, now: datetime) -> bool:
+        """Whether env bootstrap keys may authenticate right now."""
+        if not self.bootstrap_keys_enabled:
+            return False
+        return self.bootstrap_expires_at is None or now < self.bootstrap_expires_at
 
     @property
     def _redis_required(self) -> bool:
@@ -96,11 +105,16 @@ class Settings(BaseSettings):
                 "production requires an explicit EVIDENCE_ENCRYPTION_MODE (e.g. 'local' or a "
                 "documented KMS/DB-level strategy); plaintext evidence is not permitted"
             )
-        if self.bootstrap_keys_enabled and self.api_key_bindings:
+        unrestricted_bootstrap = (
+            self.bootstrap_keys_enabled
+            and bool(self.api_key_bindings)
+            and self.bootstrap_expires_at is None
+        )
+        if unrestricted_bootstrap:
             raise RuntimeError(
-                "refusing to start: bootstrap API keys are still enabled in production; create a "
-                "DB-backed owner key, then set BOOTSTRAP_KEYS_ENABLED=false and remove "
-                "API_KEY_BINDINGS before restarting"
+                "refusing to start: bootstrap API keys are enabled in production without an "
+                "expiry; set BOOTSTRAP_EXPIRES_AT to time-box the window, then create a DB-backed "
+                "owner key and set BOOTSTRAP_KEYS_ENABLED=false before restarting"
             )
         if self._redis_required:
             self._verify_redis_reachable()

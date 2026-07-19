@@ -37,6 +37,7 @@ from app.models.records import (
     RepositoryRecord,
     ValidationReportRecord,
 )
+from app.services.encryption import EncryptionProvider, get_encryption_provider
 
 
 class ArtifactTooLargeError(Exception):
@@ -46,9 +47,16 @@ class ArtifactTooLargeError(Exception):
 class ArtifactRepository:
     """Organization-scoped persistence gateway for the pipeline artifacts."""
 
-    def __init__(self, session: Session, max_artifact_bytes: int | None = None) -> None:
+    def __init__(
+        self,
+        session: Session,
+        max_artifact_bytes: int | None = None,
+        encryption: EncryptionProvider | None = None,
+    ) -> None:
         self._session = session
         self._max_artifact_bytes = max_artifact_bytes
+        # Evidence-bearing blobs (alerts, detection events, incidents) are encrypted at rest.
+        self._encryption = encryption or get_encryption_provider()
 
     def _guard_size(self, serialized: str) -> str:
         if self._max_artifact_bytes is not None and len(serialized.encode("utf-8")) > (
@@ -56,6 +64,24 @@ class ArtifactRepository:
         ):
             raise ArtifactTooLargeError("serialized artifact exceeds the maximum size")
         return serialized
+
+    def _seal(self, serialized: str) -> str:
+        """Encrypt an evidence-bearing blob before persistence (records the key version)."""
+        return self._encryption.encrypt(serialized)
+
+    def _unseal(self, stored: str) -> str:
+        """Decrypt an evidence blob; tolerate legacy plaintext JSON rows from before encryption."""
+        if stored.startswith("{"):
+            return stored
+        return self._encryption.decrypt(stored)
+
+    def _decode_alerts(self, rows: Any) -> tuple[NormalizedAlert, ...]:
+        return tuple(NormalizedAlert.model_validate_json(self._unseal(row.data)) for row in rows)
+
+    def _decode_incidents(self, rows: Any) -> tuple[ReconstructedIncident, ...]:
+        return tuple(
+            ReconstructedIncident.model_validate_json(self._unseal(row.data)) for row in rows
+        )
 
     # -- repositories ---------------------------------------------------------------------------
 
@@ -217,7 +243,7 @@ class ArtifactRepository:
                 organization_id=organization_id,
                 trace_identifier=event.trace_identifier,
                 decoy_id=event.decoy_id,
-                data=self._guard_size(event.model_dump_json()),
+                data=self._seal(self._guard_size(event.model_dump_json())),
             )
         )
         self._session.flush()
@@ -230,7 +256,7 @@ class ArtifactRepository:
             .where(DetectionEventRecord.organization_id == organization_id)
             .order_by(DetectionEventRecord.created_at)
         ).all()
-        return tuple(RawDetectionEvent.model_validate_json(row.data) for row in rows)
+        return tuple(RawDetectionEvent.model_validate_json(self._unseal(row.data)) for row in rows)
 
     def detection_events_for_decoys(
         self, organization_id: UUID, decoy_ids: set[UUID]
@@ -245,7 +271,7 @@ class ArtifactRepository:
             )
             .order_by(DetectionEventRecord.created_at)
         ).all()
-        return tuple(RawDetectionEvent.model_validate_json(row.data) for row in rows)
+        return tuple(RawDetectionEvent.model_validate_json(self._unseal(row.data)) for row in rows)
 
     # -- alerts -------------------------------------------------------------------------------
 
@@ -261,7 +287,7 @@ class ArtifactRepository:
                 deduplication_key=alert.deduplication_key,
                 first_seen=alert.first_seen,
                 last_seen=alert.last_seen,
-                data=self._guard_size(alert.model_dump_json()),
+                data=self._seal(self._guard_size(alert.model_dump_json())),
             )
         )
         self._session.flush()
@@ -302,7 +328,7 @@ class ArtifactRepository:
             .order_by(AlertRecord.created_at.desc())
             .limit(limit)
         ).all()
-        return tuple(NormalizedAlert.model_validate_json(row.data) for row in reversed(rows))
+        return self._decode_alerts(reversed(rows))
 
     # -- reconstruction work queue ------------------------------------------------------------
 
@@ -383,7 +409,7 @@ class ArtifactRepository:
                 .where(AlertRecord.organization_id == organization_id)
                 .order_by(AlertRecord.created_at)
             ).all()
-            return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
+            return self._decode_alerts(rows)
         # Bound the working set to the most recent alerts, returned chronologically.
         recent = self._session.scalars(
             select(AlertRecord)
@@ -391,7 +417,7 @@ class ArtifactRepository:
             .order_by(AlertRecord.created_at.desc())
             .limit(limit)
         ).all()
-        return tuple(NormalizedAlert.model_validate_json(row.data) for row in reversed(recent))
+        return self._decode_alerts(reversed(recent))
 
     def alerts_for_decoys(
         self, organization_id: UUID, decoy_ids: set[UUID]
@@ -406,7 +432,7 @@ class ArtifactRepository:
             )
             .order_by(AlertRecord.created_at)
         ).all()
-        return tuple(NormalizedAlert.model_validate_json(row.data) for row in rows)
+        return self._decode_alerts(rows)
 
     # -- incidents ----------------------------------------------------------------------------
 
@@ -425,7 +451,7 @@ class ArtifactRepository:
                     organization_id=organization_id,
                     status=incident.lifecycle.value,
                     last_seen=incident.last_seen,
-                    data=self._guard_size(incident.model_dump_json()),
+                    data=self._seal(self._guard_size(incident.model_dump_json())),
                 )
             )
         self._session.flush()
@@ -438,7 +464,7 @@ class ArtifactRepository:
             .where(IncidentRecord.organization_id == organization_id)
             .order_by(IncidentRecord.created_at)
         ).all()
-        return tuple(ReconstructedIncident.model_validate_json(row.data) for row in rows)
+        return self._decode_incidents(rows)
 
     def retire_stale_incidents(
         self, organization_id: UUID, now: datetime, stale_after_seconds: int
@@ -462,7 +488,7 @@ class ArtifactRepository:
                     organization_id=organization_id,
                     status=updated.lifecycle.value,
                     last_seen=updated.last_seen,
-                    data=self._guard_size(updated.model_dump_json()),
+                    data=self._seal(self._guard_size(updated.model_dump_json())),
                 )
             )
             retired += 1
@@ -475,7 +501,7 @@ class ArtifactRepository:
         record = self._session.get(IncidentRecord, incident_id)
         if record is None or record.organization_id != organization_id:
             return None
-        return ReconstructedIncident.model_validate_json(record.data)
+        return ReconstructedIncident.model_validate_json(self._unseal(record.data))
 
     # -- narratives ---------------------------------------------------------------------------
 

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -83,10 +84,19 @@ def _authenticate(
         )
         return AuthContext(organization, PERMISSIONS, "owner", None)
 
-    # Env-provisioned bootstrap/service key bound to one organization (owner scope). Prefer the
-    # hashed, DB-backed keys below; this path exists to bootstrap the first admin key.
+    # Env-provisioned bootstrap key bound to one organization (owner scope). Disabled by default and
+    # only honored inside an explicitly opened, time-boxed bootstrap window; used solely to mint the
+    # first DB-backed owner key. Every use is audited and never grants implicit permanent access.
     bound = settings.api_key_bindings.get(api_key)
     if bound is not None:
+        if not settings.bootstrap_active(datetime.now(UTC)):
+            _record_rejection(
+                session,
+                action="auth",
+                request_id=request_id,
+                detail="bootstrap key rejected (disabled or expired)",
+            )
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid API key")
         bound_org = _parse_org(bound, session=session, request_id=request_id)
         if (
             org_id is not None
@@ -102,6 +112,14 @@ def _authenticate(
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, "organization does not match the API key"
             )
+        write_audit(
+            session,
+            action="bootstrap_auth_used",
+            outcome="accepted",
+            request_id=request_id,
+            organization_id=bound_org,
+            detail="bootstrap key authenticated",
+        )
         return AuthContext(bound_org, PERMISSIONS, "owner", None)
 
     try:

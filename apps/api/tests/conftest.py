@@ -33,6 +33,8 @@ def build_client(
     cors_origins: str | None = None,
     cors_allow_credentials: bool = False,
     monitor_signature_required: bool = False,
+    bootstrap_keys_enabled: bool | None = None,
+    bootstrap_expires_at: str | None = None,
 ) -> Iterator[TestClient]:
     overrides = {
         "DEMO_ENABLED": "true" if demo_enabled else "false",
@@ -54,6 +56,16 @@ def build_client(
         "EVIDENCE_ENCRYPTION_MODE": "local",
         "EVIDENCE_ENCRYPTION_KEY": "test-evidence-key-0000000000000000000000",
     }
+    # Tests that provision env bindings exercise the (time-boxed) bootstrap window; open it by
+    # default so bound keys authenticate and production startup validation passes. Individual tests
+    # can override the flag/expiry to exercise the disabled/expired paths.
+    if api_key_bindings not in ("{}", ""):
+        overrides["BOOTSTRAP_KEYS_ENABLED"] = "true"
+        overrides["BOOTSTRAP_EXPIRES_AT"] = "2999-01-01T00:00:00+00:00"
+    if bootstrap_keys_enabled is not None:
+        overrides["BOOTSTRAP_KEYS_ENABLED"] = "true" if bootstrap_keys_enabled else "false"
+    if bootstrap_expires_at is not None:
+        overrides["BOOTSTRAP_EXPIRES_AT"] = bootstrap_expires_at
     previous = {key: os.environ.get(key) for key in overrides}
     os.environ.update(overrides)
     get_settings.cache_clear()
