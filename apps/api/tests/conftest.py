@@ -38,6 +38,9 @@ def build_client(
     decoy_deployment_enabled: bool = False,
     database_connectors_enabled: bool = False,
     database_honey_deployment_enabled: bool = False,
+    rag_connectors_enabled: bool = False,
+    mcp_connectors_enabled: bool = False,
+    ai_tripwire_deployment_enabled: bool = False,
 ) -> Iterator[TestClient]:
     # Production-like environments must enforce signatures; default the flag on there unless a test
     # explicitly overrides it. Development defaults off (migration-friendly).
@@ -56,6 +59,11 @@ def build_client(
         "DATABASE_CONNECTORS_ENABLED": "true" if database_connectors_enabled else "false",
         "DATABASE_HONEY_DEPLOYMENT_ENABLED": (
             "true" if database_honey_deployment_enabled else "false"
+        ),
+        "RAG_CONNECTORS_ENABLED": "true" if rag_connectors_enabled else "false",
+        "MCP_CONNECTORS_ENABLED": "true" if mcp_connectors_enabled else "false",
+        "AI_TRIPWIRE_DEPLOYMENT_ENABLED": (
+            "true" if ai_tripwire_deployment_enabled else "false"
         ),
         # Tests exercise production settings; delegate rate limiting to the edge so create_app
         # does not require a Redis-backed rate-limit store.

@@ -5,6 +5,7 @@
 from fastapi import APIRouter
 
 from app.api.admin import router as admin_router
+from app.api.ai_tripwire import router as ai_tripwire_router
 from app.api.database_honey import router as database_honey_router
 from app.api.demo import router as demo_router
 from app.api.deployments import router as deployments_router
@@ -32,6 +33,12 @@ def build_api_router(settings: Settings) -> APIRouter:
         router.include_router(deployments_router)
     if settings.database_connectors_enabled or settings.database_honey_deployment_enabled:
         router.include_router(database_honey_router)
+    if (
+        settings.rag_connectors_enabled
+        or settings.mcp_connectors_enabled
+        or settings.ai_tripwire_deployment_enabled
+    ):
+        router.include_router(ai_tripwire_router)
     if settings.demo_enabled and settings.is_development:
         router.include_router(demo_router)
     return router
