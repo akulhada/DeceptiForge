@@ -477,6 +477,133 @@ class DatabaseHoneyAuditRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class RagConnectorRecord(Base):
+    """A vector-store connector. Credentials are stored encrypted, never in plaintext."""
+
+    __tablename__ = "rag_connectors"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    connector_type: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(128))
+    secret_ciphertext: Mapped[str] = mapped_column(Text)
+    secret_key_version: Mapped[str] = mapped_column(String(32))
+    index_or_collection: Mapped[str] = mapped_column(String(255))
+    namespace: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    created_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    safe_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class McpConnectorRecord(Base):
+    """An MCP server connector. Any secret is stored encrypted, never in plaintext."""
+
+    __tablename__ = "mcp_connectors"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    server_reference: Mapped[str] = mapped_column(String(512))
+    transport_type: Mapped[str] = mapped_column(String(32))
+    secret_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    secret_key_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    created_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    safe_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AiTripwireDeploymentRecord(Base):
+    """A reviewable, reversible RAG/MCP tripwire deployment. The deployed content is inert."""
+
+    __tablename__ = "ai_tripwire_deployments"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    surface_type: Mapped[str] = mapped_column(String(16), index=True)
+    connector_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    target_collection: Mapped[str] = mapped_column(String(255))
+    decoy_kind: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    trace_id: Mapped[str] = mapped_column(String(128), index=True)
+    external_asset_id: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    approved_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    preview_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    preview_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    verification_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    monitoring_activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    safe_failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    safe_failure_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AiTripwireEventRecord(Base):
+    """A trusted, minimized AI tripwire event. Never stores prompts, chunks, outputs, embeddings."""
+
+    __tablename__ = "ai_tripwire_events"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    trace_id: Mapped[str] = mapped_column(String(128), index=True)
+    surface_type: Mapped[str] = mapped_column(String(16))
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    source_id: Mapped[str] = mapped_column(String(256))
+    monitor_identity: Mapped[str] = mapped_column(String(128))
+    confidence: Mapped[float] = mapped_column()
+    minimized_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AiTripwireJobRecord(Base):
+    """Async AI-tripwire work (deploy/verify/retire). Unique per deployment+type -> no duplicate
+    external assets under retries or concurrent workers."""
+
+    __tablename__ = "ai_tripwire_jobs"
+    __table_args__ = (
+        UniqueConstraint("deployment_id", "job_type", name="uq_ai_tripwire_job"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    job_type: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    correlation_id: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AiTripwireAuditRecord(Base):
+    """Append-only AI-tripwire audit. Never stores secrets, prompts, documents, or model output."""
+
+    __tablename__ = "ai_tripwire_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    deployment_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    connector_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class NarrativeRevisionRecord(Base):
     """One immutable narrative generation. Regeneration appends a revision, never overwrites."""
 

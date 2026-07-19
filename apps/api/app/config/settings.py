@@ -108,6 +108,17 @@ class Settings(BaseSettings):
     database_max_deployment_rows: int = 25
     database_default_expiry_days: int = 90
     require_separate_database_approver: bool = True
+    # AI/RAG/MCP tripwire sensors. Disabled by default; explicit per-environment enablement.
+    ai_tripwire_deployment_enabled: bool = False
+    rag_connectors_enabled: bool = False
+    mcp_connectors_enabled: bool = False
+    ai_tripwire_default_expiry_days: int = 90
+    ai_tripwire_max_document_bytes: int = 16_384
+    require_separate_ai_tripwire_approver: bool = True
+    ai_tripwire_allowed_collections: list[str] = Field(
+        default_factory=lambda: ["deceptiforge_decoys"]
+    )
+    ai_tripwire_allowed_mcp_servers: list[str] = Field(default_factory=list)
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [

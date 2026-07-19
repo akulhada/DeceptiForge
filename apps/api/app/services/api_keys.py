@@ -52,6 +52,14 @@ PERMISSIONS: frozenset[str] = frozenset(
         "database_honey:deploy",
         "database_honey:retire",
         "database_honey:rollback",
+        "ai_tripwire_connectors:read",
+        "ai_tripwire_connectors:manage",
+        "ai_tripwires:read",
+        "ai_tripwires:create",
+        "ai_tripwires:approve",
+        "ai_tripwires:deploy",
+        "ai_tripwires:retire",
+        "ai_tripwires:ingest",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -72,6 +80,7 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "demo:run",
             "decoy_deployments:create",
             "database_honey:create",
+            "ai_tripwires:create",
         }
     ),
     "viewer": _READS,
@@ -84,6 +93,9 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "decoy_deployments:execute",
             "database_honey:read",
             "database_honey:deploy",
+            "ai_tripwires:read",
+            "ai_tripwires:deploy",
+            "ai_tripwires:ingest",
         }
     ),
 }
