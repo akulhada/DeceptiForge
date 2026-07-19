@@ -73,3 +73,8 @@ explicitly future work, not solved here:
   tripwires, monitored only after verification and reversible by exact owned-row deletion. Disabled
   by default; the real connector adapter is CI-tested against an ephemeral database
   (see `docs/DatabaseHoneyRecords.md`).
+- **AI tripwires (RAG / MCP)** — inert synthetic decoy documents and MCP resources/configs deployed
+  into approved collections/servers, monitored only after verification via signed, minimized events,
+  with deterministic AI-native exposure classification and reversible owned-asset retirement.
+  Disabled by default; RAG/MCP adapters are CI-tested with deterministic fakes — no paid AI services
+  (see `docs/AiTripwires.md`, `docs/AiDataHandling.md`).

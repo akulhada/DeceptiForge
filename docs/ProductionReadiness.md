@@ -46,3 +46,13 @@ Disabled by default. When enabled, connector secrets are encrypted at rest, TLS 
 development, only approved non-sensitive tables receive rows, generated data is synthetic-only, and
 retire/rollback delete only the exact owned row. The real connector adapter is validated in CI
 against an ephemeral PostgreSQL with a synthetic schema — never customer data.
+
+## AI tripwires (RAG / MCP)
+
+Disabled by default. When enabled, connector secrets are encrypted at rest, TLS is required outside
+development, only allowlisted collections/servers are targeted, deployed assets are inert and
+synthetic-only, monitoring activates only after the external asset + trace are verified, and
+retirement deletes only the owned asset (drift blocks deletion). Event ingestion is signed, replay-
+protected, and minimized — no prompts, chunks, model output, raw embeddings, or raw customer content
+are persisted. RAG/MCP coverage runs in CI against deterministic in-memory fake adapters; no paid
+vector store or MCP server is contacted. Production wiring binds concrete provider clients.

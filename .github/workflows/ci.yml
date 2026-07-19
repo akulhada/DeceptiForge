@@ -45,6 +45,10 @@ jobs:
         run: mypy app
       - name: Pytest (unit + fakeredis integration)
         run: pytest -vv --maxfail=1
+      # AI tripwire RAG/MCP coverage runs against deterministic in-memory fake adapters — no paid
+      # vector store or MCP server is contacted in CI.
+      - name: Pytest (AI tripwire mock RAG/MCP adapters)
+        run: pytest -vv tests/test_ai_tripwire_flow.py tests/test_ai_tripwire_api.py
 
   postgres-integration:
     runs-on: ubuntu-latest

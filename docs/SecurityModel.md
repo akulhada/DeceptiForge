@@ -75,3 +75,17 @@ trigger/FK rejection; deterministic synthetic-only data (no real PII/payment/cre
 approval + separation of duties; transactional insert with monitoring activated only after
 verification; retire/rollback delete only the exact owned row (drift blocks deletion); connector
 secrets encrypted at rest and never returned. Disabled by default.
+
+## AI tripwires (RAG / MCP)
+
+Inert synthetic decoy documents (RAG) and resources/configs (MCP) are deployed into approved
+collections/servers as tripwires (see `docs/AiTripwires.md`, `docs/AiDataHandling.md`,
+`docs/integrations/RAG.md`, `docs/integrations/MCP.md`). Invariants: every asset inert (no real
+data/credentials/URLs, no executable payloads, no prompt injection); content safety validates before
+preview; collection/server allowlists; human approval + separation of duties; deploy through an
+adapter, verify the external asset + trace, and **activate monitoring only after verification**;
+retire deletes only the owned asset (drift blocks deletion); event ingestion is signed + replay-
+protected and **minimized** — never storing/logging prompts, chunks, model output, raw embeddings,
+connector secrets, or raw customer content; deterministic exposure classification + severity (GPT
+never decides safety or severity). Connector secrets encrypted at rest and never returned. Disabled
+by default.
