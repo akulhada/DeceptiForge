@@ -38,9 +38,11 @@ def _connect(spec: ConnectionSpec) -> psycopg.Connection[Any]:
         )
     except psycopg.Error as error:  # pragma: no cover - network dependent
         raise ConnectorError(type(error).__name__) from error
+    # SET does not accept bound parameters ($1); interpolate the integer as a literal (safe: int).
+    timeout = sql.Literal(int(spec.statement_timeout_ms))
     with conn.cursor() as cur:
-        cur.execute("SET statement_timeout = %s", (spec.statement_timeout_ms,))
-        cur.execute("SET idle_in_transaction_session_timeout = %s", (spec.statement_timeout_ms,))
+        cur.execute(sql.SQL("SET statement_timeout = {}").format(timeout))
+        cur.execute(sql.SQL("SET idle_in_transaction_session_timeout = {}").format(timeout))
     return conn
 
 
