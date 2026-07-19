@@ -4,11 +4,11 @@
 # Dependencies: SQLAlchemy session and the persistence records.
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models.domain.decoy import BelievabilitySafetyReport, DecoyGenerationPlan
@@ -32,6 +32,7 @@ from app.models.records import (
     IncidentRecord,
     NarrativeRevisionRecord,
     PlacementPlanRecord,
+    ReconstructionJobRecord,
     RepositoryRecord,
     ValidationReportRecord,
 )
@@ -254,10 +255,123 @@ class ArtifactRepository:
                 organization_id=organization_id,
                 trace_identifier=alert.trace_identifier,
                 decoy_id=alert.decoy_id,
+                affected_placement_id=alert.affected_placement_id,
+                correlation_id=alert.correlation_id,
+                deduplication_key=alert.deduplication_key,
+                first_seen=alert.first_seen,
+                last_seen=alert.last_seen,
                 data=self._guard_size(alert.model_dump_json()),
             )
         )
         self._session.flush()
+
+    def related_alerts(
+        self,
+        organization_id: UUID,
+        *,
+        trace_identifier: str,
+        decoy_id: UUID,
+        affected_placement_id: UUID | None,
+        correlation_id: UUID | None,
+        window_start: datetime,
+        window_end: datetime,
+        limit: int = 1000,
+    ) -> tuple[NormalizedAlert, ...]:
+        """Return alerts sharing a strong key with the trigger within the time window.
+
+        Uses the indexed correlation columns so reconstruction never scans the whole alert table.
+        """
+        key_match = [
+            AlertRecord.trace_identifier == trace_identifier,
+            AlertRecord.decoy_id == decoy_id,
+        ]
+        if affected_placement_id is not None:
+            key_match.append(AlertRecord.affected_placement_id == affected_placement_id)
+        if correlation_id is not None:
+            key_match.append(AlertRecord.correlation_id == correlation_id)
+        rows = self._session.scalars(
+            select(AlertRecord)
+            .where(
+                AlertRecord.organization_id == organization_id,
+                or_(*key_match),
+                # Overlap the correlation window: the alert's activity must intersect [start, end].
+                or_(AlertRecord.last_seen.is_(None), AlertRecord.last_seen >= window_start),
+                or_(AlertRecord.first_seen.is_(None), AlertRecord.first_seen <= window_end),
+            )
+            .order_by(AlertRecord.created_at.desc())
+            .limit(limit)
+        ).all()
+        return tuple(NormalizedAlert.model_validate_json(row.data) for row in reversed(rows))
+
+    # -- reconstruction work queue ------------------------------------------------------------
+
+    def enqueue_reconstruction(
+        self, organization_id: UUID, alert: NormalizedAlert, window_seconds: int
+    ) -> UUID:
+        """Append a reconstruction job for the alert's correlation neighborhood; return promptly."""
+        record = ReconstructionJobRecord(
+            organization_id=organization_id,
+            status="pending",
+            trace_identifier=alert.trace_identifier,
+            decoy_id=alert.decoy_id,
+            affected_placement_id=alert.affected_placement_id,
+            correlation_id=alert.correlation_id,
+            window_start=alert.first_seen - timedelta(seconds=window_seconds),
+            window_end=alert.last_seen + timedelta(seconds=window_seconds),
+        )
+        self._session.add(record)
+        self._session.flush()
+        return record.id
+
+    def claim_reconstruction_jobs(
+        self, limit: int, organization_id: UUID | None = None
+    ) -> tuple[ReconstructionJobRecord, ...]:
+        """Atomically claim up to ``limit`` pending jobs so concurrent workers never double-process.
+
+        Each candidate is claimed with a compare-and-set on status; only the worker whose UPDATE
+        changes a row owns it. This is portable across PostgreSQL and SQLite.
+        """
+        query = select(ReconstructionJobRecord.id).where(
+            ReconstructionJobRecord.status == "pending"
+        )
+        if organization_id is not None:
+            query = query.where(ReconstructionJobRecord.organization_id == organization_id)
+        candidate_ids = self._session.scalars(
+            query.order_by(ReconstructionJobRecord.created_at).limit(limit)
+        ).all()
+        claimed: list[ReconstructionJobRecord] = []
+        for job_id in candidate_ids:
+            result = self._session.execute(
+                update(ReconstructionJobRecord)
+                .where(
+                    ReconstructionJobRecord.id == job_id,
+                    ReconstructionJobRecord.status == "pending",
+                )
+                .values(status="claimed")
+            )
+            if cast("CursorResult[Any]", result).rowcount == 1:
+                record = self._session.get(ReconstructionJobRecord, job_id)
+                if record is not None:
+                    record.attempts += 1
+                    claimed.append(record)
+        self._session.flush()
+        return tuple(claimed)
+
+    def complete_reconstruction_job(self, job_id: UUID, *, ok: bool) -> None:
+        record = self._session.get(ReconstructionJobRecord, job_id)
+        if record is None:
+            return
+        record.status = "done" if ok else "failed"
+        record.processed_at = datetime.now(UTC)
+        self._session.flush()
+
+    def pending_reconstruction_count(self, organization_id: UUID | None = None) -> int:
+        query = select(ReconstructionJobRecord).where(
+            ReconstructionJobRecord.status == "pending"
+        )
+        if organization_id is not None:
+            query = query.where(ReconstructionJobRecord.organization_id == organization_id)
+        return len(self._session.scalars(query).all())
 
     def alerts_for_organization(
         self, organization_id: UUID, limit: int | None = None

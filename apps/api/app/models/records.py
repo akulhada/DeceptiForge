@@ -88,8 +88,43 @@ class AlertRecord(Base):
     organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, default=DEMO_ORGANIZATION_ID)
     trace_identifier: Mapped[str] = mapped_column(String(128), index=True)
     decoy_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    # Strong correlation keys promoted to indexed columns so reconstruction can find related alerts
+    # without scanning the whole table.
+    affected_placement_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    correlation_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    deduplication_key: Mapped[str | None] = mapped_column(String(512), index=True, nullable=True)
+    first_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
+    last_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
     data: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ReconstructionJobRecord(Base):
+    """A unit of incident-reconstruction work enqueued by monitoring ingestion.
+
+    Ingestion persists the event, upserts the alert, and appends one of these rows, then returns.
+    A separate worker claims pending rows and reconstructs only the incidents touched by the
+    triggering alert's strong correlation keys.
+    """
+
+    __tablename__ = "reconstruction_jobs"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    trace_identifier: Mapped[str] = mapped_column(String(128))
+    decoy_id: Mapped[UUID] = mapped_column(Uuid)
+    affected_placement_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    correlation_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    window_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class IncidentRecord(Base):

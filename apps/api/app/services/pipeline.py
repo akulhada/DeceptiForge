@@ -29,8 +29,6 @@ from app.services.monitoring import MonitoringInstrumentationEngine
 from app.services.placement_reasoning import PlacementReasoningEngine
 from app.services.repository_intelligence import LocalRepositoryScanner
 
-_RECONSTRUCTION_ALERT_LIMIT = 1000
-
 
 class PipelineError(Exception):
     """Raised when a use case is invoked against a missing prerequisite artifact."""
@@ -59,6 +57,8 @@ class PipelineService:
         self._decoys = decoy_planner or DecoyGenerationPlanner()
         self._believability = believability_engine or BelievabilitySafetyEngine()
         self._incidents = incident_engine or IncidentReconstructionEngine()
+        # Correlation window used when enqueuing reconstruction work (matches IncidentConfig).
+        self._reconstruction_window_seconds = 3600
 
     def scan(self, path: str, name: str | None) -> tuple[UUID, RepositoryIntelligenceProfile]:
         profile = self._scanner.scan(Path(path))
@@ -131,16 +131,12 @@ class PipelineService:
         alert = alerting.ingest(event, None)
         if alert is not None:
             self._repo.add_alert(self._org, alert)
-            # Reconstruct from a bounded set of this organization's recent alerts, and upsert only
-            # this organization's incidents so other tenants' data is never touched.
-            self._repo.upsert_incidents_for_organization(
-                self._org,
-                self._incidents.reconstruct(
-                    self._repo.alerts_for_organization(
-                        self._org, limit=_RECONSTRUCTION_ALERT_LIMIT
-                    ),
-                    organization_id=self._org,
-                ),
+            # Reconstruction is deferred off the hot path: enqueue a job keyed by this alert's
+            # strong correlation keys and return promptly. A worker reconstructs only the affected
+            # incidents via an indexed related-alert lookup, so ingestion is not O(n^2) in the
+            # alert backlog.
+            self._repo.enqueue_reconstruction(
+                self._org, alert, self._reconstruction_window_seconds
             )
         return event, alert
 

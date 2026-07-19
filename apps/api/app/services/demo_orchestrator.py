@@ -19,6 +19,7 @@ from app.services.coverage import CoverageEngine
 from app.services.decoy_generation import DecoyGenerationConfig
 from app.services.demo import _FIXTURE_NAME, _FIXTURE_PATH, DemoService
 from app.services.incident_narrative import NarrativeService
+from app.services.incident_reconstruction import ReconstructionWorker
 from app.services.pipeline import PipelineService
 
 _STEPS: tuple[tuple[str, str], ...] = (
@@ -140,6 +141,8 @@ class DemoOrchestrator:
             )
             mark("alert_created", DemoRunStepStatus.COMPLETE if alert else DemoRunStepStatus.FAILED)
 
+            # Reconstruction runs asynchronously in production; drain it inline for the demo run.
+            ReconstructionWorker(self._repo).drain(DEMO_ORGANIZATION_ID)
             state = self._demo.state()
             incident = state.incidents[0] if state.incidents else None
             mark(

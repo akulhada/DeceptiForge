@@ -18,6 +18,7 @@ from app.models.domain.intelligence import RepositoryIntelligenceProfile
 from app.repositories.artifacts import ArtifactRepository
 from app.schemas.demo import DemoCoverage, DemoOverview, DemoState
 from app.services.decoy_generation import DecoyGenerationConfig
+from app.services.incident_reconstruction import ReconstructionWorker
 from app.services.pipeline import PipelineService
 
 _FIXTURE_PATH = Path(__file__).resolve().parent.parent / "demo" / "acme-payments"
@@ -65,6 +66,9 @@ class DemoService:
             self._pipeline.ingest_event(
                 decoy_plan_id, "repository", "src/exfiltrated.py", f"copied {trace} to laptop"
             )
+            # Reconstruction is asynchronous in production; the demo drains it inline (dev-only) so
+            # the one-call dashboard shows the resulting incident immediately.
+            ReconstructionWorker(self._repo).drain(self._org)
         return self.state()
 
     def state(self) -> DemoState:

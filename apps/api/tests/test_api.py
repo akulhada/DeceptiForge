@@ -76,9 +76,22 @@ def test_full_pipeline_scan_to_incident(client, tmp_path) -> None:
     assert alerts.status_code == 200
     assert alerts.json()["alerts"]
 
+    # Reconstruction is asynchronous: ingestion enqueues work, a worker builds the incidents.
+    _drain_reconstruction(client)
+
     incidents = client.get("/incidents")
     assert incidents.status_code == 200
     assert incidents.json()["incidents"]
+
+
+def _drain_reconstruction(client) -> None:  # type: ignore[no-untyped-def]
+    from app.repositories.artifacts import ArtifactRepository
+    from app.services.incident_reconstruction import ReconstructionWorker
+
+    session = client.app_session()
+    ReconstructionWorker(ArtifactRepository(session)).drain()
+    session.commit()
+    session.close()
 
 
 def test_missing_profile_returns_404(client) -> None:
