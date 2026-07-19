@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.config.settings import get_settings
@@ -28,11 +28,20 @@ from app.schemas.api import (
 )
 from app.security import require_scope
 from app.services.api_keys import AuthContext
+from app.services.monitor_credentials import MonitorCredentialService, MonitorSignatureError
 from app.services.pipeline import PipelineError, PipelineService
 from app.services.rate_limit import get_rate_limiter, rate_limit_key
 from app.services.replay import ReplayError, get_replay_guard
 
 router = APIRouter()
+
+
+async def _raw_body(request: Request) -> bytes:
+    """Capture the exact received request bytes for body-hash signature verification.
+
+    Starlette caches the body, so the pydantic model parameter still parses from the same bytes.
+    """
+    return await request.body()
 
 
 def _service(session: Session, auth: AuthContext) -> PipelineService:
@@ -116,10 +125,14 @@ def evaluate_decoys(
 @router.post("/monitoring/events", response_model=MonitoringEventResponse, tags=["monitoring"])
 def ingest_monitoring_event(
     body: MonitoringEventRequest,
+    request: Request,
+    raw_body: bytes = Depends(_raw_body),
     auth: AuthContext = Depends(require_scope("monitoring:ingest")),
     session: Session = Depends(get_db),
     x_deceptiforge_nonce: str | None = Header(default=None),
     x_deceptiforge_timestamp: str | None = Header(default=None),
+    x_deceptiforge_monitor_id: str | None = Header(default=None),
+    x_deceptiforge_signature: str | None = Header(default=None),
 ) -> MonitoringEventResponse:
     settings = get_settings()
     # Reject oversized values before any expensive matching/hashing/persistence.
@@ -127,6 +140,22 @@ def ingest_monitoring_event(
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "monitoring value exceeds the maximum size"
         )
+    # Tamper-evidence: when signing is required, verify the HMAC over method/path/org/monitor/
+    # timestamp/nonce/body-hash before trusting the request. This proves the body was not modified.
+    if settings.auth_enabled and settings.monitor_signature_required:
+        try:
+            MonitorCredentialService(session, settings).verify_request(
+                organization_id=auth.organization_id,
+                monitor_id=x_deceptiforge_monitor_id,
+                timestamp=x_deceptiforge_timestamp,
+                nonce=x_deceptiforge_nonce,
+                signature=x_deceptiforge_signature,
+                method=request.method,
+                path=request.url.path,
+                body=raw_body,
+            )
+        except MonitorSignatureError as error:
+            raise HTTPException(error.status_code, error.message) from None
     # Replay protection is enforced for real (non-development-bypass) ingestion.
     if settings.auth_enabled:
         try:

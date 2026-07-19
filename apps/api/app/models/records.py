@@ -133,6 +133,27 @@ class SecurityAuditRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class MonitorCredentialRecord(Base):
+    """A monitor signing credential. The signing secret is stored encrypted, never in plaintext."""
+
+    __tablename__ = "monitor_credentials"
+    __table_args__ = (
+        UniqueConstraint("monitor_id", name="uq_monitor_credential_monitor_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    monitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    # Encrypted signing secret plus the key version used, so keys can be rotated.
+    secret_ciphertext: Mapped[str] = mapped_column(Text)
+    secret_key_version: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class NarrativeRevisionRecord(Base):
     """One immutable narrative generation. Regeneration appends a revision, never overwrites."""
 

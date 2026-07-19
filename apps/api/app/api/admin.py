@@ -14,6 +14,7 @@ from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.security import require_scope
 from app.services.api_keys import ROLE_SCOPES, ApiKeyService, AuthContext, AuthError, write_audit
+from app.services.monitor_credentials import MonitorCredentialService
 from app.services.rate_limit import get_rate_limiter, rate_limit_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -119,4 +120,101 @@ def revoke_api_key(
         request_id=getattr(request.state, "request_id", "unknown"),
         organization_id=auth.organization_id,
         detail=f"key_id={key_id}",
+    )
+
+
+# ---- monitor signing credentials -----------------------------------------------------------------
+
+
+class CreateMonitorCredentialRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    expires_at: datetime | None = None
+
+
+class MonitorCredentialSummary(BaseModel):
+    id: UUID
+    monitor_id: str
+    name: str
+    status: str
+    key_version: str
+    expires_at: datetime | None
+    last_used_at: datetime | None
+    created_at: datetime
+
+
+class CreateMonitorCredentialResponse(BaseModel):
+    monitor_id: str
+    signing_secret: str  # shown once; never retrievable again
+    credential: MonitorCredentialSummary
+
+
+def _monitor_summary(record) -> MonitorCredentialSummary:  # type: ignore[no-untyped-def]
+    return MonitorCredentialSummary(
+        id=record.id,
+        monitor_id=record.monitor_id,
+        name=record.name,
+        status=record.status,
+        key_version=record.secret_key_version,
+        expires_at=record.expires_at,
+        last_used_at=record.last_used_at,
+        created_at=record.created_at,
+    )
+
+
+@router.post("/monitor-credentials", response_model=CreateMonitorCredentialResponse)
+def create_monitor_credential(
+    body: CreateMonitorCredentialRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_scope("admin:manage_monitors")),
+    session: Session = Depends(get_db),
+) -> CreateMonitorCredentialResponse:
+    _rate_limit("admin:monitors:create", auth)
+    record, secret = MonitorCredentialService(session, get_settings()).create(
+        auth.organization_id, body.name, expires_at=body.expires_at
+    )
+    write_audit(
+        session,
+        action="monitor_credential_created",
+        outcome="accepted",
+        request_id=getattr(request.state, "request_id", "unknown"),
+        organization_id=auth.organization_id,
+        detail=f"monitor_id={record.monitor_id}",
+    )
+    return CreateMonitorCredentialResponse(
+        monitor_id=record.monitor_id,
+        signing_secret=secret,
+        credential=_monitor_summary(record),
+    )
+
+
+@router.get("/monitor-credentials", response_model=list[MonitorCredentialSummary])
+def list_monitor_credentials(
+    auth: AuthContext = Depends(require_scope("admin:manage_monitors")),
+    session: Session = Depends(get_db),
+) -> list[MonitorCredentialSummary]:
+    return [
+        _monitor_summary(record)
+        for record in MonitorCredentialService(session, get_settings()).list(auth.organization_id)
+    ]
+
+
+@router.delete("/monitor-credentials/{credential_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_monitor_credential(
+    credential_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_scope("admin:manage_monitors")),
+    session: Session = Depends(get_db),
+) -> None:
+    _rate_limit("admin:monitors:revoke", auth)
+    if not MonitorCredentialService(session, get_settings()).revoke(
+        auth.organization_id, credential_id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "monitor credential not found")
+    write_audit(
+        session,
+        action="monitor_credential_revoked",
+        outcome="accepted",
+        request_id=getattr(request.state, "request_id", "unknown"),
+        organization_id=auth.organization_id,
+        detail=f"credential_id={credential_id}",
     )

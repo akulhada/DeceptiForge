@@ -32,6 +32,7 @@ def build_client(
     api_key_bindings: str = "{}",
     cors_origins: str | None = None,
     cors_allow_credentials: bool = False,
+    monitor_signature_required: bool = False,
 ) -> Iterator[TestClient]:
     overrides = {
         "DEMO_ENABLED": "true" if demo_enabled else "false",
@@ -41,6 +42,7 @@ def build_client(
         "API_KEY_BINDINGS": api_key_bindings,
         "CORS_ORIGINS": cors_origins if cors_origins is not None else "[]",
         "CORS_ALLOW_CREDENTIALS": "true" if cors_allow_credentials else "false",
+        "MONITOR_SIGNATURE_REQUIRED": "true" if monitor_signature_required else "false",
         # Tests exercise production settings; delegate rate limiting to the edge so create_app
         # does not require a Redis-backed rate-limit store.
         "RATE_LIMIT_MODE": "gateway",

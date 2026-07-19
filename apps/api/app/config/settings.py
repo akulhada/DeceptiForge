@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     monitoring_event_retention_days: int = 30
     incident_stale_after_seconds: int = 86_400
     monitoring_timestamp_skew_seconds: int = 300
+    # When true, monitoring ingestion requires a valid monitor-signature-v1 HMAC signature. Kept off
+    # by default so existing deployments migrate deliberately; production examples enable it.
+    monitor_signature_required: bool = False
     # Rate limiting: "app" uses an application-level limiter; "gateway" delegates to an
     # edge/reverse-proxy. In "app" mode the backend below selects the store.
     rate_limit_mode: str = "app"
