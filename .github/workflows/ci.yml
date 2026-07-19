@@ -94,20 +94,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # Enable Corepack BEFORE setup-node so its built-in pnpm cache finds the pnpm shim. pnpm
+      # version comes from packageManager in package.json (single source of truth). This avoids a
+      # separate actions/cache@v4 step, which still declares the deprecated Node 20 runtime.
+      - name: Enable Corepack
+        run: corepack enable
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # setup-node@v5 auto-enables package-manager caching (runs pnpm before it exists). We
-          # provide pnpm via Corepack and cache the store ourselves, so disable the built-in cache.
-          package-manager-cache: false
-      - name: Enable Corepack (pnpm from packageManager — single source of truth)
-        run: corepack enable
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-
+          cache: pnpm
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
       - name: Typecheck
