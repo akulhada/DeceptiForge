@@ -55,3 +55,13 @@ shared store (Redis) and/or an edge gateway. Signed monitor request bodies are f
 
 Real identity/OAuth/SSO, full RBAC and key rotation, per-request signing, distributed rate limiting
 and replay store, async/durable ingestion, field-level encryption, and scheduled retention.
+
+## Decoy deployment (approval + lifecycle)
+
+Deploying decoys to repositories is gated by human approval and a closed state machine (see
+`docs/DecoyDeployment.md`, `docs/DecoyLifecycle.md`). Invariants: no direct default-branch writes; no
+automatic merge; monitoring activates only after a **verified merge**; retire/rollback go through
+PRs and remove only deployment-owned content; every action is organization-scoped, scope-checked
+(`decoy_deployments:*`), separation-of-duties-guarded, and audited. Rendered decoy content is inert
+(synthetic values only). The feature is disabled by default (`DECOY_DEPLOYMENT_ENABLED`). The live
+GitHub App adapter is not implemented — `docs/integrations/GitHub.md`.

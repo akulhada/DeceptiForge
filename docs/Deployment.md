@@ -156,3 +156,13 @@ Every response carries `x-request-id`. Unexpected errors return a safe body
 (`{"detail":"internal server error","request_id":...}`) with no stack trace, path, SQL, provider
 detail, or raw payload. Structured metrics/logs never include secrets, signatures, raw bodies, or
 decrypted evidence.
+
+## Decoy deployment feature (optional)
+
+Disabled by default. To enable repository decoy deployment, set `DECOY_DEPLOYMENT_ENABLED=true` and
+run the deployment worker (`python -m app.jobs.deployment`) as a separate service. The worker
+requires a live `RepositoryDeploymentClient` adapter, which is **not implemented** in this milestone
+(see `docs/integrations/GitHub.md`); until one is wired the worker refuses to run. Policy settings:
+`REQUIRE_SEPARATE_DEPLOYMENT_APPROVER`, `DECOY_ALLOWED_PATH_PREFIXES`, `DECOY_PROTECTED_PATH_PATTERNS`,
+`DECOY_MAX_FILES_PER_DEPLOYMENT`, `DECOY_MAX_BYTES_PER_DEPLOYMENT`, `DECOY_DEFAULT_EXPIRY_DAYS`,
+`DECOY_PR_DETAIL_LEVEL`. See `docs/DecoyDeployment.md` and `docs/DecoyLifecycle.md`.

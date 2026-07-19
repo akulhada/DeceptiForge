@@ -66,3 +66,6 @@ explicitly future work, not solved here:
 - **Full Coverage Engine** — the current coverage is a lightweight demo estimate, not a measured
   protected-vs-attack-surface metric.
 - **CI/CD & deployment hardening** — pipelines, secrets management, migrations, and observability.
+- **Decoy deployment approval + lifecycle** — reviewable, reversible repository decoys through a
+  controlled branch + PR, with monitoring activated only after a verified merge. Disabled by
+  default; the live GitHub App adapter is not yet implemented (see `docs/DecoyDeployment.md`).
