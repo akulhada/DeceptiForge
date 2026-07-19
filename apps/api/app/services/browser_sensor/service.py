@@ -107,7 +107,10 @@ class BrowserSensorService:
             raise EnrollmentError(404, "unknown enrollment token")
         if record.consumed_at is not None:
             raise EnrollmentError(409, "enrollment token already used")
-        if record.expires_at < _now():
+        expires = record.expires_at
+        if expires.tzinfo is None:  # SQLite returns naive datetimes
+            expires = expires.replace(tzinfo=UTC)
+        if expires < _now():
             raise EnrollmentError(410, "enrollment token expired")
         # Atomic single-use consume: only the first writer flips consumed_at.
         result = self._session.execute(
