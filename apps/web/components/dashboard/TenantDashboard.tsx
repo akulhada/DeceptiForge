@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
+import { DeploymentsPanel } from '@/components/dashboard/DeploymentsPanel';
 import { ErrorState, LoadingState } from '@/components/dashboard/states';
 import {
   AlertsSection,
@@ -69,6 +70,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             <MonitoringSection events={state.events} />
             <AlertsSection alerts={state.alerts} />
             <IncidentsSection incidents={state.incidents} />
+            {whoami?.scopes.includes('decoy_deployments:read') && (
+              <DeploymentsPanel scopes={whoami.scopes} />
+            )}
           </>
         ) : null}
       </main>
