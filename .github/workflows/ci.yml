@@ -113,8 +113,8 @@ jobs:
         run: pnpm lint
       - name: Test
         run: pnpm test
-      - name: Build (web dashboard — the deployable production artifact)
-        run: pnpm --filter @deceptiforge/web build
+      - name: Build (web dashboard + extension)
+        run: pnpm build
 
   docker:
     runs-on: ubuntu-latest
