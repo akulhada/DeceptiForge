@@ -76,4 +76,4 @@ Configuration is environment-derived; secrets are excluded from Git. CORS is den
 
 ## Decision log
 
-Architecture decisions that change a long-lived boundary should be recorded under `docs/adr/` before implementation.
+Architecture decisions that change a long-lived boundary are recorded under [`docs/adr/`](adr/README.md) before implementation. Current records cover request-time auth enforcement, the fake-adapter boundary, the default-off feature-flag policy, retention/evidence handling, and release certification criteria.
