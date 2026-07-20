@@ -183,6 +183,76 @@ class PerformanceRunRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class OnboardingWorkspaceRecord(Base):
+    __tablename__ = "onboarding_workspaces"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(24), index=True, default="not_started")
+    current_phase: Mapped[str] = mapped_column(String(32), default="organization")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    onboarding_version: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class OnboardingStepRecord(Base):
+    __tablename__ = "onboarding_steps"
+    __table_args__ = (UniqueConstraint("workspace_id", "step_key", name="uq_onboarding_step"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    workspace_id: Mapped[UUID] = mapped_column(ForeignKey("onboarding_workspaces.id"), index=True)
+    phase: Mapped[str] = mapped_column(String(32))
+    step_key: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), index=True, default="not_started")
+    blocked_reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    safe_blocked_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    evidence: Mapped[str] = mapped_column(Text, default="{}")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class OnboardingRecommendationRecord(Base):
+    __tablename__ = "onboarding_recommendations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    workspace_id: Mapped[UUID] = mapped_column(ForeignKey("onboarding_workspaces.id"), index=True)
+    recommendation_type: Mapped[str] = mapped_column(String(64))
+    target_surface_type: Mapped[str] = mapped_column(String(32))
+    target_resource_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    priority: Mapped[int] = mapped_column(Integer)
+    expected_activation_gain: Mapped[float] = mapped_column(default=0.0)
+    expected_coverage_gain: Mapped[float] = mapped_column(default=0.0)
+    implementation_effort: Mapped[str] = mapped_column(String(16), default="low")
+    risk: Mapped[str] = mapped_column(String(16), default="low")
+    explanation: Mapped[str] = mapped_column(String(1024))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DetectionTestRunRecord(Base):
+    __tablename__ = "detection_test_runs"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    deployment_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    trace_identifier: Mapped[str] = mapped_column(String(128), index=True)
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    expected_event_type: Mapped[str] = mapped_column(String(64), default="tripwire_touch")
+    observed_event_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    alert_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    incident_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    safe_failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
 class IncidentRecord(Base):
     __tablename__ = "incidents"
 

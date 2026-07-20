@@ -32,6 +32,7 @@ from app.services.api_keys import AuthContext
 from app.services.capacity import MonitoringQuotaGate, TenantCapacityService
 from app.services.metrics import emit
 from app.services.monitor_credentials import MonitorCredentialService, MonitorSignatureError
+from app.services.onboarding import OnboardingService
 from app.services.pipeline import PipelineError, PipelineService
 from app.services.rate_limit import get_rate_limiter, rate_limit_key
 from app.services.replay import ReplayError, get_replay_guard
@@ -209,6 +210,15 @@ def ingest_monitoring_event(
             body.decoy_plan_id, body.surface, body.location, body.value
         )
     )
+    # A controlled onboarding test is completed only after normal signed ingestion has created
+    # its durable event (and, when applicable, alert). This path never fabricates security data.
+    if event is not None and settings.onboarding_enabled:
+        OnboardingService(session, settings).record_detection(
+            auth.organization_id,
+            event.trace_identifier,
+            event.event_id,
+            alert.alert_id if alert is not None else None,
+        )
     emit(
         "monitor_ingest_accepted",
         request_id=request_id,

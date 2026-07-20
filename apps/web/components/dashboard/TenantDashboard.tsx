@@ -11,6 +11,7 @@ import { AgentSensorPanel } from '@/components/dashboard/AgentSensorPanel';
 import { AiTripwirePanel } from '@/components/dashboard/AiTripwirePanel';
 import { CoveragePanel } from '@/components/dashboard/CoveragePanel';
 import { IntegrationsPanel } from '@/components/dashboard/IntegrationsPanel';
+import { OnboardingPanel } from '@/components/dashboard/OnboardingPanel';
 import { ReliabilityPanel } from '@/components/dashboard/ReliabilityPanel';
 import { BrowserSensorPanel } from '@/components/dashboard/BrowserSensorPanel';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
@@ -70,6 +71,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
         ) : state ? (
           <>
             <OverviewSection overview={state.overview} />
+            {whoami?.scopes.includes('onboarding:read') && (
+              <OnboardingPanel scopes={whoami.scopes} />
+            )}
             <RepositoryProfileSection profile={state.profile} context={state.context} />
             <PlacementSection plan={state.placement_plan} />
             <DecoySection plan={state.decoy_plan} />

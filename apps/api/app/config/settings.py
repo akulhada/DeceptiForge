@@ -198,6 +198,17 @@ class Settings(BaseSettings):
     queue_backlog_alert_seconds: int = 300
     capacity_headroom_percent: int = 40
     performance_methodology_version: str = "performance-v1"
+    onboarding_enabled: bool = False
+    onboarding_version: str = "onboarding-v1"
+    onboarding_reconciliation_interval_minutes: int = 30
+    onboarding_detection_test_enabled: bool = False
+    onboarding_require_siem_for_activation: bool = False
+    onboarding_require_sso_for_activation: bool = True
+    onboarding_min_coverage_score: float = 0.0
+    onboarding_safe_first_decoy_types: list[str] = Field(
+        default_factory=lambda: ["document", "repository_config", "database_record"]
+    )
+    product_analytics_enabled: bool = False
 
     @property
     def is_active_write_region(self) -> bool:
@@ -222,6 +233,10 @@ class Settings(BaseSettings):
             raise ValueError("monitoring_max_burst must be at least events per second")
         if self.api_database_pool_size <= 0 or self.worker_database_pool_size <= 0:
             raise ValueError("database pool sizes must be positive")
+        if self.onboarding_reconciliation_interval_minutes <= 0:
+            raise ValueError("onboarding reconciliation interval must be positive")
+        if not 0 <= self.onboarding_min_coverage_score <= 1:
+            raise ValueError("onboarding minimum coverage score must be in [0, 1]")
         return self
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(

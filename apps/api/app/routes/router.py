@@ -16,6 +16,7 @@ from app.api.deployments import router as deployments_router
 from app.api.health import router as health_router
 from app.api.integrations import router as integrations_router
 from app.api.narrative import router as narrative_router
+from app.api.onboarding import router as onboarding_router
 from app.api.pipeline import router as pipeline_router
 from app.api.reliability import router as reliability_router
 from app.api.tenant import router as tenant_router
@@ -55,6 +56,8 @@ def build_api_router(settings: Settings) -> APIRouter:
         router.include_router(coverage_router)
     if settings.security_integrations_enabled:
         router.include_router(integrations_router)
+    if settings.onboarding_enabled:
+        router.include_router(onboarding_router)
     if settings.demo_enabled and settings.is_development:
         router.include_router(demo_router)
     return router
