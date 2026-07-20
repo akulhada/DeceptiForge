@@ -250,8 +250,11 @@ jobs:
         # The image installs only runtime deps. Importing the full router graph here catches a
         # runtime dependency (e.g. httpx) that was only declared under [dev] — before the app
         # crashes on boot with no listener.
+        # APP_ENV=development so create_app() skips prod runtime validation (redis/rate-limit/etc);
+        # this step verifies the import graph resolves, not the production config surface.
         run: |
-          docker run --rm -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
+          docker run --rm -e APP_ENV=development \
+            -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
             deceptiforge-api python -c 'import app.main; print("import ok")'
       - name: Start container (development, no external deps required for probes)
         run: |
