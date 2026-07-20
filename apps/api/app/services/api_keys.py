@@ -66,6 +66,14 @@ PERMISSIONS: frozenset[str] = frozenset(
         "browser_policy:manage",
         "browser_events:ingest",
         "browser_events:read",
+        "agent_sensors:read",
+        "agent_sensors:manage",
+        "agent_sessions:read",
+        "agent_sessions:create",
+        "agent_events:ingest",
+        "agent_policies:read",
+        "agent_policies:manage",
+        "agent_violations:read",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -87,6 +95,7 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "decoy_deployments:create",
             "database_honey:create",
             "ai_tripwires:create",
+            "agent_sessions:create",
         }
     ),
     "viewer": _READS,
@@ -110,6 +119,15 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
         {
             "browser_policy:read",
             "browser_events:ingest",
+        }
+    ),
+    # Agent sensor keys are provisioned per-install at enrollment. They may start scoped sessions,
+    # fetch scope policy, and ingest signed activity events — nothing else.
+    "agent_sensor": frozenset(
+        {
+            "agent_sessions:create",
+            "agent_policies:read",
+            "agent_events:ingest",
         }
     ),
 }

@@ -130,6 +130,17 @@ class Settings(BaseSettings):
     browser_sensor_min_extension_version: str = "0.1.0"
     browser_sensor_max_registry_entries: int = 5_000
     browser_sensor_max_event_metadata_bytes: int = 1_024
+    # AI agent activity sensors. Disabled by default; detect-only; explicit enablement outside dev.
+    agent_sensor_enabled: bool = False
+    agent_sensor_mode: str = "detect"
+    agent_sensor_event_max_bytes: int = 8_192
+    agent_sensor_queue_limit: int = 500
+    agent_session_max_duration_hours: int = 24
+    agent_event_retention_days: int = 30
+    agent_scope_max_allowed_paths: int = 200
+    agent_scope_max_denied_paths: int = 200
+    agent_sensor_min_version: str = "0.1.0"
+    require_signed_agent_events: bool = True
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [

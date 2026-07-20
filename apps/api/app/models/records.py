@@ -734,3 +734,161 @@ class BrowserSensorAuditRecord(Base):
     request_id: Mapped[str] = mapped_column(String(64))
     safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentSensorRecord(Base):
+    """A managed AI agent activity sensor. Signing secret encrypted; scoped ingest key is separate
+    and never reused from the dashboard."""
+
+    __tablename__ = "agent_sensors"
+    __table_args__ = (UniqueConstraint("sensor_public_id", name="uq_agent_sensor_public_id"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    sensor_public_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    adapter_type: Mapped[str] = mapped_column(String(48))
+    version: Mapped[str] = mapped_column(String(32))
+    secret_ciphertext: Mapped[str] = mapped_column(Text)
+    secret_key_version: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    api_key_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AgentEnrollmentTokenRecord(Base):
+    """A one-time, short-lived agent-sensor enrollment token. Hash-only at rest; consumed
+    atomically so it can never be replayed."""
+
+    __tablename__ = "agent_enrollment_tokens"
+    __table_args__ = (UniqueConstraint("token_hash", name="uq_agent_enrollment_token_hash"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consumed_by_sensor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentScopePolicyRecord(Base):
+    """A deterministic agent scope policy. policy_version is monotonic per policy."""
+
+    __tablename__ = "agent_scope_policies"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    allowed_paths: Mapped[str] = mapped_column(Text, default="[]")
+    denied_paths: Mapped[str] = mapped_column(Text, default="[]")
+    allowed_tools: Mapped[str] = mapped_column(Text, default="[]")
+    denied_tools: Mapped[str] = mapped_column(Text, default="[]")
+    allowed_resource_types: Mapped[str] = mapped_column(Text, default="[]")
+    maximum_file_reads: Mapped[int] = mapped_column(Integer, default=200)
+    maximum_sensitive_reads: Mapped[int] = mapped_column(Integer, default=0)
+    allow_dependency_changes: Mapped[bool] = mapped_column(default=False)
+    allow_secret_file_access: Mapped[bool] = mapped_column(default=False)
+    allow_database_access: Mapped[bool] = mapped_column(default=False)
+    allow_network_access: Mapped[bool] = mapped_column(default=False)
+    policy_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentSessionRecord(Base):
+    """A scoped agent session. task_summary is sanitized + bounded; raw conversation is never
+    stored."""
+
+    __tablename__ = "agent_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id", "external_session_id", name="uq_agent_session_external"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    sensor_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    repository_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    external_session_id: Mapped[str] = mapped_column(String(128), index=True)
+    agent_type: Mapped[str] = mapped_column(String(48))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="active")
+    task_summary_sanitized: Mapped[str] = mapped_column(String(512), default="")
+    scope_policy_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    scope_data: Mapped[str] = mapped_column(Text, default="{}")  # normalized scope snapshot
+    correlation_id: Mapped[str] = mapped_column(String(64), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentActivityEventRecord(Base):
+    """A trusted, minimized agent activity event. Never stores file content, command output,
+    prompts, or model reasoning. Unique per (session, external_event_id) -> idempotent ingest."""
+
+    __tablename__ = "agent_activity_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "external_event_id", name="uq_agent_event_idempotency"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    sensor_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    external_event_id: Mapped[str] = mapped_column(String(128))
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    repository_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    normalized_path: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    path_class: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    tool_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resource_id_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+    decoy_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    result_status: Mapped[str] = mapped_column(String(32), default="ok")
+    minimized_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    correlation_id: Mapped[str] = mapped_column(String(64), index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ScopeViolationRecord(Base):
+    """A deterministic, explainable scope violation raised from one activity event."""
+
+    __tablename__ = "agent_scope_violations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    event_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    violation_type: Mapped[str] = mapped_column(String(48), index=True)
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    confidence: Mapped[float] = mapped_column()
+    policy_rule: Mapped[str] = mapped_column(String(128))
+    explanation: Mapped[str] = mapped_column(String(512))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentSensorAuditRecord(Base):
+    """Append-only agent-sensor audit. Never stores secrets, signatures, prompts, file contents,
+    command output, or model reasoning."""
+
+    __tablename__ = "agent_sensor_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    agent_sensor_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    session_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
