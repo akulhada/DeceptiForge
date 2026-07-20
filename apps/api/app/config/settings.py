@@ -4,7 +4,7 @@
 from datetime import datetime
 from functools import lru_cache
 
-from pydantic import Field, PostgresDsn
+from pydantic import Field, PostgresDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -163,6 +163,39 @@ class Settings(BaseSettings):
     security_export_worker_lease_seconds: int = 60
     security_export_delivery_retention_days: int = 14
     security_export_dead_letter_retention_days: int = 90
+    # Multi-region reliability / disaster recovery. Region identity + fencing + failover controls.
+    deployment_region: str = "local"
+    cluster_id: str = "local"
+    cluster_role: str = "primary"  # primary | standby | recovery
+    active_region_epoch: int = 1
+    dr_enabled: bool = False
+    secondary_region: str = ""
+    database_cluster_id: str = "local"
+    deployment_revision: str = "dev"
+    backup_verification_enabled: bool = False
+    restore_drill_enabled: bool = False
+    postgres_rpo_target_minutes: int = 5
+    postgres_rto_target_minutes: int = 60
+    worker_stale_lease_seconds: int = 300
+    regional_failover_requires_approval: bool = True
+    schedulers_enabled: bool = True
+    external_side_effects_enabled: bool = True
+    maintenance_mode: bool = False
+
+    @property
+    def is_active_write_region(self) -> bool:
+        """Only the primary role may accept authoritative writes and run side-effect workers."""
+        return self.cluster_role == "primary"
+
+    @model_validator(mode="after")
+    def _validate_cluster_role(self) -> "Settings":
+        # Ambiguous cluster-role configuration is rejected everywhere; production must be explicit.
+        if self.cluster_role not in {"primary", "standby", "recovery"}:
+            raise ValueError("cluster_role must be one of primary, standby, recovery")
+        prod_dr = self.dr_enabled and self.app_env in {"staging", "production"}
+        if prod_dr and not self.secondary_region:
+            raise ValueError("secondary_region is required when dr_enabled in staging/production")
+        return self
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [

@@ -1118,3 +1118,59 @@ class IntegrationAuditRecord(Base):
     request_id: Mapped[str] = mapped_column(String(64))
     safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class FailoverEventRecord(Base):
+    """An audited failover control-plane transition. Records region attribution, operator, and the
+    active-region epoch at the time. Never stores infrastructure credentials."""
+
+    __tablename__ = "failover_events"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    from_state: Mapped[str] = mapped_column(String(24))
+    to_state: Mapped[str] = mapped_column(String(24), index=True)
+    deployment_region: Mapped[str] = mapped_column(String(64))
+    cluster_id: Mapped[str] = mapped_column(String(64))
+    active_region_epoch: Mapped[int] = mapped_column(Integer)
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    approved_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    reason: Mapped[str] = mapped_column(String(512), default="")
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+
+
+class RestoreDrillRecord(Base):
+    """A recorded backup-restore drill with the achieved RPO/RTO and check results. The signed
+    report contains no secrets."""
+
+    __tablename__ = "restore_drills"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    backup_identifier: Mapped[str] = mapped_column(String(128))
+    recovery_point: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    achieved_rpo_minutes: Mapped[float | None] = mapped_column(nullable=True)
+    achieved_rto_minutes: Mapped[float | None] = mapped_column(nullable=True)
+    migration_revision: Mapped[str] = mapped_column(String(64), default="")
+    passed: Mapped[bool] = mapped_column(default=False)
+    checksum: Mapped[str] = mapped_column(String(64), default="")
+    report_data: Mapped[str] = mapped_column(Text, default="{}")  # signed report JSON, no secrets
+    deployment_region: Mapped[str] = mapped_column(String(64), default="")
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+
+
+class ReliabilityAuditRecord(Base):
+    """Append-only reliability audit (backup/restore/failover/failback). Never stores secrets or
+    provider responses."""
+
+    __tablename__ = "reliability_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    deployment_region: Mapped[str] = mapped_column(String(64), default="")
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
