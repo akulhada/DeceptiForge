@@ -78,14 +78,6 @@ POST /demo/simulate-detection ─► trace hit → event → alert → incident 
 
 These wrap the product endpoints documented in [Api.md](Api.md); they add no engine logic.
 
-## Screenshots
-
-<!-- Add captured screenshots here for the submission:
-docs/images/dashboard-overview.png
-docs/images/dashboard-incident.png -->
-
-_Overview and incident screenshots go here for the submission._
-
 ## Notes
 
 - The `/demo/*` routes and the demo actions require `DEMO_ENABLED=true`; they never mount in a
