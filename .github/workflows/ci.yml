@@ -67,6 +67,12 @@ jobs:
         run: >-
           pytest -vv tests/test_integrations_core.py tests/test_integrations_delivery.py
           tests/test_integrations_api.py tests/test_integrations_retention.py
+      # Reliability / disaster recovery: region fencing, restore verification, failover control
+      # plane, and readiness — deterministic, no real cloud infrastructure contacted.
+      - name: Pytest (reliability fencing + restore verify + failover)
+        run: >-
+          pytest -vv tests/test_reliability_domain.py tests/test_reliability_fencing.py
+          tests/test_reliability_restore.py tests/test_reliability_api.py
 
   postgres-integration:
     runs-on: ubuntu-latest
@@ -285,3 +291,28 @@ jobs:
           grep " $tar\$" checksums.txt | sha256sum -c -
           tar -xzf "$tar" gitleaks
           ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1
+
+  reliability-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Reliability scripts syntax + safety
+        run: |
+          set -euo pipefail
+          # 1. Every reliability script must parse.
+          for f in scripts/reliability/*.sh; do bash -n "$f"; done
+          # 2. Scripts must be env-guarded (strict mode) and must not echo secret-looking literals.
+          for f in scripts/reliability/*.sh; do
+            grep -q 'set -euo pipefail' "$f" || { echo "$f missing strict mode"; exit 1; }
+          done
+          if grep -rnE '(SECRET|TOKEN|PASSWORD|API_KEY)[A-Z_]*=[A-Za-z0-9/+_-]{12,}' scripts/reliability/; then
+            echo "reliability script contains an embedded secret-looking literal"; exit 1; fi
+          # 3. Runbook links referenced by SecurityIntegrations/DisasterRecovery must exist.
+          for doc in ReliabilityArchitecture BackupPolicy PostgreSQLRecovery DisasterRecovery \
+                     RegionalFailover RegionalFailback RestoreDrills DegradedModes EncryptionKeyRecovery; do
+            test -f "docs/$doc.md" || { echo "missing docs/$doc.md"; exit 1; }
+          done
+          for rb in RegionalOutage DatabaseCorruption RedisFailure ObjectStorageFailure; do
+            test -f "docs/runbooks/$rb.md" || { echo "missing docs/runbooks/$rb.md"; exit 1; }
+          done
+          echo "reliability scripts + docs check passed"

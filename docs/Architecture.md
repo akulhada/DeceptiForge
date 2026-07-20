@@ -56,6 +56,14 @@ through a destination adapter over an SSRF-hardened HTTP transport (redirects di
 retry/dead-letter deterministically. Core ingestion never calls an external SIEM. Adapters sit behind
 one contract; credentials are decrypted only in the worker. See `docs/SecurityIntegrations.md`.
 
+Multi-region reliability (`app/services/reliability`) runs one active write region with a warm
+standby. Region + active-region-epoch fencing gates writes, schedulers, and external side-effect
+workers so no work runs in two regions; readiness reflects safe operating capability (database +
+encryption + mandatory replay). Backups are only trusted after a deterministic restore-verification
+drill; failover is a declared-incident, separation-of-duties, audited state machine (a secondary is
+never promoted before the primary is fenced) and failback is manual. Runbooks + scripts live under
+`docs/runbooks/` and `scripts/reliability/`. See `docs/DisasterRecovery.md`.
+
 ## Security posture
 
 Configuration is environment-derived; secrets are excluded from Git. CORS is deny-by-default unless an origin allow-list is configured. The extension requests only minimal MV3 permissions (storage, alarms) with host access scoped to the supported AI domains, and runs under a locked CSP with no eval or remote code (see `docs/ExtensionDeployment.md`). New AI, extension, or data-collection capabilities require a threat model and least-privilege permission design before implementation.

@@ -98,3 +98,8 @@ explicitly future work, not solved here:
   Sentinel, and Elastic via a transactional outbox + lease-based worker (SSRF-protected, idempotent,
   retried, dead-lettered), plus manual incident export (JSON/JSONL/CSV/Markdown/STIX). Disabled by
   default (see `docs/SecurityIntegrations.md`, `docs/WebhookVerification.md`, `docs/IncidentExport.md`).
+- **Multi-region reliability + disaster recovery** — one active write region with region + epoch
+  fencing (no split-brain schedulers or side effects), deterministic restore verification with
+  measured RPO/RTO, a declared-incident separation-of-duties failover control plane, degraded modes,
+  and runbooks. Backups are not valid until a restore drill passes (see
+  `docs/DisasterRecovery.md`, `docs/ReliabilityArchitecture.md`, `docs/RestoreDrills.md`).

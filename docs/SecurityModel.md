@@ -146,3 +146,19 @@ transactional outbox (never in the ingestion path, no export lost after a commit
 based claim (two workers never deliver the same row); idempotent (one logical event -> one delivery
 per integration); deterministic retry -> dead-letter; policy fails closed (allowed domains, private-
 network, whether narrative/trace/identifiers may leave). Disabled by default.
+
+## Multi-region reliability & disaster recovery
+
+Backup/restore + regional failover with split-brain protection (see
+`docs/ReliabilityArchitecture.md`, `docs/DisasterRecovery.md`, `docs/RegionalFailover.md`,
+`docs/EncryptionKeyRecovery.md`). Invariants: one active write region — only the primary role may
+accept writes or run schedulers/side-effect workers (region + active-region-epoch fencing rejects a
+stale/promoted region); ambiguous cluster-role config rejected at startup; readiness fails closed
+when the database or encryption provider is down or mandatory replay protection is unavailable;
+maintenance mode blocks writes; PostgreSQL is authoritative and Redis disposable (its loss never
+destroys durable state); backups are encrypted and not considered valid until a restore drill passes
+(deterministic integrity checks: tables/migration/org-isolation/encryption round-trip/legal-hold);
+old encrypted records remain decryptable after recovery (keys never embedded in backups); failover
+is a declared-incident, separation-of-duties (request vs approve by different operators), audited
+state machine, and a secondary is never promoted before the primary is fenced; failback is manual
+and gated on validated resync. GPT is irrelevant to recovery.

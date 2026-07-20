@@ -108,3 +108,20 @@ deterministically; delivered payloads expire before the dead-letter hash records
 security tests, adapter contract, and outbox/delivery concurrency tests against mock transports — no
 real SIEM tenant is contacted. Add the delivery worker to the deployment topology; a dedicated
 security-export worker service is recommended.
+
+## Multi-region reliability & disaster recovery
+
+Configure region identity (`DEPLOYMENT_REGION`, `CLUSTER_ROLE`, `ACTIVE_REGION_EPOCH`) — production
+rejects ambiguous `CLUSTER_ROLE`. Only the primary region accepts writes and runs schedulers/side-
+effect workers (retention, coverage, and the SIEM delivery worker skip on a non-leader region), so
+no scheduler or external side effect runs in two regions. Readiness reflects safe operating capability
+(database + encryption + mandatory replay). PostgreSQL backups must be automated + encrypted; a
+backup is not valid until a restore drill passes (`/admin/reliability/restore-drills`,
+`RESTORE_DRILL_ENABLED`) — the drill records the achieved RPO/RTO against the critical targets (≤5m /
+≤60m) with deterministic integrity checks and a checksummed report. Redis loss never destroys durable
+state (durable jobs stay in PostgreSQL; signed ingestion fails closed without replay). Regional
+failover is a declared-incident, separation-of-duties, audited procedure (`docs/RegionalFailover.md`);
+failback is manual (`docs/RegionalFailback.md`). Runbooks: `docs/runbooks/`. Certify with a staging
+restore drill + regional rehearsal (`docs/RestoreDrills.md`). CI runs the reliability fencing,
+restore-verify, and failover tests plus a scripts + docs check — no real cloud infrastructure is
+contacted.

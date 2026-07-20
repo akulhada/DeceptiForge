@@ -59,7 +59,19 @@ worker/cron services (see the prod compose example):
 | `python -m app.jobs.security_export` | drains the SIEM/SOAR delivery outbox (lease-based) |
 
 Jobs are idempotent, batched, organization-safe, and guarded by a PostgreSQL advisory lock, so
-concurrent runs are safe.
+concurrent runs are safe. In a multi-region deployment they additionally gate on the active write
+region (`CLUSTER_ROLE=primary` + `SCHEDULERS_ENABLED`) so no scheduler or external side-effect worker
+runs in two regions at once — retention, coverage, and the SIEM delivery worker skip on a standby.
+
+## Multi-region reliability
+
+Set the region identity per deployment: `DEPLOYMENT_REGION`, `CLUSTER_ID`, `CLUSTER_ROLE`
+(primary/standby/recovery — ambiguous values are rejected at startup), `ACTIVE_REGION_EPOCH`,
+`DR_ENABLED`, `SECONDARY_REGION`. Only the primary accepts writes and runs schedulers/side effects.
+`MAINTENANCE_MODE=true` blocks writes (fail closed). Backups, restore drills, failover, and failback
+are covered in `docs/DisasterRecovery.md`, `docs/BackupPolicy.md`, `docs/RegionalFailover.md`,
+`docs/RegionalFailback.md`, with automation in `scripts/reliability/` and runbooks in
+`docs/runbooks/`.
 
 ## Required environment (multi-worker production)
 
