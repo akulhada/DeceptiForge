@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { AgentSensorPanel } from '@/components/dashboard/AgentSensorPanel';
 import { AiTripwirePanel } from '@/components/dashboard/AiTripwirePanel';
 import { CoveragePanel } from '@/components/dashboard/CoveragePanel';
+import { IntegrationsPanel } from '@/components/dashboard/IntegrationsPanel';
 import { BrowserSensorPanel } from '@/components/dashboard/BrowserSensorPanel';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
 import { DatabaseHoneyPanel } from '@/components/dashboard/DatabaseHoneyPanel';
@@ -92,6 +93,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             )}
             {whoami?.scopes.includes('coverage:read') && (
               <CoveragePanel scopes={whoami.scopes} />
+            )}
+            {whoami?.scopes.includes('integrations:read') && (
+              <IntegrationsPanel scopes={whoami.scopes} />
             )}
           </>
         ) : null}
