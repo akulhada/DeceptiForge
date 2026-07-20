@@ -27,8 +27,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
@@ -95,8 +95,8 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://ci:ci-test-only@localhost:5432/deceptiforge_ci
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
@@ -146,8 +146,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
@@ -160,13 +160,13 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       # Enable Corepack BEFORE setup-node so its built-in pnpm cache finds the pnpm shim. pnpm
       # version comes from packageManager in package.json (single source of truth). This avoids a
       # separate actions/cache@v4 step, which still declares the deprecated Node 20 runtime.
       - name: Enable Corepack
         run: corepack enable
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -210,8 +210,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
@@ -232,7 +232,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Build API image
         run: docker build -t deceptiforge-api ./apps/api
       - name: Assert container runs as UID 10001 (non-root)
@@ -246,16 +246,36 @@ jobs:
           echo "cmd=$cmd"
           echo "$cmd" | grep -q uvicorn
           echo "$cmd" | grep -qiv alembic
+      - name: Runtime-only import smoke (no dev dependencies)
+        # The image installs only runtime deps. Importing the full router graph here catches a
+        # runtime dependency (e.g. httpx) that was only declared under [dev] — before the app
+        # crashes on boot with no listener.
+        run: |
+          docker run --rm -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
+            deceptiforge-api python -c 'import app.main; print("import ok")'
       - name: Start container (development, no external deps required for probes)
         run: |
+          set -euo pipefail
           docker run -d --name df-api \
             -e APP_ENV=development \
             -e DATABASE_URL='postgresql+psycopg://u:p@localhost/db' \
             -p 8000:8000 deceptiforge-api
+          healthy=false
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/health >/dev/null; then break; fi
+            # Fail fast if the container exited (e.g. an import error) instead of waiting the full 30s.
+            if [ "$(docker inspect -f '{{.State.Running}}' df-api)" != "true" ]; then
+              echo "container is not running (exited during startup):"
+              docker logs df-api || true
+              exit 1
+            fi
+            if curl -fsS http://localhost:8000/health >/dev/null; then healthy=true; break; fi
             sleep 1
           done
+          if [ "$healthy" != "true" ]; then
+            echo "container never became healthy; last logs:"
+            docker logs df-api || true
+            exit 1
+          fi
       - name: Health endpoint responds
         run: curl -fsS http://localhost:8000/health
       - name: Readiness endpoint responds safely (no secrets)
@@ -280,7 +300,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
       - name: Gitleaks (pinned version, verified against published checksums, redacted)
@@ -297,7 +317,7 @@ jobs:
   reliability-scripts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Reliability scripts syntax + safety
         run: |
           set -euo pipefail

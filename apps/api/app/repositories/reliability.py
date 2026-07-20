@@ -114,12 +114,19 @@ class ReliabilityRepository:
 
 
 def current_migration_head() -> str:
-    """The migration revision this build expects (the alembic head)."""
+    """The migration revision this build expects (the alembic head).
+
+    Resolve the migrations directory as an absolute path anchored to this package, not the current
+    working directory — so it works regardless of where the process was started (repo root,
+    apps/api, a worker container, or a test invocation)."""
+    from pathlib import Path
+
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
+    migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
     config = Config()
-    config.set_main_option("script_location", "migrations")
+    config.set_main_option("script_location", str(migrations_dir))
     return ScriptDirectory.from_config(config).get_current_head() or ""
 
 

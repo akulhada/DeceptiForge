@@ -28,14 +28,17 @@ a finished SaaS.
 
 ## Still staging-grade / MVP (do not oversell)
 
-- Rate limiter and replay nonce store are **in-process** (single worker). Production needs Redis or
-  an edge gateway; the config guard makes this explicit but the Redis backend is not implemented.
-- `API_KEY_BINDINGS` env keys remain as a bootstrap path.
-- Monitor identity is a scoped service key, not signed request bodies / a separate credential model.
-- No application-layer encryption of JSON blobs; retention beyond narrative-revision pruning is a
-  documented target, not a scheduled job.
+- Rate limiter and replay nonce store are Redis-backed for multi-worker/production
+  (`RATE_LIMIT_MODE=app` + `RATE_LIMIT_BACKEND=redis`, `REPLAY_BACKEND=redis`); a single-worker
+  staging deployment may use in-process, and the config guard enforces Redis outside development.
+- `API_KEY_BINDINGS` env keys remain a time-boxed bootstrap path (must set `BOOTSTRAP_EXPIRES_AT`).
+- Monitor ingestion is signed (`monitor-signature-v1` HMAC over the request body) with a separate
+  encrypted monitor-credential model and distributed replay protection.
+- Evidence-bearing JSON blobs (alerts/events/incidents) are encrypted at rest; retention/lifecycle
+  cleanup runs as scheduled advisory-locked jobs (`app/jobs/retention.py`, `incident_lifecycle.py`).
 - No real identity/OAuth/SSO/RBAC beyond role→scope, and no key rotation.
-- Repository scanning stays local/development-only; provider integrations are future work.
+- Repository scanning stays local/development-only; live GitHub App deployment is a fake adapter
+  only — provider integrations remain future work.
 - Frontend has API-client unit tests only; full component tests are future work.
 
 ## Operate

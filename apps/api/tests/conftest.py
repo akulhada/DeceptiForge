@@ -109,37 +109,40 @@ def build_client(
 
     from app.main import create_app
 
-    application = create_app()
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
-    Base.metadata.create_all(engine)
-    testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-
-    def override_get_db() -> Iterator[Session]:
-        session = testing_session()
-        try:
-            yield session
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-
-    application.dependency_overrides[get_db] = override_get_db
+    # create_app() runs startup validation, which may raise (e.g. an unsafe production config). Keep
+    # it inside the try/finally so the environment is always restored — otherwise a raising build
+    # would leak overrides (like AUTH_ENABLED=false) into later tests.
     try:
+        application = create_app()
+        engine = create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+        Base.metadata.create_all(engine)
+        testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+        def override_get_db() -> Iterator[Session]:
+            session = testing_session()
+            try:
+                yield session
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
+
+        application.dependency_overrides[get_db] = override_get_db
         with TestClient(application) as test_client:
             # Expose the test session factory so tests can seed rows (e.g. API keys).
             test_client.app_session = testing_session  # type: ignore[attr-defined]
             yield test_client
     finally:
-        application.dependency_overrides.clear()
         for key, value in previous.items():
             if value is None:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        get_settings.cache_clear()
         get_settings.cache_clear()
 
 
