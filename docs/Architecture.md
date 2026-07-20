@@ -49,6 +49,13 @@ persisted as immutable snapshots (idempotent by source-state hash) by a schedule
 job (`app/jobs/coverage.py`), so trends are never recomputed from mutable state. GPT never scores.
 See `docs/CoverageEngine.md`.
 
+SIEM/SOAR export (`app/services/integrations`) uses a transactional outbox: emitting an event writes
+one idempotent delivery row per matching integration in the source's own transaction, and a separate
+lease-based worker (`app/jobs/security_export.py`) builds a minimized canonical event, delivers it
+through a destination adapter over an SSRF-hardened HTTP transport (redirects disabled), and records
+retry/dead-letter deterministically. Core ingestion never calls an external SIEM. Adapters sit behind
+one contract; credentials are decrypted only in the worker. See `docs/SecurityIntegrations.md`.
+
 ## Security posture
 
 Configuration is environment-derived; secrets are excluded from Git. CORS is deny-by-default unless an origin allow-list is configured. The extension requests only minimal MV3 permissions (storage, alarms) with host access scoped to the supported AI domains, and runs under a locked CSP with no eval or remote code (see `docs/ExtensionDeployment.md`). New AI, extension, or data-collection capabilities require a threat model and least-privilege permission design before implementation.

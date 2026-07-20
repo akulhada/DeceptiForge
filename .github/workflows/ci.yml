@@ -61,6 +61,12 @@ jobs:
         run: >-
           pytest -vv tests/test_coverage_scoring.py tests/test_coverage_engine.py
           tests/test_coverage_api.py tests/test_coverage_perf.py
+      # SIEM/SOAR export: SSRF security tests, adapter contract, outbox/delivery concurrency, and
+      # mock-transport delivery — no real SIEM tenant is contacted in CI.
+      - name: Pytest (SIEM export SSRF + adapters + outbox/delivery concurrency)
+        run: >-
+          pytest -vv tests/test_integrations_core.py tests/test_integrations_delivery.py
+          tests/test_integrations_api.py tests/test_integrations_retention.py
 
   postgres-integration:
     runs-on: ubuntu-latest

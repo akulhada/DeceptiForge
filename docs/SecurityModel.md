@@ -131,3 +131,18 @@ snapshots immutable (history never recomputed from mutable state) and idempotent
 hash; recommendations filtered for safety and never auto-deployed (accept records intent only, normal
 approval + separation of duties still apply); organization-scoped; GPT never scores. Disabled by
 default.
+
+## SIEM/SOAR export
+
+Outbound export of minimized, signed alerts/incidents/coverage/operational events to enterprise
+platforms (see `docs/SecurityIntegrations.md`, `docs/WebhookVerification.md`, `docs/IncidentExport.md`,
+`docs/integrations/{Splunk,Sentinel,Elastic}.md`). Invariants: explicit per-integration opt-in;
+organization-scoped; credentials encrypted at rest, decrypted only in the delivery worker, never
+returned or logged; endpoints SSRF-validated at create and before every delivery (loopback/link-local/
+private/metadata rejected via DNS resolution; redirects disabled); canonical events are minimized —
+no raw evidence, prompts, rows, pasted text, agent streams, secrets, or stack traces; the GPT
+narrative is optional, policy-gated, and labeled non-authoritative; delivery is asynchronous via a
+transactional outbox (never in the ingestion path, no export lost after a committed source); lease-
+based claim (two workers never deliver the same row); idempotent (one logical event -> one delivery
+per integration); deterministic retry -> dead-letter; policy fails closed (allowed domains, private-
+network, whether narrative/trace/identifiers may leave). Disabled by default.

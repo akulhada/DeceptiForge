@@ -46,6 +46,14 @@ def run(settings: Settings | None = None) -> dict[str, int]:
             results["agent_activity_events"] = repo.purge_agent_activity_events(
                 now - timedelta(days=settings.agent_event_retention_days), batch
             )
+            # Delivered/dead-lettered delivery payloads expire before the dead-letter hash records,
+            # so summarized failure evidence outlives the full minimized payload.
+            results["integration_deliveries"] = repo.purge_integration_deliveries(
+                now - timedelta(days=settings.security_export_delivery_retention_days), batch
+            )
+            results["integration_dead_letters"] = repo.purge_integration_dead_letters(
+                now - timedelta(days=settings.security_export_dead_letter_retention_days), batch
+            )
     log_event("retention_completed", **results)
     return results
 

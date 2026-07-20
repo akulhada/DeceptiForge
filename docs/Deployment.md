@@ -55,6 +55,8 @@ worker/cron services (see the prod compose example):
 | `python -m app.jobs.reconstruction` | drains the incident-reconstruction queue off the hot path |
 | `python -m app.jobs.retention` | purges aged events/alerts/jobs/keys, prunes narrative revisions |
 | `python -m app.jobs.incident_lifecycle` | retires stale incidents, archives resolved/stale ones |
+| `python -m app.jobs.coverage` | recomputes measured coverage snapshots (advisory-locked) |
+| `python -m app.jobs.security_export` | drains the SIEM/SOAR delivery outbox (lease-based) |
 
 Jobs are idempotent, batched, organization-safe, and guarded by a PostgreSQL advisory lock, so
 concurrent runs are safe.

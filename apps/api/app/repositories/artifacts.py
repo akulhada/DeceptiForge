@@ -634,6 +634,29 @@ class ArtifactRepository:
             batch,
         )
 
+    def purge_integration_deliveries(self, cutoff: datetime, batch: int = 500) -> int:
+        """Delete delivered/dead-lettered delivery rows older than the cutoff. Dead-letter records
+        (hash + metadata) are retained separately and longer."""
+        from app.models.records import IntegrationDeliveryRecord
+
+        return self._batched_delete(
+            IntegrationDeliveryRecord,
+            IntegrationDeliveryRecord.id,
+            (IntegrationDeliveryRecord.status.in_(("delivered", "dead_lettered")))
+            & (IntegrationDeliveryRecord.created_at < cutoff),
+            batch,
+        )
+
+    def purge_integration_dead_letters(self, cutoff: datetime, batch: int = 500) -> int:
+        from app.models.records import IntegrationDeadLetterRecord
+
+        return self._batched_delete(
+            IntegrationDeadLetterRecord,
+            IntegrationDeadLetterRecord.id,
+            IntegrationDeadLetterRecord.created_at < cutoff,
+            batch,
+        )
+
     def purge_agent_activity_events(self, cutoff: datetime, batch: int = 500) -> int:
         """Delete raw minimized agent activity events older than the cutoff. Scope violations and
         session summaries are retained separately (longer) so incident evidence outlives raw

@@ -94,3 +94,17 @@ calculation job to the deployment topology (`python -m app.jobs.coverage`) — o
 advisory-locked, bounded, retryable; a manual recalculation is available to authorized users.
 Recommendations are never auto-deployed. CI includes coverage unit + cross-surface tests, the
 scheduled-job test, and a large-inventory performance regression guard.
+
+## SIEM/SOAR export
+
+Disabled by default (`SECURITY_INTEGRATIONS_ENABLED`); explicit staging/production enablement
+required. Delivery is asynchronous via a transactional outbox (created in the same transaction as
+the source alert/incident) and a lease-based delivery worker
+(`python -m app.jobs.security_export`) — core ingestion never waits on an external SIEM and no export
+is lost after a committed source. Credentials are encrypted at rest, decrypted only in the worker,
+and never returned or logged. Endpoints are SSRF-validated (loopback/link-local/private/metadata
+rejected; redirects disabled). Deliveries are idempotent, retried with backoff, and dead-lettered
+deterministically; delivered payloads expire before the dead-letter hash records. CI runs the SSRF
+security tests, adapter contract, and outbox/delivery concurrency tests against mock transports — no
+real SIEM tenant is contacted. Add the delivery worker to the deployment topology; a dedicated
+security-export worker service is recommended.

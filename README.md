@@ -93,3 +93,8 @@ explicitly future work, not solved here:
   unknown/low-confidence handling, immutable snapshots + trends, blind-spot detection, and ranked
   next-best placements. Disabled by default; GPT never scores (see `docs/CoverageEngine.md`,
   `docs/CoverageMethodology.md`, `docs/PlacementOptimization.md`).
+- **SIEM/SOAR integrations + incident export** — asynchronous, signed, minimized delivery of
+  alerts, incidents, coverage, and operational events to generic webhooks, Splunk HEC, Microsoft
+  Sentinel, and Elastic via a transactional outbox + lease-based worker (SSRF-protected, idempotent,
+  retried, dead-lettered), plus manual incident export (JSON/JSONL/CSV/Markdown/STIX). Disabled by
+  default (see `docs/SecurityIntegrations.md`, `docs/WebhookVerification.md`, `docs/IncidentExport.md`).
