@@ -52,13 +52,6 @@ GPT is optional and bounded to an AI-assisted incident narrative using minimized
 make authorization, approval, severity, evidence, monitoring-acceptance, organization-access, or
 incident-existence decisions; deterministic services remain authoritative and provide a fallback.
 
-### Codex collaboration
-
-Codex was used to navigate the repository, scaffold backend/frontend changes, improve test coverage,
-review organization-scoped authorization and signed ingestion, diagnose CI issues, validate
-migrations, and refine demo fallbacks. The project author retained decisions on the product problem,
-demo story, safety boundaries, human approvals, and which generated changes to accept or revise.
-
 ## Documentation
 
 - [Architecture](docs/Architecture.md)

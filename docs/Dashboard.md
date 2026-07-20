@@ -43,7 +43,7 @@ pnpm install
 pnpm dev                                     # http://localhost:3000
 ```
 
-## Demo script (2–3 minutes)
+## Demo walkthrough (2–3 minutes)
 
 1. Open `http://localhost:3000`. Click **Seed demo data**.
 2. **Overview** fills in: 1 decoy, 1 accepted, 1 active tripwire, repository coverage 100%.
