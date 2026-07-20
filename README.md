@@ -48,59 +48,37 @@ per-step status, then shows a weighted coverage estimate. A run is exportable as
 - [Dashboard](docs/Dashboard.md) · [Pipeline API](docs/Api.md) · [Incident narrative](docs/IncidentNarrative.md) · [Production boundary](docs/ProductionBoundary.md)
 - [Performance architecture](docs/PerformanceArchitecture.md) · [SLOs](docs/ServiceLevelObjectives.md) · [Load testing](docs/LoadTesting.md) · [Capacity planning](docs/CapacityPlanning.md) · [Tenant limits](docs/TenantLimits.md)
 
-## Production Hardening Roadmap
+## Current status
 
-The current build is a hackathon MVP. **Local-path repository scanning and all `/demo/*` routes are
-development/demo-only** (gated by `DEMO_ENABLED`/`AUTH_ENABLED`, off by default). The following are
-explicitly future work, not solved here:
+Controlled-staging grade, not a finished multi-tenant SaaS — see
+[Production readiness](docs/ProductionReadiness.md). Local-path repository scanning and all `/demo/*`
+routes are development/demo-only (gated by `DEMO_ENABLED`/`AUTH_ENABLED`, off by default). Advanced
+deception surfaces and reliability features ship **disabled by default** behind feature flags and are
+exercised in CI against deterministic fakes — never live third-party services.
 
-- **Auth & authorization** — the API-key/org-id boundary is a stub, not user management/OAuth/RBAC.
-- **Real tenant identity** — pipeline artifacts are organization-scoped, but the API-key binding
-  remains a stub; real tenant provisioning, identity, and authorization are future work.
-- **Repository integrations** — replace local filesystem paths with GitHub/GitLab app installs and
-  repository ids; never accept arbitrary server paths in production.
-- **Durable monitor ingestion & dedup** — current monitoring/alerting rebuild per request; needs a
-  durable queue and persistent deduplication.
-- **Repository-scoped incident persistence** — incidents currently filter by involved decoys as a
-  fallback; add an incident scoping column.
-- **Distributed rate limiting & audit history** — current limits are single-process and MVP-scoped.
-- **Full Coverage Engine** — the current coverage is a lightweight demo estimate, not a measured
-  protected-vs-attack-surface metric.
-- **CI/CD & deployment hardening** — pipelines, secrets management, migrations, and observability.
-- **Decoy deployment approval + lifecycle** — reviewable, reversible repository decoys through a
-  controlled branch + PR, with monitoring activated only after a verified merge. Disabled by
-  default; the live GitHub App adapter is not yet implemented (see `docs/DecoyDeployment.md`).
-- **Database honey records (PostgreSQL)** — approved, transactional synthetic rows as database
-  tripwires, monitored only after verification and reversible by exact owned-row deletion. Disabled
-  by default; the real connector adapter is CI-tested against an ephemeral database
-  (see `docs/DatabaseHoneyRecords.md`).
-- **AI tripwires (RAG / MCP)** — inert synthetic decoy documents and MCP resources/configs deployed
-  into approved collections/servers, monitored only after verification via signed, minimized events,
-  with deterministic AI-native exposure classification and reversible owned-asset retirement.
-  Disabled by default; RAG/MCP adapters are CI-tested with deterministic fakes — no paid AI services
-  (see `docs/AiTripwires.md`, `docs/AiDataHandling.md`).
-- **Browser AI-paste sensor (Shadow AI)** — a minimal-permission Chromium extension that detects
-  DeceptiForge trace markers pasted into AI tools via local hashed matching, distinguishes approved
-  from shadow AI destinations, and reports only signed, minimized evidence (never pasted text,
-  prompts, or AI responses). Disabled by default (see `docs/BrowserAiSensor.md`,
-  `docs/BrowserPrivacy.md`).
-- **AI agent activity sensor (scope violations)** — registered agent sessions report minimized,
-  signed activity; deterministic, explainable rules flag out-of-scope, sensitive, and decoy access
-  across repository/MCP/RAG/database surfaces. Detect-only by default; never stores file contents,
-  prompts, command output, or model reasoning (see `docs/AiAgentSensor.md`,
-  `docs/AgentScopePolicies.md`, `docs/AgentPrivacy.md`, `docs/AgentAdapterSDK.md`).
-- **Measured coverage engine + placement optimization** — deterministic, risk-weighted deception
-  coverage computed from real active controls across every surface (not decoy count), with explicit
-  unknown/low-confidence handling, immutable snapshots + trends, blind-spot detection, and ranked
-  next-best placements. Disabled by default; GPT never scores (see `docs/CoverageEngine.md`,
-  `docs/CoverageMethodology.md`, `docs/PlacementOptimization.md`).
-- **SIEM/SOAR integrations + incident export** — asynchronous, signed, minimized delivery of
-  alerts, incidents, coverage, and operational events to generic webhooks, Splunk HEC, Microsoft
-  Sentinel, and Elastic via a transactional outbox + lease-based worker (SSRF-protected, idempotent,
-  retried, dead-lettered), plus manual incident export (JSON/JSONL/CSV/Markdown/STIX). Disabled by
-  default (see `docs/SecurityIntegrations.md`, `docs/WebhookVerification.md`, `docs/IncidentExport.md`).
-- **Multi-region reliability + disaster recovery** — one active write region with region + epoch
-  fencing (no split-brain schedulers or side effects), deterministic restore verification with
-  measured RPO/RTO, a declared-incident separation-of-duties failover control plane, degraded modes,
-  and runbooks. Backups are not valid until a restore drill passes (see
-  `docs/DisasterRecovery.md`, `docs/ReliabilityArchitecture.md`, `docs/RestoreDrills.md`).
+**Implemented & tested (core).** Repository scan → context profiling → decoy generation → monitoring
+→ alerting → incident reconstruction → optional AI narrative → coverage estimate; organization-scoped
+persistence and incident upsert (no global delete/reinsert); hashed, scoped, revocable API keys;
+signed (`monitor-signature-v1`), replay-protected, size-bounded monitoring ingestion; Redis-backed
+distributed rate limiting and replay store; evidence encryption at rest; scheduled advisory-locked
+retention/lifecycle jobs. Covered by the backend suite plus live-PostgreSQL and live-Redis CI jobs.
+
+**Implemented behind default-off feature flags (controlled environments).** Each is CI-tested against
+deterministic fakes; no paid/live provider is contacted:
+
+- Decoy deployment approval + lifecycle — `docs/DecoyDeployment.md` (live GitHub App is a fake adapter — see Planned).
+- Database honey records (PostgreSQL) — `docs/DatabaseHoneyRecords.md`.
+- AI tripwires (RAG / MCP) — `docs/AiTripwires.md`, `docs/AiDataHandling.md`.
+- Browser AI-paste sensor (Shadow AI) — `docs/BrowserAiSensor.md`, `docs/BrowserPrivacy.md`.
+- AI agent activity sensor (scope violations) — `docs/AiAgentSensor.md`, `docs/AgentScopePolicies.md`.
+- Measured coverage engine + placement optimization — `docs/CoverageEngine.md`, `docs/PlacementOptimization.md`.
+- SIEM/SOAR export + incident export — `docs/SecurityIntegrations.md`, `docs/IncidentExport.md`.
+- Multi-region reliability + disaster recovery — `docs/DisasterRecovery.md`, `docs/RestoreDrills.md`.
+
+**Partially implemented.** The API-key/organization boundary has no key rotation. The demo path shows
+a lightweight weighted coverage estimate; the flagged measured coverage engine is the accurate path.
+
+**Planned / not implemented.** Real user identity (OAuth/SSO and full RBAC beyond role→scope); live
+GitHub/GitLab App provider integration (currently a fake adapter); API-key rotation. No production
+certification is claimed — certify via a staging restore drill + regional rehearsal
+(see [Staging verification](docs/checklists/StagingVerification.md)).
