@@ -74,7 +74,7 @@ class DemoOrchestrator:
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def reset(self) -> None:
-        self._repo.reset_all()
+        self._repo.reset_organization(DEMO_ORGANIZATION_ID)
         run_store.clear()
 
     def run(self) -> DemoRun:

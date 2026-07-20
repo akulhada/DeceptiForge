@@ -757,9 +757,10 @@ class ArtifactRepository:
 
     # -- maintenance --------------------------------------------------------------------------
 
-    def reset_all(self) -> None:
-        """Delete every stored artifact. Demo-only; used by the demo reset endpoint."""
+    def reset_organization(self, organization_id: UUID) -> None:
+        """Delete only one organization's pipeline artifacts; demo reset never crosses tenants."""
         for record in (
+            ReconstructionJobRecord,
             NarrativeRevisionRecord,
             IncidentRecord,
             AlertRecord,
@@ -770,7 +771,7 @@ class ArtifactRepository:
             ContextProfileRecord,
             RepositoryRecord,
         ):
-            self._session.execute(delete(record))
+            self._session.execute(delete(record).where(record.organization_id == organization_id))
         self._session.flush()
 
     # -- internals ----------------------------------------------------------------------------

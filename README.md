@@ -4,6 +4,9 @@
 
 DeceptiForge is a context-aware deception platform for AI-era security. It generates stack-aware decoys and captures unauthorized access by people and AI agents.
 
+> Context-aware deception for the AI era: believable synthetic business assets, placed where an
+> attacker or AI agent is likely to look, with deterministic reconstruction when they are touched.
+
 ## Workspace
 
 - `apps/api` — FastAPI service and database migrations.
@@ -37,6 +40,24 @@ Demo**. It runs the full pipeline — repository analysis → context → placem
 validation → tripwires → detection → alert → incident → optional AI summary → coverage — with
 per-step status, then shows a weighted coverage estimate. A run is exportable as Markdown/JSON. See
 [Dashboard](docs/Dashboard.md) and [Pipeline API](docs/Api.md).
+
+The demo uses only fictional data and development-only routes. Start the API and web app with the
+normal local-development commands, set `APP_ENV=development` and `DEMO_ENABLED=true`, then open the
+dashboard and run the demo. `POST /demo/run` is repeatable; `/demo/reset` removes **only** the demo
+organization's data. `/demo/state` (or `/demo/status`) exposes backend-derived progress, and
+`/demo/trigger` uses the normal deterministic pipeline to create the event, alert, and incident.
+These routes are never mounted in staging or production.
+
+GPT is optional and bounded to an AI-assisted incident narrative using minimized context. It cannot
+make authorization, approval, severity, evidence, monitoring-acceptance, organization-access, or
+incident-existence decisions; deterministic services remain authoritative and provide a fallback.
+
+### Codex collaboration
+
+Codex was used to navigate the repository, scaffold backend/frontend changes, improve test coverage,
+review organization-scoped authorization and signed ingestion, diagnose CI issues, validate
+migrations, and refine demo fallbacks. The project author retained decisions on the product problem,
+demo story, safety boundaries, human approvals, and which generated changes to accept or revise.
 
 ## Documentation
 
