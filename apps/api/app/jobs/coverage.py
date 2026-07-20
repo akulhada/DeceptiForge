@@ -21,6 +21,7 @@ from app.models.records import (
 )
 from app.repositories.coverage import CoverageRepository
 from app.services.coverage_engine import engine
+from app.services.reliability.fencing import scheduler_allowed
 
 _LOCK_KEY = 0x44465F434F56  # "DF_COV"
 
@@ -38,6 +39,9 @@ def _organizations(session) -> set[UUID]:  # type: ignore[no-untyped-def]
 def run(settings: Settings | None = None) -> dict[str, int]:
     """Execute one coverage pass across organizations; return counts."""
     settings = settings or get_settings()
+    if not scheduler_allowed(settings):
+        log_event("coverage_job_skipped_not_leader")
+        return {"organizations": 0, "snapshots_created": 0}
     if not settings.coverage_engine_enabled:
         log_event("coverage_job_disabled")
         return {}

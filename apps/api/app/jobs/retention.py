@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from app.config.settings import Settings, get_settings
 from app.jobs._runtime import advisory_lock, job_session, log_event
 from app.repositories.artifacts import ArtifactRepository
+from app.services.reliability.fencing import scheduler_allowed
 
 _LOCK_KEY = 0x44465F52544E  # "DF_RTN"
 
@@ -17,6 +18,10 @@ _LOCK_KEY = 0x44465F52544E  # "DF_RTN"
 def run(settings: Settings | None = None) -> dict[str, int]:
     """Execute one retention pass; return the counts removed/pruned per category."""
     settings = settings or get_settings()
+    # Only the active write region runs schedulers, so retention never runs in two regions at once.
+    if not scheduler_allowed(settings):
+        log_event("retention_skipped_not_leader")
+        return {}
     now = datetime.now(UTC)
     batch = settings.retention_batch_size
     results: dict[str, int] = {}

@@ -8,12 +8,17 @@ from app.config.settings import get_settings
 from app.jobs._runtime import job_session, log_event
 from app.services.integrations.http import build_http_transport
 from app.services.integrations.worker import DeliveryWorker
+from app.services.reliability.fencing import scheduler_allowed
 
 
 def run() -> int:
     settings = get_settings()
     if not settings.security_integrations_enabled:
         log_event("security_export_worker_disabled")
+        return 0
+    # Delivery is an external side effect: only the active write region may run it.
+    if not scheduler_allowed(settings):
+        log_event("security_export_worker_skipped_not_leader")
         return 0
     with job_session() as session:
         delivered = DeliveryWorker(session, build_http_transport(), settings).run_once()
