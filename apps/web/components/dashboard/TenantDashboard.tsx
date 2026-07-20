@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AgentSensorPanel } from '@/components/dashboard/AgentSensorPanel';
 import { AiTripwirePanel } from '@/components/dashboard/AiTripwirePanel';
 import { BrowserSensorPanel } from '@/components/dashboard/BrowserSensorPanel';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
@@ -84,6 +85,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             )}
             {whoami?.scopes.includes('browser_sensors:read') && (
               <BrowserSensorPanel scopes={whoami.scopes} />
+            )}
+            {whoami?.scopes.includes('agent_sensors:read') && (
+              <AgentSensorPanel scopes={whoami.scopes} />
             )}
           </>
         ) : null}
