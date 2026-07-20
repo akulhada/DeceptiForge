@@ -149,6 +149,20 @@ class Settings(BaseSettings):
     coverage_min_acceptable_score: float = 0.6
     coverage_max_recommendations: int = 25
     coverage_methodology_version: str = "coverage-v1"
+    # SIEM/SOAR security integrations. Disabled by default; explicit enablement outside dev.
+    security_integrations_enabled: bool = False
+    security_export_max_payload_bytes: int = 65_536
+    security_export_max_batch_size: int = 50
+    security_export_timeout_seconds: int = 10
+    security_export_max_attempts: int = 6
+    security_export_max_age_hours: int = 72
+    security_export_allowed_domains: list[str] = Field(default_factory=list)
+    security_export_allow_private_networks: bool = False
+    security_export_default_profile: str = "minimal"
+    security_export_worker_batch_size: int = 20
+    security_export_worker_lease_seconds: int = 60
+    security_export_delivery_retention_days: int = 14
+    security_export_dead_letter_retention_days: int = 90
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [

@@ -1021,3 +1021,100 @@ class CoverageAuditRecord(Base):
     request_id: Mapped[str] = mapped_column(String(64))
     safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class SecurityIntegrationRecord(Base):
+    """An outbound SIEM/SOAR integration. Credentials stored encrypted; endpoint validated for
+    SSRF before any delivery. Disabled/revoked integrations never deliver."""
+
+    __tablename__ = "security_integrations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    integration_type: Mapped[str] = mapped_column(String(32), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
+    endpoint_reference: Mapped[str] = mapped_column(String(1024))
+    secret_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    secret_key_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    config_data: Mapped[str] = mapped_column(Text, default="{}")  # non-secret adapter config
+    routing_data: Mapped[str] = mapped_column(Text, default="{}")  # declarative filter rules
+    payload_profile: Mapped[str] = mapped_column(String(24), default="minimal")
+    include_narrative: Mapped[bool] = mapped_column(default=False)
+    include_coverage_events: Mapped[bool] = mapped_column(default=True)
+    include_operational_events: Mapped[bool] = mapped_column(default=True)
+    minimum_severity: Mapped[str] = mapped_column(String(16), default="info")
+    created_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    safe_failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class IntegrationDeliveryRecord(Base):
+    """A single logical delivery of one canonical event to one integration. The transactional
+    outbox row: created in the same tx as the source event, published later by the worker. Unique
+    per idempotency_key so a duplicate source event never duplicates a delivery."""
+
+    __tablename__ = "integration_deliveries"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_integration_delivery_idempotency"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    integration_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    source_type: Mapped[str] = mapped_column(String(24))
+    source_id: Mapped[str] = mapped_column(String(128))
+    event_type: Mapped[str] = mapped_column(String(64))
+    event_version: Mapped[int] = mapped_column(Integer, default=1)
+    idempotency_key: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(16), index=True, default="queued")
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    safe_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    envelope_data: Mapped[str] = mapped_column(Text)  # minimized canonical event JSON
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class IntegrationDeadLetterRecord(Base):
+    """A delivery that exhausted retries. Retains hash + metadata (longer than the full payload)."""
+
+    __tablename__ = "integration_dead_letters"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    integration_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    delivery_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    reason_code: Mapped[str] = mapped_column(String(64))
+    first_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    final_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempt_count: Mapped[int] = mapped_column(Integer)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class IntegrationAuditRecord(Base):
+    """Append-only integration audit. Never stores secrets, signatures, full bodies, or raw
+    evidence — only minimized identifiers."""
+
+    __tablename__ = "integration_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    integration_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    delivery_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
