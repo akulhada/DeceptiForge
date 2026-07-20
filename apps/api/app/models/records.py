@@ -892,3 +892,132 @@ class AgentSensorAuditRecord(Base):
     request_id: Mapped[str] = mapped_column(String(64))
     safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class CoverageSnapshotRecord(Base):
+    """An immutable point-in-time coverage calculation. Never recomputed from mutable state; a new
+    calculation appends a new snapshot."""
+
+    __tablename__ = "coverage_snapshots"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    overall_score: Mapped[float] = mapped_column()
+    confidence: Mapped[float] = mapped_column()
+    covered_weight: Mapped[float] = mapped_column()
+    total_weight: Mapped[float] = mapped_column()
+    unknown_weight: Mapped[float] = mapped_column()
+    active_decoys: Mapped[int] = mapped_column(Integer, default=0)
+    active_sensors: Mapped[int] = mapped_column(Integer, default=0)
+    unhealthy_sensors: Mapped[int] = mapped_column(Integer, default=0)
+    expired_decoys: Mapped[int] = mapped_column(Integer, default=0)
+    blind_spot_count: Mapped[int] = mapped_column(Integer, default=0)
+    methodology_version: Mapped[str] = mapped_column(String(32), index=True)
+    source_state_hash: Mapped[str] = mapped_column(String(64), index=True)
+    surfaces_data: Mapped[str] = mapped_column(Text, default="[]")  # immutable JSON snapshot
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class CoverageSurfaceRecord(Base):
+    """Pre-aggregated current-state surface inventory. Upserted per calculation for fast reads; the
+    immutable per-snapshot copy lives in the snapshot blob."""
+
+    __tablename__ = "coverage_surfaces"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id", "surface_type", "external_or_resource_id",
+            name="uq_coverage_surface",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    surface_type: Mapped[str] = mapped_column(String(16), index=True)
+    external_or_resource_id: Mapped[str] = mapped_column(String(512))
+    display_name: Mapped[str] = mapped_column(String(256))
+    criticality: Mapped[float] = mapped_column()
+    exposure_score: Mapped[float] = mapped_column()
+    sensitivity_score: Mapped[float] = mapped_column()
+    attack_likelihood: Mapped[float] = mapped_column()
+    business_impact: Mapped[float] = mapped_column()
+    coverage_requirement: Mapped[float] = mapped_column(default=1.0)
+    risk_weight: Mapped[float] = mapped_column()
+    surface_coverage: Mapped[float] = mapped_column(default=0.0)
+    confidence: Mapped[float] = mapped_column(default=0.0)
+    status: Mapped[str] = mapped_column(String(16), default="known")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class CoverageGapRecord(Base):
+    """A blind spot bound to an immutable snapshot."""
+
+    __tablename__ = "coverage_gaps"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    snapshot_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    surface_type: Mapped[str] = mapped_column(String(16))
+    external_or_resource_id: Mapped[str] = mapped_column(String(512))
+    gap_type: Mapped[str] = mapped_column(String(32), index=True)
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    reason: Mapped[str] = mapped_column(String(512))
+    missing_controls: Mapped[str] = mapped_column(String(512), default="")
+    recommended_decoy_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recommended_sensor_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expected_coverage_gain: Mapped[float] = mapped_column(default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PlacementRecommendationRecord(Base):
+    """A ranked placement recommendation bound to an immutable snapshot."""
+
+    __tablename__ = "coverage_recommendations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    snapshot_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    surface_type: Mapped[str] = mapped_column(String(16))
+    external_or_resource_id: Mapped[str] = mapped_column(String(512))
+    recommended_action: Mapped[str] = mapped_column(String(32))
+    recommended_decoy_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    target_location: Mapped[str] = mapped_column(String(512))
+    expected_coverage_gain: Mapped[float] = mapped_column()
+    expected_detection_gain: Mapped[float] = mapped_column()
+    deployment_risk: Mapped[float] = mapped_column()
+    false_positive_risk: Mapped[float] = mapped_column()
+    implementation_effort: Mapped[float] = mapped_column()
+    priority_score: Mapped[float] = mapped_column(index=True)
+    confidence: Mapped[float] = mapped_column()
+    explanation: Mapped[str] = mapped_column(String(512))
+    status: Mapped[str] = mapped_column(String(16), default="open")  # open/accepted/dismissed
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class CoveragePolicyRecord(Base):
+    """The org's coverage policy. One current row per organization; version is monotonic."""
+
+    __tablename__ = "coverage_policies"
+    __table_args__ = (UniqueConstraint("organization_id", name="uq_coverage_policy_org"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    data: Mapped[str] = mapped_column(Text, default="{}")  # JSON weights + thresholds
+    policy_version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class CoverageAuditRecord(Base):
+    """Append-only coverage audit. Never stores raw evidence or connector secrets."""
+
+    __tablename__ = "coverage_audit"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    snapshot_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

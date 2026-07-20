@@ -74,6 +74,9 @@ PERMISSIONS: frozenset[str] = frozenset(
         "agent_policies:read",
         "agent_policies:manage",
         "agent_violations:read",
+        "coverage:read",
+        "coverage:recalculate",
+        "coverage:manage_policy",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -111,6 +114,8 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "ai_tripwires:read",
             "ai_tripwires:deploy",
             "ai_tripwires:ingest",
+            "coverage:read",
+            "coverage:recalculate",
         }
     ),
     # Browser sensor keys are provisioned per-installation at enrollment. They may fetch their

@@ -141,6 +141,14 @@ class Settings(BaseSettings):
     agent_scope_max_denied_paths: int = 200
     agent_sensor_min_version: str = "0.1.0"
     require_signed_agent_events: bool = True
+    # Measured coverage engine. Disabled by default; explicit per-environment enablement.
+    coverage_engine_enabled: bool = False
+    coverage_calculation_interval_minutes: int = 60
+    coverage_verification_max_age_hours: int = 168
+    coverage_max_unknown_weight: float = 0.4
+    coverage_min_acceptable_score: float = 0.6
+    coverage_max_recommendations: int = 25
+    coverage_methodology_version: str = "coverage-v1"
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [
