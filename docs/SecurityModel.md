@@ -104,3 +104,18 @@ classification and deterministic exposure + severity with cross-surface correlat
 decides severity); revocation is terminal and revokes the scoped key; versioned policy with
 downgrade rejection; minimal MV3 permissions (storage, alarms; host-scoped to AI domains), locked
 CSP, no eval, no remote code. Secrets encrypted at rest and never returned. Disabled by default.
+
+## AI agent activity sensor (scope violations)
+
+Registered agent sessions report minimized, signed activity; deterministic rules raise explainable
+scope violations and decoy-touch events (see `docs/AiAgentSensor.md`, `docs/AgentScopePolicies.md`,
+`docs/AgentPrivacy.md`, `docs/AgentAdapterSDK.md`). Invariants: observe only registered sessions
+under explicit policy; per-install scoped credential (not a dashboard key) via one-time enrollment
+tokens; `monitor-signature-v1` signed + replay-protected + size-bounded + idempotent ingestion;
+safe path normalization (rejects traversal/encoded/absolute/root-escape) before any policy check;
+deterministic path classification, scope-violation rules, and incident severity — GPT explains but
+never decides a violation or severity; decoy touch matched by metadata (no raw content); minimized
+metadata only — never file contents, prompts, command output, model reasoning, terminal history, or
+secrets; detect-only by default (blocking gated behind explicit policy); raw activity events expire
+before violations/summaries; revocation terminal and revokes the scoped key. Secrets encrypted at
+rest and never returned. Disabled by default.

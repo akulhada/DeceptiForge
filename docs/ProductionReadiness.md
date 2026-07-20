@@ -68,3 +68,17 @@ Revocation is terminal and revokes the scoped key. The extension requests minima
 typecheck/lint/unit-tests/production build plus a hardening audit that fails on any forbidden
 permission, `eval`/`new Function`, remote script URL, or embedded secret. The extension is not
 auto-published. A legal/privacy review is required before enterprise rollout.
+
+## AI agent activity sensor
+
+Disabled by default (`AGENT_SENSOR_ENABLED`), detect-only (`AGENT_SENSOR_MODE=detect`); explicit
+staging/production enablement required. Per-install sensors are provisioned via one-time enrollment
+tokens with a scoped ingest credential (never a dashboard key). Event ingestion is
+`monitor-signature-v1` signed, replay-protected, size-bounded, and idempotent; only minimized
+metadata is stored (no file contents, prompts, command output, or model reasoning). Paths are
+safely normalized before policy checks; scope violations, path classes, and severity are
+deterministic (GPT never decides). Blocking is disabled by default and gated behind explicit policy.
+Raw activity events are retained for `AGENT_EVENT_RETENTION_DAYS` and expire before violations and
+session summaries; cleanup is org-scoped, batched, scheduled, and auditable. CI exercises the
+adapter/CLI contract, path-normalization safety, deterministic scope rules, and signed ingestion —
+no third-party agent service is contacted.

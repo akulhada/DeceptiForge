@@ -41,6 +41,11 @@ def run(settings: Settings | None = None) -> dict[str, int]:
             results["narrative_revisions"] = repo.prune_all_narrative_revisions(
                 settings.narrative_revision_retention_count
             )
+            # Raw agent activity events expire before violations/session summaries, so summarized
+            # incident evidence outlives raw activity.
+            results["agent_activity_events"] = repo.purge_agent_activity_events(
+                now - timedelta(days=settings.agent_event_retention_days), batch
+            )
     log_event("retention_completed", **results)
     return results
 

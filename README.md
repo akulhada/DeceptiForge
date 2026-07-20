@@ -83,3 +83,8 @@ explicitly future work, not solved here:
   from shadow AI destinations, and reports only signed, minimized evidence (never pasted text,
   prompts, or AI responses). Disabled by default (see `docs/BrowserAiSensor.md`,
   `docs/BrowserPrivacy.md`).
+- **AI agent activity sensor (scope violations)** — registered agent sessions report minimized,
+  signed activity; deterministic, explainable rules flag out-of-scope, sensitive, and decoy access
+  across repository/MCP/RAG/database surfaces. Detect-only by default; never stores file contents,
+  prompts, command output, or model reasoning (see `docs/AiAgentSensor.md`,
+  `docs/AgentScopePolicies.md`, `docs/AgentPrivacy.md`, `docs/AgentAdapterSDK.md`).

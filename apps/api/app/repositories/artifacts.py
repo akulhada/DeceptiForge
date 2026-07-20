@@ -634,6 +634,19 @@ class ArtifactRepository:
             batch,
         )
 
+    def purge_agent_activity_events(self, cutoff: datetime, batch: int = 500) -> int:
+        """Delete raw minimized agent activity events older than the cutoff. Scope violations and
+        session summaries are retained separately (longer) so incident evidence outlives raw
+        activity."""
+        from app.models.records import AgentActivityEventRecord
+
+        return self._batched_delete(
+            AgentActivityEventRecord,
+            AgentActivityEventRecord.id,
+            AgentActivityEventRecord.created_at < cutoff,
+            batch,
+        )
+
     def purge_expired_api_keys(self, now: datetime, cutoff: datetime, batch: int = 500) -> int:
         """Delete keys that are revoked or expired and older than the retention cutoff."""
         return self._batched_delete(

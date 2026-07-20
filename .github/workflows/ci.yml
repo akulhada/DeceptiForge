@@ -49,6 +49,12 @@ jobs:
       # vector store or MCP server is contacted in CI.
       - name: Pytest (AI tripwire mock RAG/MCP adapters)
         run: pytest -vv tests/test_ai_tripwire_flow.py tests/test_ai_tripwire_api.py
+      # Agent activity sensor: adapter/SDK contract, path-normalization safety, deterministic scope
+      # rules, and signed event ingestion — no third-party agent service is contacted in CI.
+      - name: Pytest (agent sensor rules, adapter/CLI, signed ingest)
+        run: >-
+          pytest -vv tests/test_agent_sensor_services.py tests/test_agent_sensor_api.py
+          tests/test_agent_sdk.py tests/test_agent_retention.py
 
   postgres-integration:
     runs-on: ubuntu-latest

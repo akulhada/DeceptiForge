@@ -35,6 +35,13 @@ Per-install sensors carry a scoped credential provisioned via one-time enrollmen
 signing secret stays in the background service worker. Detection logic is factored into pure,
 node-testable modules with thin DOM/background adapters. See `docs/BrowserAiSensor.md`.
 
+The AI agent activity sensor extends the same signed-ingestion pattern to coding agents: a wrapper/
+CLI (`app/agent_sdk`) reports minimized, signed activity for a scoped session, and a deterministic,
+bounded engine (`app/services/agent_sensor`) classifies paths, resolves decoy touches by metadata,
+and raises explainable scope violations with deterministic severity. Path normalization is
+security-critical (rejects traversal/encoded/absolute). Detect-only by default. See
+`docs/AiAgentSensor.md`.
+
 ## Security posture
 
 Configuration is environment-derived; secrets are excluded from Git. CORS is deny-by-default unless an origin allow-list is configured. The extension requests only minimal MV3 permissions (storage, alarms) with host access scoped to the supported AI domains, and runs under a locked CSP with no eval or remote code (see `docs/ExtensionDeployment.md`). New AI, extension, or data-collection capabilities require a threat model and least-privilege permission design before implementation.
