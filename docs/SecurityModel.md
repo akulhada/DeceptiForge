@@ -35,8 +35,14 @@ enabled it also requires `X-DeceptiForge-Nonce` and `X-DeceptiForge-Timestamp`; 
 within a window and timestamps must be within the configured clock skew. Oversized values are
 rejected (413) before any matching/hashing/persistence.
 
-Limitation: nonce store and rate limiter are **in-process** (single worker). Production needs a
-shared store (Redis) and/or an edge gateway. Signed monitor request bodies are future work.
+Request bodies are signed: `monitor-signature-v1` is an HMAC over the canonical
+method/path/org/monitor-id/timestamp/nonce/body-hash, verified against a per-monitor secret held in
+the encrypted monitor-credential model. A tampered body fails signature verification (401).
+
+Deployment: the replay-nonce store and rate limiter run **Redis-backed** for multi-worker/production
+(`REPLAY_BACKEND=redis`, `RATE_LIMIT_MODE=app` + `RATE_LIMIT_BACKEND=redis`); a single-worker staging
+deployment may use the in-process backends, and the production config guard requires Redis (or an
+edge `RATE_LIMIT_MODE=gateway`) outside development. Redis loss fails signed ingestion closed.
 
 ## Audit
 
@@ -49,12 +55,16 @@ shared store (Redis) and/or an edge gateway. Signed monitor request bodies are f
 - Error responses never leak stack traces, filesystem paths, SQL, provider details, raw payloads, or
   keys; each carries `x-request-id`.
 - Artifact JSON blobs are size-capped before persistence; narrative revisions are pruned to a
-  retention count. Application-layer encryption and full retention jobs are **future work**.
+  retention count. Evidence-bearing JSON (alerts/events/incidents) is encrypted at rest, and
+  retention/lifecycle cleanup runs as scheduled advisory-locked jobs (`app/jobs/retention.py`,
+  `app/jobs/incident_lifecycle.py`).
 
 ## Not implemented (still required for production)
 
-Real identity/OAuth/SSO, full RBAC and key rotation, per-request signing, distributed rate limiting
-and replay store, async/durable ingestion, field-level encryption, and scheduled retention.
+Real identity/OAuth/SSO, full RBAC, and API-key rotation remain future work. Distributed rate
+limiting and replay store, per-request body signing (`monitor-signature-v1`), async/durable
+ingestion (transactional outbox + delivery worker), evidence encryption at rest, and scheduled
+retention are **implemented** — see the sections above.
 
 ## Decoy deployment (approval + lifecycle)
 

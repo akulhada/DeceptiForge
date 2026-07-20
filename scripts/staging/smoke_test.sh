@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Purpose: end-to-end signed-ingestion smoke test against a running staging API.
-# Behavior: builds a monitor-signature-v1 request, submits one monitoring event, and proves the
-#   security controls — replay rejection, body-tamper rejection, expired-timestamp rejection. Never
-#   logs the monitor secret or the full signature.
+# Behavior: builds a monitor-signature-v1 request, submits one monitoring event, and proves both the
+#   happy path (valid signed ingest against a seeded decoy plan returns 200) and the security controls
+#   — replay rejection, body-tamper rejection, expired-timestamp rejection. A missing/unseeded decoy
+#   plan fails the test (no false pass on the 409 that also signals replay). Never logs the monitor
+#   secret or the full signature.
 #
 # Required environment:
 #   BASE_URL          e.g. https://staging.example.com
@@ -52,11 +54,15 @@ NONCE="smoke-$(date +%s%N)"
 
 echo "== signed ingestion smoke =="
 
-# 1) Valid signed request. 200 = alert created; 409 = signature valid but decoy plan not seeded.
+# 1) Valid signed request. MUST be 200 (signature accepted AND the seeded decoy plan matched, so an
+#    alert is created). A 409 here means the decoy plan was not seeded (DECOY_PLAN_ID/TRACE do not
+#    resolve to a real plan) — the happy path was never exercised, so the smoke test must FAIL rather
+#    than pass on a missing-plan 409 (which is also the replay-rejection code, hiding a false pass).
 status="$(post_signed "$BODY" "$NOW" "$NONCE")"
 if [ "$status" = "200" ]; then note "valid ingest" "ok (200, alert created)";
-elif [ "$status" = "409" ]; then note "valid ingest" "signature ok, decoy plan not seeded (409)";
-else note "valid ingest" "FAIL (got $status)"; fail=1; fi
+elif [ "$status" = "409" ]; then
+  note "valid ingest" "FAIL (409: decoy plan not seeded — seed DECOY_PLAN_ID/TRACE before smoke)"; fail=1;
+else note "valid ingest" "FAIL (got $status, want 200)"; fail=1; fi
 
 # 2) Replay the exact same request (same nonce) -> 409 replayed nonce.
 check "replayed nonce rejected" "$(post_signed "$BODY" "$NOW" "$NONCE")" "409"

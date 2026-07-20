@@ -118,6 +118,8 @@ output). A result is only "pass" if it was actually observed.
 | Rationale | |
 
 **Status after this record:** `Controlled staging verified` **or** `Staging no-go with documented
-failures`. This milestone does NOT constitute full production certification (no enterprise SSO/RBAC,
-real integrations, real decoy deployment, browser/RAG/MCP/agent sensors, measured coverage, or
-multi-region).
+failures`. This milestone does NOT constitute full production certification: no enterprise SSO/RBAC,
+no real provider integrations, and live decoy deployment to GitHub is a fake adapter only. The
+browser/RAG/MCP/database/agent sensors, measured coverage engine, SIEM export, and multi-region
+reliability ARE implemented (each disabled by default behind its own feature flag) — enabling any of
+them in staging requires exercising its verification steps in this record, not treating it as absent.
