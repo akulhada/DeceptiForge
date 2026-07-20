@@ -82,3 +82,15 @@ Raw activity events are retained for `AGENT_EVENT_RETENTION_DAYS` and expire bef
 session summaries; cleanup is org-scoped, batched, scheduled, and auditable. CI exercises the
 adapter/CLI contract, path-normalization safety, deterministic scope rules, and signed ingestion —
 no third-party agent service is contacted.
+
+## Measured coverage engine
+
+Disabled by default (`COVERAGE_ENGINE_ENABLED`); explicit staging/production enablement required.
+Coverage is deterministic and risk-weighted from real active controls; failed/expired controls earn
+nothing, unknown inventory is reported separately (never counted as covered), and a high score with
+low confidence is shown as qualified. Snapshots are immutable and idempotent by source-state hash,
+so a scheduled or concurrent run over unchanged state creates nothing new. Add the coverage
+calculation job to the deployment topology (`python -m app.jobs.coverage`) — organization-scoped,
+advisory-locked, bounded, retryable; a manual recalculation is available to authorized users.
+Recommendations are never auto-deployed. CI includes coverage unit + cross-surface tests, the
+scheduled-job test, and a large-inventory performance regression guard.

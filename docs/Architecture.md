@@ -42,6 +42,13 @@ and raises explainable scope violations with deterministic severity. Path normal
 security-critical (rejects traversal/encoded/absolute). Detect-only by default. See
 `docs/AiAgentSensor.md`.
 
+The measured coverage engine (`app/services/coverage_engine`) reads across all deployment + sensor
+records to build a unified surface inventory, scores deterministic risk-weighted coverage from the
+controls actually present, detects blind spots, and ranks placement recommendations. Results are
+persisted as immutable snapshots (idempotent by source-state hash) by a scheduled, advisory-locked
+job (`app/jobs/coverage.py`), so trends are never recomputed from mutable state. GPT never scores.
+See `docs/CoverageEngine.md`.
+
 ## Security posture
 
 Configuration is environment-derived; secrets are excluded from Git. CORS is deny-by-default unless an origin allow-list is configured. The extension requests only minimal MV3 permissions (storage, alarms) with host access scoped to the supported AI domains, and runs under a locked CSP with no eval or remote code (see `docs/ExtensionDeployment.md`). New AI, extension, or data-collection capabilities require a threat model and least-privilege permission design before implementation.

@@ -119,3 +119,15 @@ metadata only — never file contents, prompts, command output, model reasoning,
 secrets; detect-only by default (blocking gated behind explicit policy); raw activity events expire
 before violations/summaries; revocation terminal and revokes the scoped key. Secrets encrypted at
 rest and never returned. Disabled by default.
+
+## Measured coverage engine
+
+The coverage engine measures deterministic, risk-weighted deception coverage across every surface
+(see `docs/CoverageEngine.md`, `docs/CoverageMethodology.md`, `docs/PlacementOptimization.md`).
+Invariants: coverage computed from real active controls (failed/expired earn nothing), never from
+decoy count; placement requires an active decoy; unknown/low-confidence inventory reported separately
+and never counted as covered; a high score with low confidence shown as qualified, never certainty;
+snapshots immutable (history never recomputed from mutable state) and idempotent by source-state
+hash; recommendations filtered for safety and never auto-deployed (accept records intent only, normal
+approval + separation of duties still apply); organization-scoped; GPT never scores. Disabled by
+default.

@@ -88,3 +88,8 @@ explicitly future work, not solved here:
   across repository/MCP/RAG/database surfaces. Detect-only by default; never stores file contents,
   prompts, command output, or model reasoning (see `docs/AiAgentSensor.md`,
   `docs/AgentScopePolicies.md`, `docs/AgentPrivacy.md`, `docs/AgentAdapterSDK.md`).
+- **Measured coverage engine + placement optimization** — deterministic, risk-weighted deception
+  coverage computed from real active controls across every surface (not decoy count), with explicit
+  unknown/low-confidence handling, immutable snapshots + trends, blind-spot detection, and ranked
+  next-best placements. Disabled by default; GPT never scores (see `docs/CoverageEngine.md`,
+  `docs/CoverageMethodology.md`, `docs/PlacementOptimization.md`).

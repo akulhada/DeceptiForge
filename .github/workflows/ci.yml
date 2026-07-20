@@ -55,6 +55,12 @@ jobs:
         run: >-
           pytest -vv tests/test_agent_sensor_services.py tests/test_agent_sensor_api.py
           tests/test_agent_sdk.py tests/test_agent_retention.py
+      # Measured coverage engine: deterministic scoring, cross-surface calculation, scheduled job,
+      # and a large-inventory performance regression guard (bounded, no O(n^2)).
+      - name: Pytest (coverage engine + cross-surface + perf regression)
+        run: >-
+          pytest -vv tests/test_coverage_scoring.py tests/test_coverage_engine.py
+          tests/test_coverage_api.py tests/test_coverage_perf.py
 
   postgres-integration:
     runs-on: ubuntu-latest
