@@ -11,6 +11,7 @@ import { AgentSensorPanel } from '@/components/dashboard/AgentSensorPanel';
 import { AiTripwirePanel } from '@/components/dashboard/AiTripwirePanel';
 import { CoveragePanel } from '@/components/dashboard/CoveragePanel';
 import { IntegrationsPanel } from '@/components/dashboard/IntegrationsPanel';
+import { ReliabilityPanel } from '@/components/dashboard/ReliabilityPanel';
 import { BrowserSensorPanel } from '@/components/dashboard/BrowserSensorPanel';
 import { ConnectPanel } from '@/components/dashboard/ConnectPanel';
 import { DatabaseHoneyPanel } from '@/components/dashboard/DatabaseHoneyPanel';
@@ -96,6 +97,9 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             )}
             {whoami?.scopes.includes('integrations:read') && (
               <IntegrationsPanel scopes={whoami.scopes} />
+            )}
+            {whoami?.scopes.includes('reliability:read') && (
+              <ReliabilityPanel scopes={whoami.scopes} />
             )}
           </>
         ) : null}
