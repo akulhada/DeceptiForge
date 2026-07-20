@@ -56,3 +56,15 @@ retirement deletes only the owned asset (drift blocks deletion). Event ingestion
 protected, and minimized — no prompts, chunks, model output, raw embeddings, or raw customer content
 are persisted. RAG/MCP coverage runs in CI against deterministic in-memory fake adapters; no paid
 vector store or MCP server is contacted. Production wiring binds concrete provider clients.
+
+## Browser AI-paste sensor
+
+Disabled by default (`BROWSER_SENSOR_ENABLED`); explicit staging/production enablement required.
+Per-install sensors are provisioned via one-time short-lived enrollment tokens with a scoped ingest
+credential (never a dashboard key); event ingestion is signed + replay-protected + minimized (no
+pasted text, prompts, or AI responses persisted). Matching is local against hashed trace tokens.
+Revocation is terminal and revokes the scoped key. The extension requests minimal MV3 permissions
+(storage, alarms; host-scoped to the supported AI domains) with a locked CSP. CI runs extension
+typecheck/lint/unit-tests/production build plus a hardening audit that fails on any forbidden
+permission, `eval`/`new Function`, remote script URL, or embedded secret. The extension is not
+auto-published. A legal/privacy review is required before enterprise rollout.

@@ -78,3 +78,8 @@ explicitly future work, not solved here:
   with deterministic AI-native exposure classification and reversible owned-asset retirement.
   Disabled by default; RAG/MCP adapters are CI-tested with deterministic fakes — no paid AI services
   (see `docs/AiTripwires.md`, `docs/AiDataHandling.md`).
+- **Browser AI-paste sensor (Shadow AI)** — a minimal-permission Chromium extension that detects
+  DeceptiForge trace markers pasted into AI tools via local hashed matching, distinguishes approved
+  from shadow AI destinations, and reports only signed, minimized evidence (never pasted text,
+  prompts, or AI responses). Disabled by default (see `docs/BrowserAiSensor.md`,
+  `docs/BrowserPrivacy.md`).

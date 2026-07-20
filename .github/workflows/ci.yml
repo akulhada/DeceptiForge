@@ -154,6 +154,29 @@ jobs:
         run: pnpm test
       - name: Build (web dashboard + extension)
         run: pnpm build
+      # Extension hardening: the built MV3 bundle must request only minimal permissions, ship a
+      # locked-down CSP, and contain no eval, no remote code, and no embedded secrets.
+      - name: Extension manifest + permission audit
+        run: |
+          set -euo pipefail
+          MF=apps/extension/build/chrome-mv3-prod/manifest.json
+          test -f "$MF" || { echo "missing built manifest"; exit 1; }
+          for forbidden in '<all_urls>' 'clipboardRead' 'webRequest' '"history"' '"tabs"' '"cookies"' '"<all_urls>"'; do
+            if grep -q "$forbidden" "$MF"; then echo "forbidden permission: $forbidden"; exit 1; fi
+          done
+          grep -q '"storage"' "$MF" || { echo "expected minimal storage permission"; exit 1; }
+          echo "manifest permission audit passed"
+      - name: Extension no-eval / no-remote-code / secret scan
+        run: |
+          set -euo pipefail
+          DIR=apps/extension/build/chrome-mv3-prod
+          if grep -rEn 'eval\(|new Function\(' "$DIR"/*.js "$DIR"/**/*.js 2>/dev/null; then
+            echo "eval / new Function found in extension build"; exit 1; fi
+          if grep -rEn "https?://[^\"' )]+\.js" "$DIR"/*.js "$DIR"/**/*.js 2>/dev/null; then
+            echo "remote script URL found in extension build"; exit 1; fi
+          if grep -rEn 'dfk_[A-Za-z0-9]{8}|signing_secret"?\s*[:=]\s*"[A-Za-z0-9_-]{16}|BEGIN (RSA|EC|PRIVATE) KEY' "$DIR" 2>/dev/null; then
+            echo "possible secret embedded in extension build"; exit 1; fi
+          echo "no eval / remote code / secrets in extension build"
 
   production-config:
     runs-on: ubuntu-latest

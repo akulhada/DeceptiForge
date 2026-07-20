@@ -89,3 +89,18 @@ protected and **minimized** — never storing/logging prompts, chunks, model out
 connector secrets, or raw customer content; deterministic exposure classification + severity (GPT
 never decides safety or severity). Connector secrets encrypted at rest and never returned. Disabled
 by default.
+
+## Browser AI-paste sensor (Shadow AI)
+
+A Chromium extension detects DeceptiForge trace markers pasted into AI tools (see
+`docs/BrowserAiSensor.md`, `docs/ShadowAiDetection.md`, `docs/BrowserPrivacy.md`,
+`docs/ExtensionDeployment.md`). Invariants: local matching against irreversible hashed trace tokens
+(no full decoy payload or marker plaintext shipped); observe only explicit paste/beforeinput on
+monitored AI domains — never password/payment/hidden fields, history, keystrokes, or clipboard;
+never persist/transmit pasted text, prompts, or AI responses; per-install scoped credential (not a
+dashboard key) provisioned via one-time short-lived enrollment tokens; `monitor-signature-v1` signed
++ replay-protected + minimized ingestion; server-side (not extension-trusted) destination
+classification and deterministic exposure + severity with cross-surface correlation (GPT never
+decides severity); revocation is terminal and revokes the scoped key; versioned policy with
+downgrade rejection; minimal MV3 permissions (storage, alarms; host-scoped to AI domains), locked
+CSP, no eval, no remote code. Secrets encrypted at rest and never returned. Disabled by default.

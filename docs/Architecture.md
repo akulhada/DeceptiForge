@@ -28,9 +28,16 @@ jobs (unique per deployment+type), and monitoring events arrive through signed, 
 minimized ingestion. The AI tripwire slice (RAG/MCP) follows this pattern — see
 `docs/AiTripwires.md`.
 
+The browser AI-paste sensor (`apps/extension`, Chromium MV3) extends monitoring to the endpoint: a
+minimal-permission extension matches DeceptiForge trace markers locally against irreversible hashed
+tokens and reports only signed, minimized events to the same `monitor-signature-v1` ingestion path.
+Per-install sensors carry a scoped credential provisioned via one-time enrollment tokens, and the
+signing secret stays in the background service worker. Detection logic is factored into pure,
+node-testable modules with thin DOM/background adapters. See `docs/BrowserAiSensor.md`.
+
 ## Security posture
 
-Configuration is environment-derived; secrets are excluded from Git. CORS is deny-by-default unless an origin allow-list is configured. The extension requests no browser permissions or host access. New AI, extension, or data-collection capabilities require a threat model and least-privilege permission design before implementation.
+Configuration is environment-derived; secrets are excluded from Git. CORS is deny-by-default unless an origin allow-list is configured. The extension requests only minimal MV3 permissions (storage, alarms) with host access scoped to the supported AI domains, and runs under a locked CSP with no eval or remote code (see `docs/ExtensionDeployment.md`). New AI, extension, or data-collection capabilities require a threat model and least-privilege permission design before implementation.
 
 ## Decision log
 
