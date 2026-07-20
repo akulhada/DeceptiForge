@@ -8,6 +8,10 @@ a finished SaaS.
 
 ## Now in place
 
+- Opt-in tenant capacity management: Redis-backed monitoring burst/sustained quotas, pending
+  reconstruction queue backpressure, tenant-scoped usage/limit APIs, fair reconstruction claims, and
+  capacity recommendations that remain `uncertified` until a measured staging run exists.
+
 - Authenticated tenant dashboard read path (no `/demo/*`); demo mode stays development-only.
 - Hashed, scoped, revocable, expirable API keys bound to one organization; admin key endpoints;
   plaintext shown once, never logged. See [SecurityModel](SecurityModel.md).

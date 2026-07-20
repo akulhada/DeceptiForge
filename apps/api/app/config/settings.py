@@ -181,6 +181,23 @@ class Settings(BaseSettings):
     schedulers_enabled: bool = True
     external_side_effects_enabled: bool = True
     maintenance_mode: bool = False
+    # Performance and capacity policy. The defaults are deliberately conservative until a staging
+    # certification records measured throughput for the deployed topology.
+    performance_testing_enabled: bool = False
+    capacity_management_enabled: bool = False
+    default_tenant_tier: str = "small"
+    monitoring_max_events_per_second: int = 20
+    monitoring_max_burst: int = 50
+    tenant_max_pending_jobs: int = 1_000
+    tenant_max_concurrent_scans: int = 2
+    tenant_max_concurrent_deployments: int = 2
+    tenant_max_report_jobs: int = 2
+    worker_priority_reserve_percent: int = 30
+    api_database_pool_size: int = 10
+    worker_database_pool_size: int = 5
+    queue_backlog_alert_seconds: int = 300
+    capacity_headroom_percent: int = 40
+    performance_methodology_version: str = "performance-v1"
 
     @property
     def is_active_write_region(self) -> bool:
@@ -195,6 +212,16 @@ class Settings(BaseSettings):
         prod_dr = self.dr_enabled and self.app_env in {"staging", "production"}
         if prod_dr and not self.secondary_region:
             raise ValueError("secondary_region is required when dr_enabled in staging/production")
+        if self.default_tenant_tier not in {"small", "medium", "large"}:
+            raise ValueError("default_tenant_tier must be small, medium, or large")
+        if not 0 <= self.worker_priority_reserve_percent < 100:
+            raise ValueError("worker_priority_reserve_percent must be in [0, 100)")
+        if self.monitoring_max_events_per_second <= 0 or self.monitoring_max_burst <= 0:
+            raise ValueError("monitoring event limits must be positive")
+        if self.monitoring_max_burst < self.monitoring_max_events_per_second:
+            raise ValueError("monitoring_max_burst must be at least events per second")
+        if self.api_database_pool_size <= 0 or self.worker_database_pool_size <= 0:
+            raise ValueError("database pool sizes must be positive")
         return self
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
@@ -249,6 +276,10 @@ class Settings(BaseSettings):
             )
         if self._redis_required and self.redis_url is None:
             raise RuntimeError("REDIS_URL is required when a Redis-backed backend is selected")
+        if self.capacity_management_enabled and self.redis_url is None:
+            raise RuntimeError(
+                "capacity management requires REDIS_URL for shared tenant quota enforcement"
+            )
         if self.evidence_encryption_mode == "disabled":
             raise RuntimeError(
                 "production requires an explicit EVIDENCE_ENCRYPTION_MODE (e.g. 'local' or a "

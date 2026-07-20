@@ -117,12 +117,25 @@ def _request_id(request: Request) -> str:
     return value if isinstance(value, str) else "unknown"
 
 
-def _safe_response(request: Request, status_code: int, detail: str) -> JSONResponse:
+_SAFE_ERROR_HEADERS = frozenset({"retry-after", "www-authenticate"})
+
+
+def _safe_response(
+    request: Request, status_code: int, detail: str, headers: dict[str, str] | None = None
+) -> JSONResponse:
     request_id = _request_id(request)
+    response_headers = {"x-request-id": request_id}
+    response_headers.update(
+        {
+            key: value
+            for key, value in (headers or {}).items()
+            if key.lower() in _SAFE_ERROR_HEADERS
+        }
+    )
     return JSONResponse(
         status_code=status_code,
         content={"detail": detail, "request_id": request_id},
-        headers={"x-request-id": request_id},
+        headers=response_headers,
     )
 
 
@@ -131,7 +144,7 @@ def register_exception_handlers(application: FastAPI) -> None:
 
     @application.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        return _safe_response(request, exc.status_code, str(exc.detail))
+        return _safe_response(request, exc.status_code, str(exc.detail), dict(exc.headers or {}))
 
     @application.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:

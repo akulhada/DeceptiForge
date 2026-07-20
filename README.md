@@ -46,6 +46,7 @@ per-step status, then shows a weighted coverage estimate. A run is exportable as
 - [Folder structure](docs/FolderStructure.md)
 - [Production readiness](docs/ProductionReadiness.md) · [Security model](docs/SecurityModel.md) · [Preflight checklist](docs/checklists/ProductionPreflight.md)
 - [Dashboard](docs/Dashboard.md) · [Pipeline API](docs/Api.md) · [Incident narrative](docs/IncidentNarrative.md) · [Production boundary](docs/ProductionBoundary.md)
+- [Performance architecture](docs/PerformanceArchitecture.md) · [SLOs](docs/ServiceLevelObjectives.md) · [Load testing](docs/LoadTesting.md) · [Capacity planning](docs/CapacityPlanning.md) · [Tenant limits](docs/TenantLimits.md)
 
 ## Production Hardening Roadmap
 

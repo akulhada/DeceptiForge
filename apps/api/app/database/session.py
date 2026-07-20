@@ -15,7 +15,13 @@ from app.config.settings import get_settings
 @lru_cache
 def get_engine() -> Engine:
     """Build one process-wide engine from settings on first use."""
-    return create_engine(get_settings().database_url.unicode_string(), pool_pre_ping=True)
+    settings = get_settings()
+    url = settings.database_url.unicode_string()
+    options: dict[str, object] = {"pool_pre_ping": True}
+    # SQLite's pool does not accept QueuePool sizing; production PostgreSQL gets an explicit budget.
+    if not url.startswith("sqlite"):
+        options.update(pool_size=settings.api_database_pool_size, max_overflow=0, pool_timeout=5)
+    return create_engine(url, **options)
 
 
 @lru_cache

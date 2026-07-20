@@ -92,10 +92,20 @@ PERMISSIONS: frozenset[str] = frozenset(
         "failover:approve",
         "failback:manage",
         "reliability_policy:manage",
+        "usage:read",
+        "limits:read",
+        "organization_limits:manage",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
     }
+)
+
+# Platform-only scopes are intentionally excluded from owner/admin tenant keys. They are provisioned
+# out-of-band for the operations plane, so ordinary tenant administrators cannot read global
+# capacity.
+PLATFORM_PERMISSIONS: frozenset[str] = frozenset(
+    {"capacity:read", "capacity:manage", "performance_runs:read", "performance_runs:execute"}
 )
 
 _READS = frozenset(p for p in PERMISSIONS if p.endswith(":read"))
@@ -156,6 +166,7 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "agent_events:ingest",
         }
     ),
+    "operator": PLATFORM_PERMISSIONS,
 }
 
 

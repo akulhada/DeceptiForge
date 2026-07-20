@@ -8,6 +8,7 @@ from app.api.admin import router as admin_router
 from app.api.agent_sensor import router as agent_sensor_router
 from app.api.ai_tripwire import router as ai_tripwire_router
 from app.api.browser_sensor import router as browser_sensor_router
+from app.api.capacity import router as capacity_router
 from app.api.coverage import router as coverage_router
 from app.api.database_honey import router as database_honey_router
 from app.api.demo import router as demo_router
@@ -32,6 +33,7 @@ def build_api_router(settings: Settings) -> APIRouter:
     router.include_router(pipeline_router)
     router.include_router(narrative_router)
     router.include_router(tenant_router)
+    router.include_router(capacity_router)
     router.include_router(admin_router)
     router.include_router(reliability_router)
     # Decoy deployment routes mount only when the feature is explicitly enabled.

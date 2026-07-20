@@ -28,6 +28,12 @@ jobs (unique per deployment+type), and monitoring events arrive through signed, 
 minimized ingestion. The AI tripwire slice (RAG/MCP) follows this pattern — see
 `docs/AiTripwires.md`.
 
+Capacity management sits at the ingestion/worker boundary: tenant limits are versioned and audited,
+monitoring requests receive bounded Redis-backed admission before durable acceptance, and the P1
+reconstruction worker claims a fair batch share per organization. Capacity recommendations consume
+only stored synthetic staging measurements; no unmeasured throughput is presented as certified. See
+`docs/PerformanceArchitecture.md` and `docs/CapacityPlanning.md`.
+
 The browser AI-paste sensor (`apps/extension`, Chromium MV3) extends monitoring to the endpoint: a
 minimal-permission extension matches DeceptiForge trace markers locally against irreversible hashed
 tokens and reports only signed, minimized events to the same `monitor-signature-v1` ingestion path.

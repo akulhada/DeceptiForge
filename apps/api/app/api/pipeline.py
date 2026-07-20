@@ -29,6 +29,7 @@ from app.schemas.api import (
 )
 from app.security import require_scope
 from app.services.api_keys import AuthContext
+from app.services.capacity import MonitoringQuotaGate, TenantCapacityService
 from app.services.metrics import emit
 from app.services.monitor_credentials import MonitorCredentialService, MonitorSignatureError
 from app.services.pipeline import PipelineError, PipelineService
@@ -185,6 +186,24 @@ def ingest_monitoring_event(
     ):
         emit("rate_limit_rejected", endpoint="monitoring:ingest", organization_id=org)
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "monitoring rate limit exceeded")
+    if settings.capacity_management_enabled:
+        capacity = TenantCapacityService(session, settings)
+        limits = capacity.limits(auth.organization_id)
+        if capacity.queue_snapshot(auth.organization_id).pending_count >= limits.max_pending_jobs:
+            emit("tenant_queue_rejected", queue="reconstruction", organization_id=org)
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "tenant reconstruction queue is at capacity",
+                headers={"Retry-After": "60"},
+            )
+        quota = MonitoringQuotaGate(settings).admit(auth.organization_id, limits)
+        if not quota.accepted:
+            emit("tenant_quota_rejected", reason=quota.reason, organization_id=org)
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "tenant monitoring quota exceeded",
+                headers={"Retry-After": str(quota.retry_after_seconds)},
+            )
     event, alert = _guard(
         lambda: _service(session, auth).ingest_event(
             body.decoy_plan_id, body.surface, body.location, body.value

@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, delete, or_, select, update
+from sqlalchemy import CursorResult, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -393,11 +393,34 @@ class ArtifactRepository:
         Each candidate is claimed with a compare-and-set on status; only the worker whose UPDATE
         changes a row owns it. This is portable across PostgreSQL and SQLite.
         """
+        if organization_id is None:
+            return self._claim_reconstruction_jobs_fair(limit)
+        return self._claim_reconstruction_jobs_for_org(limit, organization_id)
+
+    def _claim_reconstruction_jobs_fair(self, limit: int) -> tuple[ReconstructionJobRecord, ...]:
+        """Reserve one fair share for each tenant before any tenant receives extra work."""
+        organizations = self._session.scalars(
+            select(ReconstructionJobRecord.organization_id)
+            .where(ReconstructionJobRecord.status == "pending")
+            .group_by(ReconstructionJobRecord.organization_id)
+            .order_by(func.min(ReconstructionJobRecord.created_at))
+            .limit(limit)
+        ).all()
+        if not organizations:
+            return ()
+        share = max(1, limit // len(organizations))
+        claimed: list[ReconstructionJobRecord] = []
+        for organization in organizations:
+            claimed.extend(self._claim_reconstruction_jobs_for_org(share, organization))
+        return tuple(claimed)
+
+    def _claim_reconstruction_jobs_for_org(
+        self, limit: int, organization_id: UUID
+    ) -> tuple[ReconstructionJobRecord, ...]:
         query = select(ReconstructionJobRecord.id).where(
             ReconstructionJobRecord.status == "pending"
         )
-        if organization_id is not None:
-            query = query.where(ReconstructionJobRecord.organization_id == organization_id)
+        query = query.where(ReconstructionJobRecord.organization_id == organization_id)
         candidate_ids = self._session.scalars(
             query.order_by(ReconstructionJobRecord.created_at).limit(limit)
         ).all()

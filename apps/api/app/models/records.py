@@ -148,6 +148,41 @@ class ReconstructionJobRecord(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TenantLimitRecord(Base):
+    """One audited, organization-scoped capacity policy; no tenant shares another's row."""
+
+    __tablename__ = "tenant_limits"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, unique=True, index=True)
+    tier: Mapped[str] = mapped_column(String(16))
+    monitoring_events_per_second: Mapped[int] = mapped_column(Integer)
+    monitoring_burst: Mapped[int] = mapped_column(Integer)
+    max_pending_jobs: Mapped[int] = mapped_column(Integer)
+    max_concurrent_scans: Mapped[int] = mapped_column(Integer)
+    max_concurrent_deployments: Mapped[int] = mapped_column(Integer)
+    max_report_jobs: Mapped[int] = mapped_column(Integer)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PerformanceRunRecord(Base):
+    """Immutable synthetic benchmark certification; no raw payloads or credentials."""
+
+    __tablename__ = "performance_runs"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    methodology_version: Mapped[str] = mapped_column(String(64), index=True)
+    code_revision: Mapped[str] = mapped_column(String(128))
+    infrastructure: Mapped[str] = mapped_column(Text)
+    workload: Mapped[str] = mapped_column(Text)
+    results: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class IncidentRecord(Base):
     __tablename__ = "incidents"
 

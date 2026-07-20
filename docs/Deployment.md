@@ -89,10 +89,15 @@ are covered in `docs/DisasterRecovery.md`, `docs/BackupPolicy.md`, `docs/Regiona
 | `EVIDENCE_ENCRYPTION_MODE` | `local` (with `EVIDENCE_ENCRYPTION_KEY`) or a documented KMS strategy |
 | `BOOTSTRAP_KEYS_ENABLED` | `false` in steady state (see `bootstrap-and-encryption.md`) |
 | `CORS_ORIGINS` | explicit allow-list; empty = CORS off (fail closed) |
+| `CAPACITY_MANAGEMENT_ENABLED=true` | enables Redis-backed tenant monitoring and queue admission |
 
 Production **fails fast at startup** on: in-memory rate-limit/replay backends, missing `REDIS_URL`
 when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled`, or unrestricted
 (no-expiry) bootstrap keys.
+
+When capacity management is enabled, keep `REDIS_URL` private and set the tenant defaults, queue
+backlog threshold, pool budgets, and headroom settings from a staging certification. See
+[PerformanceArchitecture](PerformanceArchitecture.md) and [StagingPerformanceCertification](StagingPerformanceCertification.md).
 
 ## Health / readiness
 
