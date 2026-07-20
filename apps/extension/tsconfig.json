@@ -5,8 +5,18 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "~*": [
+        "src/*"
+      ]
     }
   },
-  "include": [".plasmo/index.d.ts", "src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
+  "include": [
+    ".plasmo/index.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts"
+  ]
 }

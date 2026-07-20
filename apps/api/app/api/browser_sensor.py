@@ -64,6 +64,7 @@ class EnrollRequest(BaseModel):
 class EnrollResponse(BaseModel):
     sensor_id: UUID
     sensor_public_id: str
+    organization_id: UUID
     signing_secret: str  # shown once
     api_key: str  # shown once
 
@@ -213,6 +214,7 @@ def enroll(
     )
     return EnrollResponse(
         sensor_id=result.sensor.id, sensor_public_id=result.sensor_public_id,
+        organization_id=result.sensor.organization_id,
         signing_secret=result.signing_secret, api_key=result.api_key,
     )
 

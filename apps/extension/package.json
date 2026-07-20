@@ -27,7 +27,19 @@
   },
   "manifest": {
     "name": "DeceptiForge",
-    "description": "DeceptiForge browser extension.",
-    "version": "0.1.0"
+    "description": "DeceptiForge browser AI-paste sensor: detects synthetic protected content pasted into AI tools. No prompts, responses, history, or clipboard are captured.",
+    "version": "0.1.0",
+    "permissions": ["storage", "alarms"],
+    "host_permissions": [
+      "https://chatgpt.com/*",
+      "https://chat.openai.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*",
+      "https://copilot.microsoft.com/*",
+      "https://github.com/*"
+    ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'"
+    }
   }
 }
