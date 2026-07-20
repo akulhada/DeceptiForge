@@ -13,6 +13,7 @@ from app.api.database_honey import router as database_honey_router
 from app.api.demo import router as demo_router
 from app.api.deployments import router as deployments_router
 from app.api.health import router as health_router
+from app.api.integrations import router as integrations_router
 from app.api.narrative import router as narrative_router
 from app.api.pipeline import router as pipeline_router
 from app.api.tenant import router as tenant_router
@@ -48,6 +49,8 @@ def build_api_router(settings: Settings) -> APIRouter:
         router.include_router(agent_sensor_router)
     if settings.coverage_engine_enabled:
         router.include_router(coverage_router)
+    if settings.security_integrations_enabled:
+        router.include_router(integrations_router)
     if settings.demo_enabled and settings.is_development:
         router.include_router(demo_router)
     return router
