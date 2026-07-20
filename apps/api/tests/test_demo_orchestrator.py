@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from app.models.records import RepositoryRecord
+
 
 def test_run_completes_every_step_with_coverage(client) -> None:
     run = client.post("/demo/run")
@@ -30,6 +32,24 @@ def test_reset_clears_all_state(client) -> None:
     reset = client.post("/demo/reset").json()
     assert reset["profile"] is None
     assert reset["overview"]["total_decoys"] == 0
+
+
+def test_reset_is_scoped_to_the_demo_organization(client) -> None:
+    other_org = uuid4()
+    with client.app_session() as session:  # type: ignore[attr-defined]
+        session.add(
+            RepositoryRecord(
+                organization_id=other_org,
+                name="isolated-repository",
+                root_path="/safe/other",
+                profile="{}",
+            )
+        )
+        session.commit()
+    client.post("/demo/run")
+    assert client.post("/demo/reset").status_code == 200
+    with client.app_session() as session:  # type: ignore[attr-defined]
+        assert session.query(RepositoryRecord).filter_by(organization_id=other_org).count() == 1
 
 
 def test_run_is_retrievable_and_exportable(client) -> None:

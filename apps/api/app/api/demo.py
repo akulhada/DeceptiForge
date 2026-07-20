@@ -33,6 +33,12 @@ def get_demo_state(session: Session = Depends(get_db)) -> DemoState:
     return _service(session).state()
 
 
+@router.get("/status", response_model=DemoState)
+def get_demo_status(session: Session = Depends(get_db)) -> DemoState:
+    """Compatibility status view for deterministic demo progress; never exposes credentials."""
+    return _service(session).state()
+
+
 @router.post("/seed", response_model=DemoState)
 def seed_demo(session: Session = Depends(get_db)) -> DemoState:
     """Scan the bundled fixture and run the whole pipeline, returning the seeded state."""
@@ -42,6 +48,12 @@ def seed_demo(session: Session = Depends(get_db)) -> DemoState:
 @router.post("/simulate-detection", response_model=DemoState)
 def simulate_detection(session: Session = Depends(get_db)) -> DemoState:
     """Simulate an accepted decoy being touched, producing an event, alert, and incident."""
+    return _service(session).simulate_detection()
+
+
+@router.post("/trigger", response_model=DemoState)
+def trigger_demo(session: Session = Depends(get_db)) -> DemoState:
+    """Development-only controlled touch; the normal pipeline creates event, alert, and incident."""
     return _service(session).simulate_detection()
 
 
