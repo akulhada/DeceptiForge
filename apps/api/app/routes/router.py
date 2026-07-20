@@ -8,6 +8,7 @@ from app.api.admin import router as admin_router
 from app.api.agent_sensor import router as agent_sensor_router
 from app.api.ai_tripwire import router as ai_tripwire_router
 from app.api.browser_sensor import router as browser_sensor_router
+from app.api.coverage import router as coverage_router
 from app.api.database_honey import router as database_honey_router
 from app.api.demo import router as demo_router
 from app.api.deployments import router as deployments_router
@@ -45,6 +46,8 @@ def build_api_router(settings: Settings) -> APIRouter:
         router.include_router(browser_sensor_router)
     if settings.agent_sensor_enabled:
         router.include_router(agent_sensor_router)
+    if settings.coverage_engine_enabled:
+        router.include_router(coverage_router)
     if settings.demo_enabled and settings.is_development:
         router.include_router(demo_router)
     return router
