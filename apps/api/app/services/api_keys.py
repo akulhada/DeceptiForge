@@ -247,6 +247,23 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "agent_events:ingest",
         }
     ),
+    # The curated demo story. Enough to drive the fixed narrative and read its results, and nothing
+    # else: no tenant writes, no administration, no judge scopes. A demo session must never become a
+    # judge, tenant or platform actor. Bound at the request boundary to the demo organization, so it
+    # cannot read another organization even with these scopes.
+    "demo": frozenset(
+        {
+            "demo:run",
+            "repositories:read",
+            "placements:read",
+            "decoys:read",
+            "validation:read",
+            "monitoring:read",
+            "alerts:read",
+            "incidents:read",
+            "narratives:read",
+        }
+    ),
     # A judge credential is provisioned out-of-band per sandbox session, never minted by a tenant.
     # It holds no write scope on tenant data, no administration, and nothing from the platform
     # plane: the only mutations it can cause are the ones the sandbox endpoints perform on its own
@@ -260,6 +277,11 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
 assert not (JUDGE_PERMISSIONS & PERMISSIONS), "judge scopes must not leak into tenant roles"
 assert not (JUDGE_PERMISSIONS & PLATFORM_PERMISSIONS), "judge scopes must not be platform scopes"
 assert not (ROLE_SCOPES["judge"] & PLATFORM_PERMISSIONS), "judge must hold no platform scope"
+assert not (ROLE_SCOPES["demo"] & PLATFORM_PERMISSIONS), "demo must hold no platform scope"
+assert not (ROLE_SCOPES["demo"] & JUDGE_PERMISSIONS), "a demo session must not become a judge"
+assert not any(
+    scope.startswith("admin:") for scope in ROLE_SCOPES["demo"]
+), "demo must hold no administration"
 
 
 def assert_grantable(issuer_scopes: frozenset[str], target_role: str) -> None:

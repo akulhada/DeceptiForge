@@ -119,6 +119,26 @@ A prerendered page therefore has every script blocked and never hydrates — sil
 error. `app/layout.tsx` reads a request header to opt out of prerendering, and CI asserts the nonce
 in the served HTML matches the one in the header.
 
+### Curated demo access
+
+Five of the nine `/demo/*` routes mutate: they seed data, drive the pipeline and reset state. In
+development they stay open for local convenience, the same way the demo API-key bypass is
+development-only. Anywhere the demo can be **hosted** — today that means `judge` — they require a
+`demo:run` credential bound to the demo organization, because a hosted deployment makes them
+internet-reachable.
+
+Mint one out-of-band:
+
+```
+python scripts/provision_judge_sandbox.py --demo-credential
+```
+
+The `demo` role carries `demo:run` plus the reads needed to display the story, and nothing else: no
+tenant writes, no administration, no platform scopes and no judge scopes. It is absent from
+`TENANT_GRANTABLE_ROLES`, so no tenant administrator can mint one. A demo credential cannot open the
+judge workspace and a judge credential cannot open the demo; the demo drives the fixed demo
+organization while judge sandboxes use generated ones, so neither can read the other's records.
+
 ### Restricted judge workspace
 
 `JUDGE_WORKSPACE_ENABLED=true` mounts `/api/v1/judge/*`. Each judge gets a TTL-bound sandbox: a

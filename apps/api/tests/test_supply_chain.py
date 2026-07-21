@@ -156,8 +156,15 @@ def test_analysis_lab_flags_cannot_drift_apart() -> None:
     its own flag, and no committed environment template may turn it on.
     """
     page = (REPO / "apps" / "web" / "app" / "analysis-lab" / "page.tsx").read_text()
-    assert "NEXT_PUBLIC_ANALYSIS_LAB_ENABLED" in page
     assert "notFound()" in page, "the route must 404 when disabled, not merely hide navigation"
+    # The page delegates eligibility to the shared route-model helper rather than reading the flag
+    # inline. Follow the indirection so this stays a real check: the helper must consult the flag,
+    # and must also require a development/test deployment mode, which is stricter than the flag
+    # alone — the lab cannot appear in a hosted judge or production build even if the flag is set.
+    assert "analysisLabEnabled()" in page
+    helper = (REPO / "apps" / "web" / "services" / "deploymentMode.ts").read_text()
+    assert "NEXT_PUBLIC_ANALYSIS_LAB_ENABLED" in helper
+    assert "'development' || mode === 'test'" in helper
 
     for template in REPO.rglob(".env*.example"):
         for line in template.read_text().splitlines():
