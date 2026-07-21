@@ -62,7 +62,7 @@ These commits are evidence of meaningful extension during the event period; they
 
 ## Codex Session ID
 
-Before submission, obtain the ID from `/feedback` in the principal Codex development thread and add it here once. Do not invent an ID.
+Codex Session ID: `019f67eb-fa4d-77d0-ad70-eb034c57d246`
 
 ## Quick start
 
