@@ -32,7 +32,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Diagnostics (safe)
         run: |
           echo "python: $(python --version)"
@@ -100,7 +102,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Diagnostics (safe)
         run: |
           echo "alembic: $(alembic --version)"
@@ -151,7 +155,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Distributed replay + rate-limit integration (real Redis)
         env:
           REDIS_TEST_URL: redis://localhost:6379/0
@@ -215,7 +221,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Production settings smoke test
         run: pytest -vv tests/test_production_settings_smoke.py
       - name: Production Compose renders
@@ -338,7 +346,7 @@ jobs:
           set -euo pipefail
           python -m venv /tmp/rtaudit
           /tmp/rtaudit/bin/pip install --upgrade pip >/dev/null
-          /tmp/rtaudit/bin/pip install ./apps/api >/dev/null
+          /tmp/rtaudit/bin/pip install --require-hashes -r apps/api/requirements.lock.txt >/dev/null
           /tmp/rtaudit/bin/pip install pip-audit >/dev/null
           ignores=""
           if [ -f .pip-audit-ignore ]; then
@@ -351,7 +359,9 @@ jobs:
           /tmp/rtaudit/bin/pip-audit --skip-editable --progress-spinner off $ignores
       - name: Install API dependencies (dev group)
         working-directory: apps/api
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       # Tier 2 (reported, non-blocking): developer tooling never reaches the production image, so a
       # finding here is surfaced in the log rather than blocking a release. It is never hidden.
       - name: Development dependency audit (reported)
