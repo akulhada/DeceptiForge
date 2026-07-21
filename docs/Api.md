@@ -20,9 +20,54 @@ Each artifact is persisted; engines are unchanged and hold the detection logic.
 | POST | `/monitoring/events` | Feed a value at a surface; register decoys, detect, alert |
 | GET | `/alerts` | List normalized alerts |
 | GET | `/incidents` | List reconstructed incidents |
+| GET | `/api/v1/analysis/scenarios` | List prepared fictional Interactive Demo Lab scenarios |
+| POST | `/api/v1/analysis/preview` | Deterministic preview analysis of structured signals |
 
 Missing prerequisites (for example generating before planning) return `409`; an unknown repository
 profile returns `404`.
+
+## Interactive Analysis Lab — `POST /api/v1/analysis/preview`
+
+Deterministic, stateless preview analysis over **structured repository signals**. Powers the
+`/analysis-lab` product route.
+
+- **Authentication**: standard API key + `X-DeceptiForge-Org-Id`. Organization is resolved from the
+  authenticated identity — a body `organization_id` is neither accepted nor trusted.
+- **Permission**: `analysis:preview` (viewer, analyst, admin, owner). Sensor and unscoped service
+  credentials are rejected (`403`).
+- **Request** (`AnalysisPreviewRequest`): `{ signals: RepositorySignals, scenario_id?: string,
+  options?: { include_alternatives?: bool, maximum_recommendations?: 1..20, minimum_confidence?:
+  0..1 } }`. Options are a strict allowlist — no engine names, classes, or executable config.
+- **RepositorySignals** (all optional, bounded): `languages, frameworks, package_managers, services,
+  naming_patterns, infrastructure, databases, documentation, secret_locations, ai_surfaces`. Unknown
+  top-level keys are reported back as `input_summary.ignored_fields`; unknown nested keys are
+  dropped. Path-like strings are descriptive metadata only — the server never opens them.
+- **Response** (`AnalysisPreviewResponse`, `schema_version: analysis-preview-v1`): `input_summary,
+  context_profile, vocabulary, sensitive_zones, placement_recommendations, warnings, confidence,
+  engine_versions, request_id, generated_at`. Each inferred value carries its confidence, supporting
+  signals, and a deterministic explanation.
+- **Deterministic**: identical input yields identical output (excluding `generated_at`). No GPT is
+  called; no filesystem scan, repository clone, or code execution occurs.
+- **Stateless**: input and results are never persisted. Only safe operational metadata is emitted
+  (organization, actor, request id, scenario id, payload size, duration, outcome) — never the raw
+  JSON input.
+- **Limits**: request body over the transport limit → `413`; contract violation or too many
+  aggregate representative paths → `422`; per-organization+actor rate limit exceeded → `429` with
+  `Retry-After`.
+
+Example request:
+
+```json
+{
+  "signals": {
+    "services": [{"name": "payment-service"}, {"name": "ledger-api"}],
+    "databases": [{"engine": "PostgreSQL", "data_domain_terms": ["payment", "settlement"]}],
+    "naming_patterns": {"domain_terms": ["payment", "settlement", "reconciliation"]},
+    "secret_locations": [{"path": "services/payment/.env.example", "category": "payment_gateway"}]
+  },
+  "scenario_id": "fintech-payments"
+}
+```
 
 ## End-to-end flow
 

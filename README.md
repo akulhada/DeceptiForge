@@ -37,6 +37,24 @@ sensors, measured coverage, SIEM export, reliability, and capacity controls are 
 links below. They are disabled by default and exercised with deterministic fakes. They are not a
 claim of production certification.
 
+## Interactive Analysis Lab
+
+An authenticated, organization-scoped product route (`/analysis-lab`) that turns the single prepared
+demo into a testable prototype. Paste or edit **structured repository signals** as JSON (languages,
+frameworks, services, databases, naming patterns, infrastructure, documentation, secret locations,
+AI surfaces), pick one of **ten prepared fictional scenarios** (fintech, SaaS/CRM, healthcare,
+e-commerce, ML/RAG, Kubernetes microservices, monorepo, sparse, conflicting, high-risk secrets+AI),
+and run DeceptiForge's **deterministic** analysis: inferred context profile, vocabulary/naming,
+ranked sensitive zones, ranked placement recommendations, layered confidence, and explainable
+warnings — each showing which input signals drove it. Compare two scenarios side by side and export
+the result as JSON or Markdown.
+
+Boundary: the lab accepts only structured signals. It **does not scan a filesystem, clone a
+repository, execute code, or call GPT**, and it does not persist input or results. Path-like strings
+are descriptive metadata only and are never opened. The endpoint is
+`POST /api/v1/analysis/preview` (permission `analysis:preview`; viewer/analyst/admin/owner; sensors
+excluded), authenticated and org-scoped, with payload and rate limits — see [Pipeline API](docs/Api.md).
+
 ## Architecture
 
 Next.js provides the dashboard. FastAPI hosts the API and deterministic security pipeline.
