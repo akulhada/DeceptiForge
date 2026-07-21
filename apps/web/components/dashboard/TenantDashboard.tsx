@@ -30,6 +30,7 @@ import {
 } from '@/components/dashboard/sections';
 import { useTenantDashboardData } from '@/hooks/useTenantDashboardData';
 import { clearSession, getSession } from '@/services/authSession';
+import { tenantApi } from '@/services/tenantApi';
 
 function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
   const { state, whoami, loading, error, refetch } = useTenantDashboardData();
@@ -80,7 +81,10 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
             <ValidationSection reports={state.reports} />
             <MonitoringSection events={state.events} />
             <AlertsSection alerts={state.alerts} />
-            <IncidentsSection incidents={state.incidents} />
+            <IncidentsSection
+              incidents={state.incidents}
+              generateNarrative={tenantApi.generateIncidentNarrative}
+            />
             {whoami?.scopes.includes('decoy_deployments:read') && (
               <DeploymentsPanel scopes={whoami.scopes} />
             )}

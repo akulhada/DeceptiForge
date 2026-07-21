@@ -5,7 +5,7 @@
 'use client';
 
 import { getSession } from './authSession';
-import type { Alert, Incident, RepositoryProfile } from './types';
+import type { Alert, Incident, IncidentNarrative, RepositoryProfile } from './types';
 
 export class TenantApiError extends Error {
   constructor(
@@ -29,17 +29,19 @@ export interface TenantRepository {
   profile: RepositoryProfile;
 }
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const session = getSession();
   if (!session) throw new TenantApiError('not connected', 0);
   let response: Response;
   try {
     response = await fetch(`${session.baseUrl}${path}`, {
+      ...init,
       cache: 'no-store',
       headers: {
         'content-type': 'application/json',
         'X-DeceptiForge-Org-Id': session.organizationId,
         'X-DeceptiForge-API-Key': session.apiKey,
+        ...init?.headers,
       },
     });
   } catch {
@@ -63,4 +65,6 @@ export const tenantApi = {
   alerts: () => request<{ alerts: readonly Alert[] }>('/alerts').then((r) => r.alerts),
   incidents: () =>
     request<{ incidents: readonly Incident[] }>('/incidents').then((r) => r.incidents),
+  generateIncidentNarrative: (incidentId: string) =>
+    request<IncidentNarrative>(`/incidents/${incidentId}/narrative`, { method: 'POST' }),
 };

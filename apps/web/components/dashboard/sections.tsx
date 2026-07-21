@@ -20,6 +20,7 @@ import type {
   DecoyPlan,
   DetectionEvent,
   Incident,
+  IncidentNarrative,
   Overview,
   PlacementPlan,
   RepositoryProfile,
@@ -320,7 +321,15 @@ export function AlertsSection({ alerts }: { alerts: readonly Alert[] }) {
   );
 }
 
-export function IncidentsSection({ incidents }: { incidents: readonly Incident[] }) {
+export function IncidentsSection({
+  incidents,
+  narrative,
+  generateNarrative,
+}: {
+  incidents: readonly Incident[];
+  narrative?: IncidentNarrative | null;
+  generateNarrative?: (id: string) => Promise<IncidentNarrative>;
+}) {
   return (
     <Section
       id="incidents"
@@ -333,7 +342,12 @@ export function IncidentsSection({ incidents }: { incidents: readonly Incident[]
       ) : (
         <div className="space-y-4">
           {incidents.map((incident) => (
-            <IncidentPanel key={incident.incident_id} incident={incident} />
+            <IncidentPanel
+              key={incident.incident_id}
+              incident={incident}
+              narrative={narrative?.incident_id === incident.incident_id ? narrative : null}
+              generateNarrative={generateNarrative}
+            />
           ))}
         </div>
       )}

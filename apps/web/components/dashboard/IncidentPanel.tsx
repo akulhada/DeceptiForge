@@ -67,8 +67,20 @@ function NarrativeView({ narrative }: { narrative: IncidentNarrative }) {
   );
 }
 
-function AiInvestigationSummary({ incidentId }: { incidentId: string }) {
-  const { narrative, loading, error, generate } = useIncidentNarrative(incidentId);
+function AiInvestigationSummary({
+  incidentId,
+  narrative: initialNarrative,
+  generateNarrative,
+}: {
+  incidentId: string;
+  narrative?: IncidentNarrative | null;
+  generateNarrative?: (id: string) => Promise<IncidentNarrative>;
+}) {
+  const { narrative, loading, error, generate } = useIncidentNarrative(
+    incidentId,
+    initialNarrative,
+    generateNarrative,
+  );
 
   return (
     <div className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
@@ -76,9 +88,11 @@ function AiInvestigationSummary({ incidentId }: { incidentId: string }) {
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
           <Sparkles className="h-4 w-4 text-sky-400" /> AI Investigation Summary
         </p>
-        <Button size="sm" variant="secondary" onClick={() => void generate()} disabled={loading}>
-          {loading ? 'Generating…' : narrative ? 'Regenerate' : 'Generate AI Summary'}
-        </Button>
+        {generateNarrative ? (
+          <Button size="sm" variant="secondary" onClick={() => void generate()} disabled={loading}>
+            {loading ? 'Generating…' : narrative ? 'Regenerate' : 'Generate AI Summary'}
+          </Button>
+        ) : null}
       </div>
 
       <div className="mt-3">
@@ -88,9 +102,13 @@ function AiInvestigationSummary({ incidentId }: { incidentId: string }) {
           <p className="text-xs text-slate-500">Summarizing minimized incident context…</p>
         ) : narrative ? (
           <NarrativeView narrative={narrative} />
-        ) : (
+        ) : generateNarrative ? (
           <p className="text-xs text-slate-500">
             No AI summary yet. Generate one from the minimized incident context on demand.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Run the curated demo to include its deterministic incident summary.
           </p>
         )}
       </div>
@@ -98,7 +116,15 @@ function AiInvestigationSummary({ incidentId }: { incidentId: string }) {
   );
 }
 
-export function IncidentPanel({ incident }: { incident: Incident }) {
+export function IncidentPanel({
+  incident,
+  narrative,
+  generateNarrative,
+}: {
+  incident: Incident;
+  narrative?: IncidentNarrative | null;
+  generateNarrative?: (id: string) => Promise<IncidentNarrative>;
+}) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -136,7 +162,11 @@ export function IncidentPanel({ incident }: { incident: Incident }) {
           </ul>
         </Field>
 
-        <AiInvestigationSummary incidentId={incident.incident_id} />
+        <AiInvestigationSummary
+          incidentId={incident.incident_id}
+          narrative={narrative}
+          generateNarrative={generateNarrative}
+        />
       </CardContent>
     </Card>
   );

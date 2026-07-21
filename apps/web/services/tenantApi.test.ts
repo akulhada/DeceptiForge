@@ -37,4 +37,22 @@ describe('tenantApi', () => {
   it('throws when not connected', async () => {
     await expect(tenantApi.whoami()).rejects.toThrow();
   });
+
+  it('uses the tenant session for narrative generation', async () => {
+    setSession({
+      baseUrl: 'https://api.example.com',
+      organizationId: 'org-123',
+      apiKey: 'dfk_secret',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await tenantApi.generateIncidentNarrative('incident-123');
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.example.com/incidents/incident-123/narrative');
+    expect(init.method).toBe('POST');
+    expect(init.headers['X-DeceptiForge-Org-Id']).toBe('org-123');
+    expect(init.headers['X-DeceptiForge-API-Key']).toBe('dfk_secret');
+  });
 });

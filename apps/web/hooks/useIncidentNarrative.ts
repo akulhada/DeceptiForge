@@ -3,9 +3,9 @@
 //   returned narrative. Never auto-generates. Dependencies: the API client.
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { api, ApiError } from '@/services/api';
+import { ApiError } from '@/services/api';
 import type { IncidentNarrative } from '@/services/types';
 
 interface NarrativeState {
@@ -15,22 +15,32 @@ interface NarrativeState {
   generate: () => Promise<void>;
 }
 
-export function useIncidentNarrative(incidentId: string): NarrativeState {
-  const [narrative, setNarrative] = useState<IncidentNarrative | null>(null);
+export function useIncidentNarrative(
+  incidentId: string,
+  initialNarrative?: IncidentNarrative | null,
+  generateNarrative?: (id: string) => Promise<IncidentNarrative>,
+): NarrativeState {
+  const [narrative, setNarrative] = useState<IncidentNarrative | null>(initialNarrative ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setNarrative(initialNarrative ?? null);
+    setError(null);
+  }, [incidentId, initialNarrative]);
+
   const generate = useCallback(async () => {
+    if (!generateNarrative) return;
     setLoading(true);
     setError(null);
     try {
-      setNarrative(await api.generateIncidentNarrative(incidentId));
+      setNarrative(await generateNarrative(incidentId));
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Failed to generate the summary.');
     } finally {
       setLoading(false);
     }
-  }, [incidentId]);
+  }, [generateNarrative, incidentId]);
 
   return { narrative, loading, error, generate };
 }

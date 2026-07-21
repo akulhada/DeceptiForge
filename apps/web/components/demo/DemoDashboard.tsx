@@ -103,7 +103,7 @@ export function DemoDashboard() {
             <ValidationSection reports={state.reports} />
             <MonitoringSection events={state.events} />
             <AlertsSection alerts={state.alerts} />
-            <IncidentsSection incidents={state.incidents} />
+            <IncidentsSection incidents={state.incidents} narrative={run?.narrative} />
           </>
         ) : null}
       </main>
