@@ -67,31 +67,51 @@ class _Ctx:
         self.trace = "DFAI-abc123"
         if surface == SurfaceType.RAG_DOCUMENT:
             self.connector = self.repo.create_rag_connector(
-                organization_id=self.org, connector_type="pgvector", name="store",
-                secret="s3cr3t-token", index_or_collection="deceptiforge_decoys",
-                namespace=None, created_by_actor_id=uuid4(),
+                organization_id=self.org,
+                connector_type="pgvector",
+                name="store",
+                secret="s3cr3t-token",
+                index_or_collection="deceptiforge_decoys",
+                namespace=None,
+                created_by_actor_id=uuid4(),
             )
             preview, _ = build_rag_preview(
-                deployment_id=str(uuid4()), connector_id=str(self.connector.id),
-                target_collection="deceptiforge_decoys", decoy_kind="architecture_note",
-                trace_token=self.trace, expires_at=None, settings=self.settings,
+                deployment_id=str(uuid4()),
+                connector_id=str(self.connector.id),
+                target_collection="deceptiforge_decoys",
+                decoy_kind="architecture_note",
+                trace_token=self.trace,
+                expires_at=None,
+                settings=self.settings,
             )
         else:
             self.connector = self.repo.create_mcp_connector(
-                organization_id=self.org, name="mcp", server_reference="stg.internal",
-                transport_type="stdio", secret="s3cr3t-token", created_by_actor_id=uuid4(),
+                organization_id=self.org,
+                name="mcp",
+                server_reference="stg.internal",
+                transport_type="stdio",
+                secret="s3cr3t-token",
+                created_by_actor_id=uuid4(),
             )
             preview, _ = build_mcp_preview(
-                deployment_id=str(uuid4()), connector_id=str(self.connector.id),
-                target_collection="deceptiforge_decoys", decoy_kind="mcp_resource",
-                trace_token=self.trace, surface=SurfaceType.MCP_RESOURCE,
-                expires_at=None, settings=self.settings,
+                deployment_id=str(uuid4()),
+                connector_id=str(self.connector.id),
+                target_collection="deceptiforge_decoys",
+                decoy_kind="mcp_resource",
+                trace_token=self.trace,
+                surface=SurfaceType.MCP_RESOURCE,
+                expires_at=None,
+                settings=self.settings,
             )
         self.record = self.repo.create_deployment(
-            organization_id=self.org, surface_type=surface.value,
-            connector_id=self.connector.id, target_collection="deceptiforge_decoys",
-            decoy_kind=preview.decoy_kind, trace_id=self.trace,
-            requested_by_actor_id=uuid4(), expires_at=None,
+            organization_id=self.org,
+            surface_type=surface.value,
+            connector_id=self.connector.id,
+            target_collection="deceptiforge_decoys",
+            decoy_kind=preview.decoy_kind,
+            trace_id=self.trace,
+            requested_by_actor_id=uuid4(),
+            expires_at=None,
         )
         self.repo.set_preview(self.record, preview)
         self.svc = AiTripwireService(self.repo, self.rag, self.mcp, self.settings)
@@ -212,15 +232,21 @@ def test_events_are_minimized_no_raw_content() -> None:
     c.to_deploying()
     c.svc.execute(c.org, c.record.id)
     event = MinimizedAiEvent(
-        deployment_id=str(c.record.id), trace_id=c.trace,
-        surface_type=SurfaceType.RAG_DOCUMENT, event_type=AiEventType.DOCUMENT_RETRIEVED,
-        source_id="agent-7", monitor_identity="signed-monitor-1", confidence=0.9,
+        deployment_id=str(c.record.id),
+        trace_id=c.trace,
+        surface_type=SurfaceType.RAG_DOCUMENT,
+        event_type=AiEventType.DOCUMENT_RETRIEVED,
+        source_id="agent-7",
+        monitor_identity="signed-monitor-1",
+        confidence=0.9,
         # Ingestion minimizes before the event is ever constructed/persisted.
-        minimized_metadata=minimize_metadata({
-            "collection": "deceptiforge_decoys",
-            "prompt": "SECRET USER PROMPT",  # forbidden -> dropped
-            "output": "SECRET ANSWER",  # forbidden -> dropped
-        }),
+        minimized_metadata=minimize_metadata(
+            {
+                "collection": "deceptiforge_decoys",
+                "prompt": "SECRET USER PROMPT",  # forbidden -> dropped
+                "output": "SECRET ANSWER",  # forbidden -> dropped
+            }
+        ),
         observed_at=datetime.now(UTC),
     )
     stored = c.repo.add_event(c.org, event)
@@ -244,18 +270,24 @@ def test_classification_is_deterministic() -> None:
 def test_severity_is_deterministic_and_bumps() -> None:
     base = severity(
         AiExposureType.RAG_RETRIEVAL_EXPOSURE,
-        event_count=1, distinct_sources=1, surface_count=1,
+        event_count=1,
+        distinct_sources=1,
+        surface_count=1,
     )
     bumped = severity(
         AiExposureType.RAG_RETRIEVAL_EXPOSURE,
-        event_count=5, distinct_sources=3, surface_count=2,
+        event_count=5,
+        distinct_sources=3,
+        surface_count=2,
     )
     assert base == Severity.MEDIUM
     assert _ordinal(bumped) > _ordinal(base)
     # Deterministic: same inputs, same output.
     assert bumped == severity(
         AiExposureType.RAG_RETRIEVAL_EXPOSURE,
-        event_count=5, distinct_sources=3, surface_count=2,
+        event_count=5,
+        distinct_sources=3,
+        surface_count=2,
     )
 
 

@@ -27,15 +27,15 @@ def test_allowed_paths(path: str) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "docs/.env.example",          # protected pattern
-        "config/decoys/db.secret",    # protected pattern
-        "src/app.py",                 # outside allowlist
-        "/etc/passwd",                # absolute
-        "~/secrets",                  # home
-        "docs/../../etc/x",           # traversal
-        "docs/deploy.sh",             # executable
-        "docs/logo.png",              # binary
-        ".github/workflows/ci.yml",   # protected CI path (also outside allowlist)
+        "docs/.env.example",  # protected pattern
+        "config/decoys/db.secret",  # protected pattern
+        "src/app.py",  # outside allowlist
+        "/etc/passwd",  # absolute
+        "~/secrets",  # home
+        "docs/../../etc/x",  # traversal
+        "docs/deploy.sh",  # executable
+        "docs/logo.png",  # binary
+        ".github/workflows/ci.yml",  # protected CI path (also outside allowlist)
     ],
 )
 def test_rejected_paths(path: str) -> None:

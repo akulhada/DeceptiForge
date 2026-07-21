@@ -66,9 +66,14 @@ class _Ctx:
         self.client.register_table(_customers())
         self.org = uuid4()
         self.connector = self.repo.create_connector(
-            organization_id=self.org, name="warehouse", host_reference="db.internal",
-            database_name="app", secret_payload={"user": "deceptiforge_writer", "password": "x"},
-            ssl_mode="require", read_only_mode=False, created_by_actor_id=uuid4(),
+            organization_id=self.org,
+            name="warehouse",
+            host_reference="db.internal",
+            database_name="app",
+            secret_payload={"user": "deceptiforge_writer", "password": "x"},
+            ssl_mode="require",
+            read_only_mode=False,
+            created_by_actor_id=uuid4(),
         )
         snapshot = self.client.discover_schema(
             _dummy_spec(), allowed_schemas=("public",), max_tables=100
@@ -76,15 +81,23 @@ class _Ctx:
         self.snap_record = self.repo.add_snapshot(self.org, self.connector.id, snapshot)
         self.snapshot = snapshot
         self.record = self.repo.create_deployment(
-            organization_id=self.org, connector_id=self.connector.id,
-            schema_snapshot_id=self.snap_record.id, target_schema="public",
-            target_table="customers", decoy_type=HoneyDecoyType.CUSTOMER.value,
-            requested_by_actor_id=uuid4(), expires_at=None,
+            organization_id=self.org,
+            connector_id=self.connector.id,
+            schema_snapshot_id=self.snap_record.id,
+            target_schema="public",
+            target_table="customers",
+            decoy_type=HoneyDecoyType.CUSTOMER.value,
+            requested_by_actor_id=uuid4(),
+            expires_at=None,
         )
         preview, _row = build_preview(
-            deployment_id=str(self.record.id), connector_id=str(self.connector.id),
-            snapshot=snapshot, schema="public", table="customers",
-            decoy_type=HoneyDecoyType.CUSTOMER, trace_id="DFG-DB-1",
+            deployment_id=str(self.record.id),
+            connector_id=str(self.connector.id),
+            snapshot=snapshot,
+            schema="public",
+            table="customers",
+            decoy_type=HoneyDecoyType.CUSTOMER,
+            trace_id="DFG-DB-1",
             allowed_schemas=("public",),
             blocked_patterns=tuple(self.settings.database_blocked_table_patterns),
             expires_at=None,
@@ -157,10 +170,14 @@ def test_retire_deletes_only_the_owned_row() -> None:
     c.svc.execute(c.org, c.record.id)
     # An unrelated real row must survive.
     real = {
-        "id": str(uuid4()), "email": "real@corp.example", "full_name": "Real", "status": "active",
+        "id": str(uuid4()),
+        "email": "real@corp.example",
+        "full_name": "Real",
+        "status": "active",
     }
-    c.client.insert_row(_dummy_spec(), schema="public", table="customers", values=real,
-                        pk_columns=("id",))
+    c.client.insert_row(
+        _dummy_spec(), schema="public", table="customers", values=real, pk_columns=("id",)
+    )
     assert c.client.row_count("public", "customers") == 2
     c.repo.transition(c.record, HoneyDeploymentStatus.RETIRING)
     c.svc.retire(c.org, c.record.id)

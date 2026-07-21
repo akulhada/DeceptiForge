@@ -65,5 +65,5 @@ def test_run_is_retrievable_and_exportable(client) -> None:
 
 
 def test_demo_run_is_gated_by_demo_enabled(make_client) -> None:
-    with make_client(demo_enabled=False, app_env="production") as client:
+    with make_client(demo_enabled=False, app_env="production", auth_enabled=True) as client:
         assert client.post("/demo/run").status_code == 404

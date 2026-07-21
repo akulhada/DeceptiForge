@@ -80,3 +80,29 @@ def test_scanner_exceptions_are_documented_not_blanket() -> None:
 
 def test_local_agent_state_is_ignored() -> None:
     assert ".claude/" in (REPO / ".gitignore").read_text()
+
+
+def test_production_compose_postgres_has_a_healthcheck() -> None:
+    """Every service waits on `condition: service_healthy`; without this the stack cannot start."""
+    compose = (REPO / "docker-compose.prod.example.yml").read_text()
+    assert "pg_isready" in compose, "postgres must define a real healthcheck"
+    # And the dependency it satisfies must still be declared.
+    assert "condition: service_healthy" in compose
+
+
+def test_every_service_awaited_as_healthy_defines_a_healthcheck() -> None:
+    import yaml
+
+    doc = yaml.safe_load((REPO / "docker-compose.prod.example.yml").read_text())
+    services = doc["services"]
+    awaited: set[str] = set()
+    for service in services.values():
+        depends = service.get("depends_on") or {}
+        if isinstance(depends, dict):
+            for name, spec in depends.items():
+                if isinstance(spec, dict) and spec.get("condition") == "service_healthy":
+                    awaited.add(name)
+    for name in awaited:
+        assert (
+            "healthcheck" in services[name]
+        ), f"{name} is awaited as service_healthy but defines no healthcheck"

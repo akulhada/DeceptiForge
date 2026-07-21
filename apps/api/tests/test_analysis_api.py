@@ -21,7 +21,12 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 
 def _client(make_client):  # type: ignore[no-untyped-def]
-    return make_client(demo_enabled=False, auth_enabled=True, app_env="development")
+    return make_client(
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        analysis_lab_enabled=True,
+    )
 
 
 _FINTECH = {
@@ -142,3 +147,42 @@ def test_malformed_contract_returns_422(make_client) -> None:  # type: ignore[no
             headers=_headers(key, org),
         )
         assert r.status_code == 422
+
+
+# ---- environment gating ------------------------------------------------------------------------
+
+
+def test_analysis_routes_return_404_when_lab_disabled(make_client) -> None:  # type: ignore[no-untyped-def]
+    """A demonstration surface: disabled means absent, not merely hidden in navigation."""
+    with make_client(
+        demo_enabled=False, auth_enabled=True, app_env="development", analysis_lab_enabled=False
+    ) as client:
+        org = str(uuid4())
+        key = _key(client, org, "analyst")
+        headers = _headers(key, org)
+        assert (
+            client.post("/api/v1/analysis/preview", json=_FINTECH, headers=headers).status_code
+            == 404
+        )
+        assert client.get("/api/v1/analysis/scenarios", headers=headers).status_code == 404
+
+
+def test_analysis_lab_flag_is_refused_outside_development() -> None:
+    """Startup rejects the flag in staging/production, so those environments cannot expose it."""
+    import pytest
+
+    from app.config.settings import Settings
+
+    with pytest.raises(RuntimeError, match="ANALYSIS_LAB_ENABLED"):
+        Settings(
+            app_env="production",
+            analysis_lab_enabled=True,
+            auth_enabled=True,
+            demo_enabled=False,
+            rate_limit_mode="gateway",
+            replay_backend="redis",
+            redis_url="redis://localhost:6379/0",
+            monitor_signature_required=True,
+            evidence_encryption_mode="local",
+            evidence_encryption_key="test-evidence-key-0000000000000000000000",
+        ).validate_runtime()

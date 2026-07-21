@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     admin_rate_limit_per_minute: int = 30
     # Interactive Demo Lab preview analysis: read-only but compute-bearing, so it gets its own
     # per-organization+actor budget rather than reusing the monitoring-ingest limit.
+    # The Interactive Analysis Lab is a demonstration/testing surface, not a production capability.
+    # Off by default and refused outside development even when explicitly enabled.
+    analysis_lab_enabled: bool = False
     analysis_preview_rate_limit_per_minute: int = 30
 
     # ---- Controlled learning + calibration ------------------------------------------------------
@@ -265,6 +268,7 @@ class Settings(BaseSettings):
         if not 0 <= self.onboarding_min_coverage_score <= 1:
             raise ValueError("onboarding minimum coverage score must be in [0, 1]")
         return self
+
     database_allowed_schemas: list[str] = Field(default_factory=lambda: ["public"])
     database_blocked_table_patterns: list[str] = Field(
         default_factory=lambda: [
@@ -318,6 +322,25 @@ class Settings(BaseSettings):
             )
         if self._redis_required and self.redis_url is None:
             raise RuntimeError("REDIS_URL is required when a Redis-backed backend is selected")
+        if self.analysis_lab_enabled:
+            raise RuntimeError(
+                "ANALYSIS_LAB_ENABLED=true is not permitted outside development; the analysis lab "
+                "is a demonstration surface and must return 404 in staging and production"
+            )
+        # P0: security controls must never fail open outside development. A Redis outage must
+        # refuse signed ingestion and deny rate-limited requests, not silently admit them.
+        if self.redis_fail_mode != "closed":
+            raise RuntimeError(
+                "REDIS_FAIL_MODE must be 'closed' outside development; failing open would let "
+                "replay protection and rate limiting silently admit requests during a Redis outage"
+            )
+        # A deployment with authentication disabled is operationally unusable (every protected route
+        # returns 401) and must not be reported as a healthy running service.
+        if not self.auth_enabled:
+            raise RuntimeError(
+                "AUTH_ENABLED=false is not permitted outside development; every protected route "
+                "would reject requests while the deployment reported itself healthy"
+            )
         if self.capacity_management_enabled and self.redis_url is None:
             raise RuntimeError(
                 "capacity management requires REDIS_URL for shared tenant quota enforcement"

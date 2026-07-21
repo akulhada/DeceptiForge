@@ -11,15 +11,22 @@ from app.services.monitor_signing import canonical_request, verify
 
 def _config() -> AgentClientConfig:
     return AgentClientConfig(
-        base_url="https://api.example.com", organization_id="org-1", api_key="dfk_x",
-        sensor_public_id="dfa_x", signing_secret="s3cr3t", queue_limit=3,
+        base_url="https://api.example.com",
+        organization_id="org-1",
+        api_key="dfk_x",
+        sensor_public_id="dfa_x",
+        signing_secret="s3cr3t",
+        queue_limit=3,
     )
 
 
 def test_adapter_strips_raw_content() -> None:
     ev = JsonlAdapter().normalize_event(
         {
-            "id": "e1", "event_type": "file_read", "path": "apps/web/x.tsx", "tool": "cat",
+            "id": "e1",
+            "event_type": "file_read",
+            "path": "apps/web/x.tsx",
+            "tool": "cat",
             "metadata": {"lines": 5, "file_content": "SECRET", "reasoning": "chain"},
         }
     )
@@ -59,9 +66,13 @@ def test_client_signs_requests() -> None:
     assert status == 200
     h = captured["headers"]
     canonical = canonical_request(
-        method="POST", path="/monitoring/agent-events", organization_id="org-1",
-        monitor_id="dfa_x", timestamp=h["X-DeceptiForge-Timestamp"],
-        nonce=h["X-DeceptiForge-Nonce"], body=captured["body"],
+        method="POST",
+        path="/monitoring/agent-events",
+        organization_id="org-1",
+        monitor_id="dfa_x",
+        timestamp=h["X-DeceptiForge-Timestamp"],
+        nonce=h["X-DeceptiForge-Nonce"],
+        body=captured["body"],
     )
     assert verify("s3cr3t", canonical, h["X-DeceptiForge-Signature"])
     assert b"SECRET" not in captured["body"]

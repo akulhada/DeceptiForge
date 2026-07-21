@@ -43,7 +43,10 @@ def synthetic_table():  # type: ignore[no-untyped-def]
 
     spec = _spec()
     conn = psycopg.connect(
-        host=spec.host, dbname=spec.database, user=spec.user, password=spec.password,
+        host=spec.host,
+        dbname=spec.database,
+        user=spec.user,
+        password=spec.password,
     )
     conn.autocommit = True
     with conn.cursor() as cur:
@@ -78,15 +81,21 @@ def test_discover_rank_generate_insert_verify_delete(synthetic_table) -> None:  
     row = generate_row(table, trace_id="DFH-INT-1", required_fields=eligibility.required_fields)
 
     result = client.insert_row(
-        spec, schema="public", table="df_customers", values=dict(row.values),
+        spec,
+        schema="public",
+        table="df_customers",
+        values=dict(row.values),
         pk_columns=table.primary_key,
     )
     assert result.inserted and result.verified and "id" in result.primary_key
 
     # Delete only the exact owned row, with an ownership check.
     deleted = client.delete_owned_row(
-        spec, schema="public", table="df_customers",
-        primary_key=result.primary_key, expected_row=dict(row.values),
+        spec,
+        schema="public",
+        table="df_customers",
+        primary_key=result.primary_key,
+        expected_row=dict(row.values),
     )
     assert deleted.deleted and not deleted.drift
 
@@ -101,7 +110,10 @@ def test_modified_row_blocks_deletion(synthetic_table) -> None:  # type: ignore[
     eligibility = evaluate_table(table, allowed_schemas=_ALLOWED, blocked_patterns=_BLOCKED)
     row = generate_row(table, trace_id="DFH-INT-2", required_fields=eligibility.required_fields)
     result = client.insert_row(
-        spec, schema="public", table="df_customers", values=dict(row.values),
+        spec,
+        schema="public",
+        table="df_customers",
+        values=dict(row.values),
         pk_columns=table.primary_key,
     )
 
@@ -118,7 +130,10 @@ def test_modified_row_blocks_deletion(synthetic_table) -> None:  # type: ignore[
     conn.close()
 
     outcome = client.delete_owned_row(
-        spec, schema="public", table="df_customers",
-        primary_key=result.primary_key, expected_row=dict(row.values),
+        spec,
+        schema="public",
+        table="df_customers",
+        primary_key=result.primary_key,
+        expected_row=dict(row.values),
     )
     assert outcome.drift and not outcome.deleted  # never delete a row that changed

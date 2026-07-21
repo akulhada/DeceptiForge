@@ -172,9 +172,7 @@ def test_postgres_integration_concurrent_duplicates_make_one_alert() -> None:
 
     check = factory()
     try:
-        rows = check.scalars(
-            select(AlertRecord).where(AlertRecord.organization_id == org)
-        ).all()
+        rows = check.scalars(select(AlertRecord).where(AlertRecord.organization_id == org)).all()
         assert len(rows) == 1  # exactly one alert despite concurrent duplicates
         assert rows[0].event_count == len(events)  # every event counted, none lost
     finally:

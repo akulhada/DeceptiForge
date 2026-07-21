@@ -19,7 +19,8 @@ _NOW = datetime(2026, 7, 19, tzinfo=UTC)
 def _settings(**over) -> Settings:  # type: ignore[no-untyped-def]
     base = dict(
         database_url="postgresql+psycopg://u:p@localhost/db",  # type: ignore[arg-type]
-        app_env="development", evidence_encryption_mode="local",
+        app_env="development",
+        evidence_encryption_mode="local",
         evidence_encryption_key="k" * 40,
     )
     base.update(over)
@@ -63,14 +64,26 @@ def test_report_checksum_is_deterministic() -> None:
     session = _session()
     checks = restore_verify.verify(session, _settings(), expected_migration="0019_reliability")
     r1 = restore_verify.build_report(
-        drill_id="d", backup_identifier="b", recovery_point=_NOW, started_at=_NOW,
-        finished_at=_NOW + timedelta(minutes=10), achieved_rpo_minutes=2.0,
-        achieved_rto_minutes=10.0, migration_revision="0019_reliability", checks=checks,
+        drill_id="d",
+        backup_identifier="b",
+        recovery_point=_NOW,
+        started_at=_NOW,
+        finished_at=_NOW + timedelta(minutes=10),
+        achieved_rpo_minutes=2.0,
+        achieved_rto_minutes=10.0,
+        migration_revision="0019_reliability",
+        checks=checks,
     )
     r2 = restore_verify.build_report(
-        drill_id="d2", backup_identifier="b", recovery_point=_NOW, started_at=_NOW,
-        finished_at=_NOW + timedelta(minutes=10), achieved_rpo_minutes=2.0,
-        achieved_rto_minutes=10.0, migration_revision="0019_reliability", checks=checks,
+        drill_id="d2",
+        backup_identifier="b",
+        recovery_point=_NOW,
+        started_at=_NOW,
+        finished_at=_NOW + timedelta(minutes=10),
+        achieved_rpo_minutes=2.0,
+        achieved_rto_minutes=10.0,
+        migration_revision="0019_reliability",
+        checks=checks,
     )
     assert r1.checksum == r2.checksum and r1.passed is True
 

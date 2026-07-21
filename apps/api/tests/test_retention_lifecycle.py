@@ -46,12 +46,20 @@ def test_purge_detection_events_removes_only_aged_rows() -> None:
     session = _session(_engine())
     org = uuid4()
     old = DetectionEventRecord(
-        id=uuid4(), organization_id=org, trace_identifier="t", decoy_id=uuid4(),
-        data="{}", created_at=_NOW - timedelta(days=40),
+        id=uuid4(),
+        organization_id=org,
+        trace_identifier="t",
+        decoy_id=uuid4(),
+        data="{}",
+        created_at=_NOW - timedelta(days=40),
     )
     fresh = DetectionEventRecord(
-        id=uuid4(), organization_id=org, trace_identifier="t", decoy_id=uuid4(),
-        data="{}", created_at=_NOW - timedelta(days=1),
+        id=uuid4(),
+        organization_id=org,
+        trace_identifier="t",
+        decoy_id=uuid4(),
+        data="{}",
+        created_at=_NOW - timedelta(days=1),
     )
     session.add_all([old, fresh])
     session.commit()
@@ -68,8 +76,12 @@ def test_purge_is_idempotent() -> None:
     session = _session(_engine())
     session.add(
         DetectionEventRecord(
-            id=uuid4(), organization_id=uuid4(), trace_identifier="t", decoy_id=uuid4(),
-            data="{}", created_at=_NOW - timedelta(days=40),
+            id=uuid4(),
+            organization_id=uuid4(),
+            trace_identifier="t",
+            decoy_id=uuid4(),
+            data="{}",
+            created_at=_NOW - timedelta(days=40),
         )
     )
     session.commit()
@@ -86,14 +98,22 @@ def test_prune_narrative_revisions_keeps_newest_per_incident() -> None:
     for revision in range(1, 6):
         session.add(
             NarrativeRevisionRecord(
-                organization_id=org, incident_id=incident, revision_number=revision,
-                context_hash="h", status="ok", data="{}",
+                organization_id=org,
+                incident_id=incident,
+                revision_number=revision,
+                context_hash="h",
+                status="ok",
+                data="{}",
             )
         )
     session.add(
         NarrativeRevisionRecord(
-            organization_id=org, incident_id=other_incident, revision_number=1,
-            context_hash="h", status="ok", data="{}",
+            organization_id=org,
+            incident_id=other_incident,
+            revision_number=1,
+            context_hash="h",
+            status="ok",
+            data="{}",
         )
     )
     session.commit()
@@ -126,13 +146,24 @@ def test_prune_narrative_revisions_keeps_newest_per_incident() -> None:
 
 def _incident_alert(trace: str, at: datetime) -> NormalizedAlert:
     return NormalizedAlert(
-        alert_id=uuid4(), trace_identifier=trace, decoy_id=uuid4(), severity=Severity.HIGH,
-        title="t", summary="observed", source_monitor=MonitorType.REPOSITORY, confidence=0.9,
-        first_seen=at, last_seen=at, event_count=1,
+        alert_id=uuid4(),
+        trace_identifier=trace,
+        decoy_id=uuid4(),
+        severity=Severity.HIGH,
+        title="t",
+        summary="observed",
+        source_monitor=MonitorType.REPOSITORY,
+        confidence=0.9,
+        first_seen=at,
+        last_seen=at,
+        event_count=1,
         deduplication_key=f"{trace}:id:repository:path:repository:content_access",
-        affected_placement_id=uuid4(), affected_decoy_type="secret",
+        affected_placement_id=uuid4(),
+        affected_decoy_type="secret",
         evidence=(AlertEvidence(excerpt=trace, digest="a" * 64, location="src/x.py"),),
-        raw_event_ids=(uuid4(),), recommended_actions=("review",), correlation_id=uuid4(),
+        raw_event_ids=(uuid4(),),
+        recommended_actions=("review",),
+        correlation_id=uuid4(),
     )
 
 
@@ -151,10 +182,7 @@ def test_retire_stale_incidents_marks_only_eligible() -> None:
     retired = repo.retire_all_stale_incidents(_NOW, 86_400)  # stale after 1 day
     session.commit()
 
-    statuses = {
-        row.status
-        for row in session.scalars(select(IncidentRecord)).all()
-    }
+    statuses = {row.status for row in session.scalars(select(IncidentRecord)).all()}
     assert retired == 1
     assert "stale" in statuses and "open" in statuses
 
@@ -163,16 +191,25 @@ def test_archive_incidents_removes_only_resolved_or_stale_past_window() -> None:
     session = _session(_engine())
     org = uuid4()
     keep_open = IncidentRecord(
-        id=uuid4(), organization_id=org, status="open",
-        last_seen=_NOW - timedelta(days=60), data="{}",
+        id=uuid4(),
+        organization_id=org,
+        status="open",
+        last_seen=_NOW - timedelta(days=60),
+        data="{}",
     )
     archive_stale = IncidentRecord(
-        id=uuid4(), organization_id=org, status="stale",
-        last_seen=_NOW - timedelta(days=60), data="{}",
+        id=uuid4(),
+        organization_id=org,
+        status="stale",
+        last_seen=_NOW - timedelta(days=60),
+        data="{}",
     )
     recent_stale = IncidentRecord(
-        id=uuid4(), organization_id=org, status="stale",
-        last_seen=_NOW - timedelta(days=1), data="{}",
+        id=uuid4(),
+        organization_id=org,
+        status="stale",
+        last_seen=_NOW - timedelta(days=1),
+        data="{}",
     )
     session.add_all([keep_open, archive_stale, recent_stale])
     session.commit()
@@ -201,8 +238,12 @@ def test_retention_job_runs_end_to_end(monkeypatch) -> None:  # type: ignore[no-
     seed = factory()
     seed.add(
         DetectionEventRecord(
-            id=uuid4(), organization_id=uuid4(), trace_identifier="t", decoy_id=uuid4(),
-            data="{}", created_at=_NOW - timedelta(days=40),
+            id=uuid4(),
+            organization_id=uuid4(),
+            trace_identifier="t",
+            decoy_id=uuid4(),
+            data="{}",
+            created_at=_NOW - timedelta(days=40),
         )
     )
     seed.commit()

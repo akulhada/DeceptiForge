@@ -27,7 +27,7 @@ def test_secure_defaults_disable_demo_and_local_path_scanning(monkeypatch) -> No
 
 
 def test_demo_routes_absent_when_disabled(make_client) -> None:
-    with make_client(demo_enabled=False, app_env="production") as client:
+    with make_client(demo_enabled=False, app_env="production", auth_enabled=True) as client:
         assert client.get("/demo/state").status_code == 404
         assert client.post("/demo/seed").status_code == 404
 
@@ -38,7 +38,7 @@ def test_demo_routes_present_in_development(make_client) -> None:
 
 
 def test_demo_routes_blocked_in_production_even_if_enabled(make_client) -> None:
-    with make_client(demo_enabled=True, app_env="production") as client:
+    with make_client(demo_enabled=True, app_env="production", auth_enabled=True) as client:
         assert client.get("/demo/state").status_code == 404
         assert client.post("/demo/run").status_code == 404
 

@@ -41,8 +41,11 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 def _client(make_client):  # type: ignore[no-untyped-def]
     return make_client(
-        demo_enabled=False, auth_enabled=True, app_env="development",
-        rag_connectors_enabled=True, mcp_connectors_enabled=True,
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        rag_connectors_enabled=True,
+        mcp_connectors_enabled=True,
         ai_tripwire_deployment_enabled=True,
     )
 
@@ -51,8 +54,10 @@ def _rag_connector(c, key: str, org: str) -> str:  # type: ignore[no-untyped-def
     resp = c.post(
         "/rag-connectors",
         json={
-            "name": "store", "connector_type": "pgvector",
-            "index_or_collection": "deceptiforge_decoys", "secret": "s3cr3t-token",
+            "name": "store",
+            "connector_type": "pgvector",
+            "index_or_collection": "deceptiforge_decoys",
+            "secret": "s3cr3t-token",
         },
         headers=_headers(key, org),
     )
@@ -66,8 +71,10 @@ def _drive_to_deployed(c, rag, owner, approver, org) -> str:  # type: ignore[no-
     did = c.post(
         "/ai-tripwire-deployments",
         json={
-            "surface_type": "rag_document", "connector_id": cid,
-            "target_collection": "deceptiforge_decoys", "decoy_kind": "architecture_note",
+            "surface_type": "rag_document",
+            "connector_id": cid,
+            "target_collection": "deceptiforge_decoys",
+            "decoy_kind": "architecture_note",
         },
         headers=_headers(owner, org),
     ).json()["id"]
@@ -104,8 +111,10 @@ def test_cross_org_connector_isolation(make_client, fakes) -> None:  # type: ign
         resp = c.post(
             "/ai-tripwire-deployments",
             json={
-                "surface_type": "rag_document", "connector_id": cid,
-                "target_collection": "deceptiforge_decoys", "decoy_kind": "architecture_note",
+                "surface_type": "rag_document",
+                "connector_id": cid,
+                "target_collection": "deceptiforge_decoys",
+                "decoy_kind": "architecture_note",
             },
             headers=_headers(owner_b, org_b),
         )
@@ -121,8 +130,10 @@ def test_separation_of_duties_enforced(make_client, fakes) -> None:  # type: ign
         did = c.post(
             "/ai-tripwire-deployments",
             json={
-                "surface_type": "rag_document", "connector_id": cid,
-                "target_collection": "deceptiforge_decoys", "decoy_kind": "architecture_note",
+                "surface_type": "rag_document",
+                "connector_id": cid,
+                "target_collection": "deceptiforge_decoys",
+                "decoy_kind": "architecture_note",
             },
             headers=_headers(owner, org),
         ).json()["id"]
@@ -143,8 +154,10 @@ def test_cannot_deploy_before_approval(make_client, fakes) -> None:  # type: ign
         did = c.post(
             "/ai-tripwire-deployments",
             json={
-                "surface_type": "rag_document", "connector_id": cid,
-                "target_collection": "deceptiforge_decoys", "decoy_kind": "architecture_note",
+                "surface_type": "rag_document",
+                "connector_id": cid,
+                "target_collection": "deceptiforge_decoys",
+                "decoy_kind": "architecture_note",
             },
             headers=_headers(owner, org),
         ).json()["id"]
@@ -161,8 +174,10 @@ def test_unapproved_collection_rejected(make_client, fakes) -> None:  # type: ig
         resp = c.post(
             "/ai-tripwire-deployments",
             json={
-                "surface_type": "rag_document", "connector_id": cid,
-                "target_collection": "prod_kb", "decoy_kind": "architecture_note",
+                "surface_type": "rag_document",
+                "connector_id": cid,
+                "target_collection": "prod_kb",
+                "decoy_kind": "architecture_note",
             },
             headers=_headers(owner, org),
         )
@@ -176,9 +191,7 @@ def test_happy_path_deploys_and_activates(make_client, fakes) -> None:  # type: 
         owner = _key(c, org, "owner")
         approver = _key(c, org, "owner")
         did = _drive_to_deployed(c, rag, owner, approver, org)
-        final = c.get(
-            f"/ai-tripwire-deployments/{did}", headers=_headers(approver, org)
-        ).json()
+        final = c.get(f"/ai-tripwire-deployments/{did}", headers=_headers(approver, org)).json()
         assert final["status"] == "deployed"
         assert final["monitoring_activated"] is True
         assert rag.asset_count("deceptiforge_decoys") == 1
@@ -191,14 +204,16 @@ def test_event_ingestion_minimized_and_classified(make_client, fakes) -> None:  
         owner = _key(c, org, "owner")
         approver = _key(c, org, "owner")
         did = _drive_to_deployed(c, rag, owner, approver, org)
-        trace = c.get(
-            f"/ai-tripwire-deployments/{did}", headers=_headers(approver, org)
-        ).json()["trace_id"]
+        trace = c.get(f"/ai-tripwire-deployments/{did}", headers=_headers(approver, org)).json()[
+            "trace_id"
+        ]
         service = _key(c, org, "service")
         resp = c.post(
             "/ai-tripwire-events",
             json={
-                "trace_id": trace, "event_type": "document_retrieved", "source_id": "agent-9",
+                "trace_id": trace,
+                "event_type": "document_retrieved",
+                "source_id": "agent-9",
                 "confidence": 0.9,
                 "metadata": {
                     "collection": "deceptiforge_decoys",
@@ -234,9 +249,9 @@ def test_event_replay_rejected(make_client, fakes) -> None:  # type: ignore[no-u
         owner = _key(c, org, "owner")
         approver = _key(c, org, "owner")
         did = _drive_to_deployed(c, rag, owner, approver, org)
-        trace = c.get(
-            f"/ai-tripwire-deployments/{did}", headers=_headers(approver, org)
-        ).json()["trace_id"]
+        trace = c.get(f"/ai-tripwire-deployments/{did}", headers=_headers(approver, org)).json()[
+            "trace_id"
+        ]
         service = _key(c, org, "service")
         nonce = uuid4().hex
         headers = {
@@ -245,7 +260,9 @@ def test_event_replay_rejected(make_client, fakes) -> None:  # type: ignore[no-u
             "X-DeceptiForge-Timestamp": str(time.time()),
         }
         body = {
-            "trace_id": trace, "event_type": "document_retrieved", "source_id": "agent-9",
+            "trace_id": trace,
+            "event_type": "document_retrieved",
+            "source_id": "agent-9",
         }
         assert c.post("/ai-tripwire-events", json=body, headers=headers).status_code == 200
         # Reusing the same nonce is a replay and must be rejected.
@@ -261,14 +278,16 @@ def test_event_rejected_when_monitoring_inactive(make_client, fakes) -> None:  #
         did = c.post(
             "/ai-tripwire-deployments",
             json={
-                "surface_type": "rag_document", "connector_id": cid,
-                "target_collection": "deceptiforge_decoys", "decoy_kind": "architecture_note",
+                "surface_type": "rag_document",
+                "connector_id": cid,
+                "target_collection": "deceptiforge_decoys",
+                "decoy_kind": "architecture_note",
             },
             headers=_headers(owner, org),
         ).json()["id"]
-        trace = c.get(
-            f"/ai-tripwire-deployments/{did}", headers=_headers(owner, org)
-        ).json()["trace_id"]
+        trace = c.get(f"/ai-tripwire-deployments/{did}", headers=_headers(owner, org)).json()[
+            "trace_id"
+        ]
         service = _key(c, org, "service")
         resp = c.post(
             "/ai-tripwire-events",

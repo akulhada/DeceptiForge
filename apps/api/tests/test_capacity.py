@@ -1,4 +1,5 @@
 """Deterministic unit coverage for tenant limits, quota backpressure, and measured estimates."""
+
 from __future__ import annotations
 
 import json

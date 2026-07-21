@@ -39,9 +39,10 @@ def build_api_router(settings: Settings) -> APIRouter:
     router.include_router(capacity_router)
     router.include_router(admin_router)
     router.include_router(reliability_router)
-    # Interactive Demo Lab: deterministic, stateless preview analysis. A core product route, always
-    # mounted, authenticated + org-scoped (analysis:preview) — never under the /demo namespace.
-    router.include_router(analysis_router)
+    # Interactive Analysis Lab: a demonstration surface. Mounted only when explicitly enabled, and
+    # startup validation refuses the flag outside development, so staging/production return 404.
+    if settings.analysis_lab_enabled:
+        router.include_router(analysis_router)
     # Controlled learning mounts only when explicitly enabled; it never activates weights itself.
     if settings.learning_enabled:
         router.include_router(learning_router)

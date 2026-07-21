@@ -84,9 +84,7 @@ def test_two_instances_share_rate_limit_state() -> None:
     a_client, b_client = _clients(2)
     a = RedisRateLimiter(a_client, prefix="t", fail_open=False)
     b = RedisRateLimiter(b_client, prefix="t", fail_open=False)
-    accepted = sum(
-        1 for limiter in (a, b, a, b, a, b) if limiter.allow("shared", 3)
-    )
+    accepted = sum(1 for limiter in (a, b, a, b, a, b) if limiter.allow("shared", 3))
     assert accepted == 3
 
 
@@ -207,12 +205,8 @@ def test_redis_integration_two_instances_share_state() -> None:
     url = _redis_test_url()
     assert url is not None
     prefix = f"citest-{uuid.uuid4().hex}"
-    a = RedisRateLimiter(
-        redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False
-    )
-    b = RedisRateLimiter(
-        redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False
-    )
+    a = RedisRateLimiter(redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False)
+    b = RedisRateLimiter(redis.from_url(url, decode_responses=True), prefix=prefix, fail_open=False)
     accepted = sum(1 for limiter in (a, b, a, b, a, b) if limiter.allow("shared", 3))
     assert accepted == 3
 

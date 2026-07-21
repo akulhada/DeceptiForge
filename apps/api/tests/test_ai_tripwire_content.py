@@ -126,8 +126,12 @@ def test_rag_preview_requires_allowed_collection() -> None:
     settings = _settings()
     with pytest.raises(AiPreviewError):
         build_rag_preview(
-            deployment_id="d", connector_id="c", target_collection="not_allowed",
-            decoy_kind="support_runbook", trace_token="DFAI-abc123de", expires_at=None,
+            deployment_id="d",
+            connector_id="c",
+            target_collection="not_allowed",
+            decoy_kind="support_runbook",
+            trace_token="DFAI-abc123de",
+            expires_at=None,
             settings=settings,
         )
 
@@ -135,19 +139,32 @@ def test_rag_preview_requires_allowed_collection() -> None:
 def test_rag_and_mcp_previews_are_deterministic() -> None:
     settings = _settings()
     p1, _ = build_rag_preview(
-        deployment_id="d", connector_id="c", target_collection="deceptiforge_decoys",
-        decoy_kind="support_runbook", trace_token="DFAI-abc123de", expires_at=None,
+        deployment_id="d",
+        connector_id="c",
+        target_collection="deceptiforge_decoys",
+        decoy_kind="support_runbook",
+        trace_token="DFAI-abc123de",
+        expires_at=None,
         settings=settings,
     )
     p2, _ = build_rag_preview(
-        deployment_id="d", connector_id="c", target_collection="deceptiforge_decoys",
-        decoy_kind="support_runbook", trace_token="DFAI-abc123de", expires_at=None,
+        deployment_id="d",
+        connector_id="c",
+        target_collection="deceptiforge_decoys",
+        decoy_kind="support_runbook",
+        trace_token="DFAI-abc123de",
+        expires_at=None,
         settings=settings,
     )
     assert p1.preview_hash == p2.preview_hash
     mp, resource = build_mcp_preview(
-        deployment_id="d", connector_id="c", target_collection="staging-mcp",
-        decoy_kind="mcp_resource", trace_token="DFAI-abc123de", surface=SurfaceType.MCP_RESOURCE,
-        expires_at=None, settings=settings,
+        deployment_id="d",
+        connector_id="c",
+        target_collection="staging-mcp",
+        decoy_kind="mcp_resource",
+        trace_token="DFAI-abc123de",
+        surface=SurfaceType.MCP_RESOURCE,
+        expires_at=None,
+        settings=settings,
     )
     assert mp.surface_type is SurfaceType.MCP_RESOURCE and resource.uri in mp.exact_content

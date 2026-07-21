@@ -1,4 +1,5 @@
 """Fast regression guard for deterministic capacity arithmetic; no network or real tenant data."""
+
 from __future__ import annotations
 
 from app.services.capacity import TenantLimits

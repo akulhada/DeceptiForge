@@ -29,7 +29,8 @@ _NOW = datetime(2026, 7, 19, tzinfo=UTC)
 def _settings(**over) -> Settings:  # type: ignore[no-untyped-def]
     base = dict(
         database_url="postgresql+psycopg://u:p@localhost/db",  # type: ignore[arg-type]
-        app_env="development", security_export_max_attempts=3,
+        app_env="development",
+        security_export_max_attempts=3,
         security_export_allow_private_networks=True,
     )
     base.update(over)
@@ -67,18 +68,32 @@ class FlakyTransport:
 
 def _integration(repo: IntegrationRepository, org, itype="generic_webhook", endpoint=None):  # type: ignore[no-untyped-def]
     return repo.create_integration(
-        organization_id=org, integration_type=itype, name="siem",
-        endpoint=endpoint or "https://10.0.0.5/hook", secret="signing-secret", config_json="{}",
-        routing_json="{}", payload_profile="standard", minimum_severity="low",
-        include_narrative=False, include_coverage=True, include_operational=True,
+        organization_id=org,
+        integration_type=itype,
+        name="siem",
+        endpoint=endpoint or "https://10.0.0.5/hook",
+        secret="signing-secret",
+        config_json="{}",
+        routing_json="{}",
+        payload_profile="standard",
+        minimum_severity="low",
+        include_narrative=False,
+        include_coverage=True,
+        include_operational=True,
         created_by_actor_id=None,
     )
 
 
 def _event():  # type: ignore[no-untyped-def]
     return mapping.build_alert_event(
-        event_type=EventType.ALERT_CREATED, org="org-1", occurred_at=_NOW, alert_id="a1",
-        severity=Severity.HIGH, title="Alert", summary="decoy accessed", confidence=0.9,
+        event_type=EventType.ALERT_CREATED,
+        org="org-1",
+        occurred_at=_NOW,
+        alert_id="a1",
+        severity=Severity.HIGH,
+        title="Alert",
+        summary="decoy accessed",
+        confidence=0.9,
         trace_ids=("DFAI-abc",),
     )
 
@@ -121,10 +136,15 @@ def test_worker_delivers_signed_webhook() -> None:
     assert delivery.status == "delivered"
     req = transport.calls[0]
     # Signature verifies over the canonical webhook string.
-    canonical = "\n".join((
-        "df-webhook-v1", str(delivery.id), "deceptiforge.alert.created",
-        req.headers["X-DeceptiForge-Timestamp"], body_sha256(req.body),
-    ))
+    canonical = "\n".join(
+        (
+            "df-webhook-v1",
+            str(delivery.id),
+            "deceptiforge.alert.created",
+            req.headers["X-DeceptiForge-Timestamp"],
+            body_sha256(req.body),
+        )
+    )
     assert req.headers["X-DeceptiForge-Signature"] == sign("signing-secret", canonical)
     assert b"signing-secret" not in req.body
 

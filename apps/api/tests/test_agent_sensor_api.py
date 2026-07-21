@@ -22,14 +22,15 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 def _client(make_client):  # type: ignore[no-untyped-def]
     return make_client(
-        demo_enabled=False, auth_enabled=True, app_env="development", agent_sensor_enabled=True,
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        agent_sensor_enabled=True,
     )
 
 
 def _enroll(c, admin, org):  # type: ignore[no-untyped-def]
-    token = c.post(
-        "/agent-sensors/enrollment-tokens", headers=_headers(admin, org)
-    ).json()["token"]
+    token = c.post("/agent-sensors/enrollment-tokens", headers=_headers(admin, org)).json()["token"]
     resp = c.post(
         "/agent-sensors/enroll",
         json={"token": token, "name": "cli", "adapter_type": "jsonl", "version": "0.1.0"},
@@ -51,7 +52,8 @@ def _start_session(c, sensor, org, ext="sess-1", allowed=("apps/web/**",)):  # t
     resp = c.post(
         "/agent-sessions",
         json={
-            "external_session_id": ext, "agent_type": "claude-code",
+            "external_session_id": ext,
+            "agent_type": "claude-code",
             "task_summary": "Fix the mobile navbar spacing",
             "allowed_paths": list(allowed),
         },
@@ -63,8 +65,10 @@ def _start_session(c, sensor, org, ext="sess-1", allowed=("apps/web/**",)):  # t
 
 def _event(c, sensor, org, **over):  # type: ignore[no-untyped-def]
     body = {
-        "external_event_id": uuid4().hex, "session_external_id": "sess-1",
-        "event_type": "file_read", "path": "apps/web/navbar.tsx",
+        "external_event_id": uuid4().hex,
+        "session_external_id": "sess-1",
+        "event_type": "file_read",
+        "path": "apps/web/navbar.tsx",
     }
     body.update(over)
     return c.post("/monitoring/agent-events", json=body, headers=_ingest_headers(sensor, org))
@@ -81,9 +85,9 @@ def test_enroll_one_time_secret_once(make_client) -> None:  # type: ignore[no-un
     org = str(uuid4())
     with _client(make_client) as c:
         admin = _key(c, org, "admin")
-        token = c.post(
-            "/agent-sensors/enrollment-tokens", headers=_headers(admin, org)
-        ).json()["token"]
+        token = c.post("/agent-sensors/enrollment-tokens", headers=_headers(admin, org)).json()[
+            "token"
+        ]
         body = {"token": token, "name": "cli", "adapter_type": "jsonl", "version": "0.1.0"}
         first = c.post("/agent-sensors/enroll", json=body)
         assert first.status_code == 201 and "signing_secret" in first.json()
@@ -117,7 +121,10 @@ def test_out_of_scope_and_full_content_rejected(make_client) -> None:  # type: i
         _start_session(c, sensor, org)
         # metadata carrying raw content is stripped, not persisted.
         resp = _event(
-            c, sensor, org, path="scripts/unrelated.py",
+            c,
+            sensor,
+            org,
+            path="scripts/unrelated.py",
             metadata={"tool": "cat", "file_content": "SECRET SOURCE", "reasoning": "chain"},
         )
         assert resp.status_code == 200
@@ -161,9 +168,10 @@ def test_cross_org_session_rejected(make_client) -> None:  # type: ignore[no-unt
         sensor_a = _enroll(c, _key(c, org_a, "admin"), org_a)
         s = _start_session(c, sensor_a, org_a)
         analyst_b = _key(c, org_b, "analyst")
-        assert c.get(
-            f"/agent-sessions/{s['id']}", headers=_headers(analyst_b, org_b)
-        ).status_code == 404
+        assert (
+            c.get(f"/agent-sessions/{s['id']}", headers=_headers(analyst_b, org_b)).status_code
+            == 404
+        )
 
 
 def test_violations_listed_with_explanation(make_client) -> None:  # type: ignore[no-untyped-def]
@@ -174,9 +182,7 @@ def test_violations_listed_with_explanation(make_client) -> None:  # type: ignor
         _start_session(c, sensor, org)
         _event(c, sensor, org, path="services/auth/.env")
         sid = c.get("/agent-sessions", headers=_headers(admin, org)).json()[0]["id"]
-        violations = c.get(
-            f"/agent-sessions/{sid}/violations", headers=_headers(admin, org)
-        ).json()
+        violations = c.get(f"/agent-sessions/{sid}/violations", headers=_headers(admin, org)).json()
         assert len(violations) == 1
         assert violations[0]["explanation"]
         assert violations[0]["policy_rule"]

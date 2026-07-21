@@ -20,7 +20,8 @@ def _customers() -> TableInfo:
         return ColumnInfo(name=name, data_type=dtype, is_nullable=kw.pop("nullable", False), **kw)
 
     return TableInfo(
-        schema_name="public", table_name="customers",
+        schema_name="public",
+        table_name="customers",
         columns=(
             col("id", "uuid", is_primary_key=True),
             col("email", "varchar", max_length=255),
@@ -53,8 +54,11 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 def _client(make_client):  # type: ignore[no-untyped-def]
     return make_client(
-        demo_enabled=False, auth_enabled=True, app_env="development",
-        database_connectors_enabled=True, database_honey_deployment_enabled=True,
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        database_connectors_enabled=True,
+        database_honey_deployment_enabled=True,
     )
 
 
@@ -62,8 +66,12 @@ def _make_connector(c, key: str, org: str) -> str:  # type: ignore[no-untyped-de
     resp = c.post(
         "/database-connectors",
         json={
-            "name": "warehouse", "host_reference": "db.internal", "database_name": "app",
-            "user": "deceptiforge_writer", "password": "s3cr3t", "ssl_mode": "require",
+            "name": "warehouse",
+            "host_reference": "db.internal",
+            "database_name": "app",
+            "user": "deceptiforge_writer",
+            "password": "s3cr3t",
+            "ssl_mode": "require",
         },
         headers=_headers(key, org),
     )
@@ -97,8 +105,11 @@ def test_viewer_cannot_manage_connector(make_client, fake_client) -> None:  # ty
         resp = c.post(
             "/database-connectors",
             json={
-                "name": "x", "host_reference": "h", "database_name": "d",
-                "user": "u", "password": "p",
+                "name": "x",
+                "host_reference": "h",
+                "database_name": "d",
+                "user": "u",
+                "password": "p",
             },
             headers=_headers(viewer, org),
         )
@@ -120,15 +131,23 @@ def test_happy_path_deploys_and_activates(make_client, fake_client) -> None:  # 
         )
         assert created.status_code == 201
         did = created.json()["id"]
-        assert c.get(
-            f"/database-honey-deployments/{did}/preview", headers=_headers(requester, org)
-        ).status_code == 200
+        assert (
+            c.get(
+                f"/database-honey-deployments/{did}/preview", headers=_headers(requester, org)
+            ).status_code
+            == 200
+        )
 
         c.post(f"/database-honey-deployments/{did}/submit", headers=_headers(requester, org))
         # Separation of duties: requester (analyst) lacks approve scope anyway.
-        assert c.post(
-            f"/database-honey-deployments/{did}/approve", json={}, headers=_headers(requester, org)
-        ).status_code == 403
+        assert (
+            c.post(
+                f"/database-honey-deployments/{did}/approve",
+                json={},
+                headers=_headers(requester, org),
+            ).status_code
+            == 403
+        )
         approved = c.post(
             f"/database-honey-deployments/{did}/approve", json={}, headers=_headers(approver, org)
         )
@@ -141,9 +160,7 @@ def test_happy_path_deploys_and_activates(make_client, fake_client) -> None:  # 
         session.commit()
         session.close()
 
-        final = c.get(
-            f"/database-honey-deployments/{did}", headers=_headers(approver, org)
-        ).json()
+        final = c.get(f"/database-honey-deployments/{did}", headers=_headers(approver, org)).json()
         assert final["status"] == "deployed"
         assert final["monitoring_activated"] is True
         assert fake_client.row_count("public", "customers") == 1
@@ -176,7 +193,5 @@ def test_cross_org_deployment_isolation(make_client, fake_client) -> None:  # ty
             json={"connector_id": cid, "target_schema": "public", "target_table": "customers"},
             headers=_headers(owner, org),
         ).json()["id"]
-        seen = c.get(
-            f"/database-honey-deployments/{did}", headers=_headers(other_owner, other)
-        )
+        seen = c.get(f"/database-honey-deployments/{did}", headers=_headers(other_owner, other))
         assert seen.status_code == 404

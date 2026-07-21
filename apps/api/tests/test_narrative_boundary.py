@@ -25,8 +25,12 @@ def test_missing_auth_rejected_when_enabled(make_client) -> None:
 
 
 def test_auth_bypass_is_rejected_outside_development(make_client) -> None:
-    with make_client(demo_enabled=True, auth_enabled=False, app_env="production") as client:
-        assert client.get(f"/incidents/{uuid4()}/narrative").status_code == 401
+    """Production refuses to start with authentication disabled, so the bypass is unreachable."""
+    import pytest
+
+    with pytest.raises(RuntimeError, match="AUTH_ENABLED"):
+        with make_client(demo_enabled=True, auth_enabled=False, app_env="production"):
+            pass
 
 
 def test_cross_org_incident_access_rejected(make_client) -> None:
