@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
 
 from app.config.settings import get_settings
+from app.dependencies import get_db
 from app.models.domain.analysis_preview import AnalysisPreviewResponse
 from app.models.domain.analysis_signals import (
     MAX_TOTAL_PATHS,
@@ -21,6 +23,7 @@ from app.security import require_scope
 from app.services.analysis_lab import AnalysisPreviewService
 from app.services.analysis_lab.scenarios import load_scenarios
 from app.services.api_keys import AuthContext
+from app.services.learning.applied import ActiveCalibration
 from app.services.metrics import emit
 from app.services.rate_limit import get_rate_limiter, rate_limit_key
 
@@ -54,6 +57,32 @@ class ScenarioSummary(BaseModel):
     signals: dict[str, object]
 
 
+def _active_calibration(session: Session, auth: AuthContext) -> ActiveCalibration:
+    """Read this organization's approved, active calibration. Read-only; never cross-tenant."""
+    settings = get_settings()
+    if not settings.learning_enabled:
+        return ActiveCalibration()
+    from app.models.domain.learning import CalibrationMetrics, CalibrationWeights
+    from app.repositories.learning import LearningRepository
+
+    record = LearningRepository(session, auth.organization_id).active_version()
+    if record is None:
+        return ActiveCalibration()
+    metrics = CalibrationMetrics.model_validate_json(record.metrics or "{}")
+    samples = {m.cohort: m.sample_count for m in metrics.acceptance if m.sufficient}
+    intervals = {
+        m.cohort: (m.wilson_low, m.wilson_high) for m in metrics.acceptance if m.sufficient
+    }
+    return ActiveCalibration(
+        model_version_id=record.id,
+        weights=CalibrationWeights.model_validate_json(record.weights or "{}"),
+        organization_specific=record.organization_id is not None,
+        global_aggregate_used=False,
+        cohort_samples=samples,
+        cohort_intervals=intervals,
+    )
+
+
 def _request_id(request: Request) -> str:
     return getattr(request.state, "request_id", "unknown")
 
@@ -73,6 +102,7 @@ def list_scenarios(
 def preview_analysis(
     payload: AnalysisPreviewRequest,
     request: Request,
+    session: Session = Depends(get_db),
     auth: AuthContext = Depends(require_scope("analysis:preview")),
 ) -> AnalysisPreviewResponse:
     settings = get_settings()
@@ -121,6 +151,7 @@ def preview_analysis(
         ignored_fields=ignored_fields,
         max_recommendations=options.maximum_recommendations,
         minimum_confidence=options.minimum_confidence,
+        calibration=_active_calibration(session, auth),
     )
     emit(
         "analysis_succeeded",

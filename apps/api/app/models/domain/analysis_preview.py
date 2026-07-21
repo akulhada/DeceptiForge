@@ -10,6 +10,7 @@ from datetime import datetime
 from pydantic import Field
 
 from app.models.domain.base import DomainModel
+from app.models.domain.learning import RecommendationChangeExplanation
 
 # Bump SCHEMA_VERSION on any breaking change to this contract; the frontend surfaces mismatches.
 SCHEMA_VERSION = "analysis-preview-v1"
@@ -113,6 +114,16 @@ class AnalysisWarning(DomainModel):
     effect: str = Field(default="", max_length=512)
 
 
+class CalibrationAttribution(DomainModel):
+    """Which reviewed calibration (if any) shaped this result, and on whose evidence."""
+
+    applied: bool = False
+    model_version_id: str | None = None
+    feature_schema_version: str | None = None
+    organization_specific: bool = False
+    global_aggregate_used: bool = False
+
+
 class AnalysisPreviewResponse(DomainModel):
     schema_version: str
     organization_id: str
@@ -128,3 +139,6 @@ class AnalysisPreviewResponse(DomainModel):
     engine_versions: dict[str, str]
     generated_at: datetime
     stage_timings_ms: dict[str, float] = Field(default_factory=dict)
+    # Every result states which calibration shaped it (or that none did) and why anything changed.
+    calibration: CalibrationAttribution = Field(default_factory=CalibrationAttribution)
+    change_explanations: tuple[RecommendationChangeExplanation, ...] = ()

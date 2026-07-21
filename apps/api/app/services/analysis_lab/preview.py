@@ -12,6 +12,7 @@ from app.models.domain.analysis_preview import (
     ENGINE_VERSIONS,
     SCHEMA_VERSION,
     AnalysisPreviewResponse,
+    CalibrationAttribution,
     ConfidenceBreakdown,
     ContextProfileView,
     InferredField,
@@ -24,6 +25,7 @@ from app.models.domain.analysis_signals import (
     RepositorySignals,
 )
 from app.models.domain.intelligence import OrganizationContextProfile, PlacementPlan
+from app.models.domain.learning import FEATURE_SCHEMA_VERSION
 from app.services.analysis_lab.mapping import signals_to_profile
 from app.services.analysis_lab.quality import (
     compute_confidence,
@@ -32,6 +34,7 @@ from app.services.analysis_lab.quality import (
 )
 from app.services.analysis_lab.sensitive_zones import rank_sensitive_zones
 from app.services.context_engine import ContextEngine
+from app.services.learning.applied import ActiveCalibration, apply_calibration
 from app.services.placement_reasoning import PlacementReasoningEngine
 
 _DOMAIN_LABELS: dict[str, str] = {
@@ -389,6 +392,7 @@ class AnalysisPreviewService:
         ignored_fields: tuple[str, ...] = (),
         max_recommendations: int = 10,
         minimum_confidence: float = 0.0,
+        calibration: ActiveCalibration | None = None,
     ) -> AnalysisPreviewResponse:
         timings: dict[str, float] = {}
 
@@ -408,6 +412,10 @@ class AnalysisPreviewService:
             placements = tuple(
                 p.model_copy(update={"rank": i}) for i, p in enumerate(placements, 1)
             )
+        # Reviewed calibration may only adjust confidence and ordering; zone, path, decoy type and
+        # deployment risk are copied through untouched.
+        active = calibration or ActiveCalibration()
+        placements, change_explanations = apply_calibration(placements, active)
         context_view = _context_view(signals, context, tuple(z.category for z in zones))
         vocab = _vocabulary_view(signals, context)
         confidence: ConfidenceBreakdown = stage(
@@ -434,6 +442,14 @@ class AnalysisPreviewService:
             engine_versions=dict(ENGINE_VERSIONS),
             generated_at=datetime.now(UTC),
             stage_timings_ms=timings,
+            calibration=CalibrationAttribution(
+                applied=active.active,
+                model_version_id=str(active.model_version_id) if active.model_version_id else None,
+                feature_schema_version=FEATURE_SCHEMA_VERSION,
+                organization_specific=active.organization_specific,
+                global_aggregate_used=active.global_aggregate_used,
+            ),
+            change_explanations=change_explanations,
         )
 
 
