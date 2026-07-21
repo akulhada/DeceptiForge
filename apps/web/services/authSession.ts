@@ -1,6 +1,10 @@
 // Purpose: hold the staging tenant connection (base URL, organization id, API key).
 // Responsibilities: keep credentials only in sessionStorage/memory — never in NEXT_PUBLIC build
 //   variables — and expose get/set/clear. The API key is a staging secret; treat it as sensitive.
+// Note on lifetime: sessionStorage is per-tab but NOT memory-only. Browsers persist it and restore
+//   it on session restore or tab duplication, so it can outlive the visible session. UI copy must
+//   not promise that closing the window destroys the key. Any script on this origin can also read
+//   it, which is why the CSP in middleware.ts forbids inline and third-party scripts.
 'use client';
 
 export interface TenantSession {

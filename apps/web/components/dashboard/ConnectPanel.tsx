@@ -40,7 +40,10 @@ export function ConnectPanel({ onConnected }: { onConnected: () => void }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="rounded-md border border-amber-900/60 bg-amber-950/30 p-2 text-xs text-amber-300">
-          This is a staging API-key connection, not SSO. The key is kept only in this browser session.
+          This is a staging API-key connection, not SSO. The key stays in this browser tab and is
+          sent only to the API base URL below — never to the DeceptiForge dashboard server. Use
+          Disconnect when you are done; browser session restore can carry the key into a reopened
+          tab.
         </p>
         <label className="block text-xs text-slate-400">
           API base URL
