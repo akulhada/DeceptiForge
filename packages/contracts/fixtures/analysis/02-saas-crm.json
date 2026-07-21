@@ -1,0 +1,41 @@
+{
+  "languages": [{"name": "TypeScript", "confidence": 0.9, "representative_paths": ["apps/api/src/index.ts"]}],
+  "frameworks": [{"name": "NestJS", "category": "web", "representative_paths": ["apps/api/src/app.module.ts"]}],
+  "package_managers": [{"name": "pnpm", "manifest_paths": ["package.json"]}],
+  "services": [
+    {"name": "tenant-service", "service_type": "api", "representative_paths": ["services/tenant/"]},
+    {"name": "subscription-billing", "service_type": "api", "representative_paths": ["services/subscription/"]},
+    {"name": "account-admin", "service_type": "api", "representative_paths": ["services/admin/"]},
+    {"name": "support-desk", "service_type": "api", "representative_paths": ["services/support/"]}
+  ],
+  "databases": [
+    {"engine": "PostgreSQL", "usage": "multitenant", "schema_or_migration_paths": ["db/"], "data_domain_terms": ["tenant", "account", "subscription", "seat", "workspace"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/tenant-provisioning.md"],
+    "architecture_paths": ["docs/architecture/multitenancy.md"],
+    "operational_paths": ["docs/ops/escalation.md"],
+    "support_paths": ["docs/support/account-recovery.md"],
+    "policy_paths": []
+  },
+  "secret_locations": [
+    {"path": "services/admin/.env.example", "category": "admin_credentials", "confidence": 0.8, "source_type": "example_env"}
+  ],
+  "infrastructure": {
+    "container_tools": ["docker"],
+    "orchestration": [],
+    "cloud_indicators": ["gcp"],
+    "ci_cd": ["github-actions"],
+    "infrastructure_as_code": [],
+    "deployment_paths": ["deploy/render.yaml"]
+  },
+  "naming_patterns": {
+    "entity_names": ["Tenant", "Account", "Subscription", "Seat"],
+    "prefixes": ["tenant", "acct"],
+    "suffixes": ["Service", "Controller"],
+    "environment_terms": ["TENANT_DB_URL"],
+    "team_terms": ["crm-core"],
+    "domain_terms": ["tenant", "subscription", "account", "crm", "workspace"]
+  },
+  "ai_surfaces": []
+}

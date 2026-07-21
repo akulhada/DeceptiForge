@@ -100,6 +100,7 @@ PERMISSIONS: frozenset[str] = frozenset(
         "onboarding:run_detection_test",
         "onboarding:accept_recommendation",
         "onboarding:view_activation_metrics",
+        "analysis:preview",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -132,9 +133,10 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "incidents:export",
             "alerts:export",
             "coverage:export",
+            "analysis:preview",
         }
     ),
-    "viewer": _READS,
+    "viewer": _READS | frozenset({"analysis:preview"}),
     # Service keys execute approved deployment jobs; they cannot create or approve them.
     "service": frozenset(
         {

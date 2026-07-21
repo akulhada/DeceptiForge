@@ -1,0 +1,46 @@
+{
+  "languages": [{"name": "Python", "confidence": 0.95, "representative_paths": ["pipelines/train.py"]}],
+  "frameworks": [
+    {"name": "LangChain", "category": "rag", "representative_paths": ["services/rag/chain.py"]},
+    {"name": "PyTorch", "category": "ml", "representative_paths": ["models/net.py"]}
+  ],
+  "package_managers": [{"name": "poetry", "manifest_paths": ["pyproject.toml"]}],
+  "services": [
+    {"name": "embedding-service", "service_type": "api", "representative_paths": ["services/embedding/"]},
+    {"name": "retrieval-service", "service_type": "api", "representative_paths": ["services/retrieval/"], "dependencies": ["vector-store"]},
+    {"name": "training-pipeline", "service_type": "batch", "representative_paths": ["pipelines/"]}
+  ],
+  "databases": [
+    {"engine": "pgvector", "usage": "vector-store", "schema_or_migration_paths": ["db/vectors/"], "data_domain_terms": ["embedding", "vector", "retrieval"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/model-serving.md"],
+    "architecture_paths": ["docs/architecture/rag-pipeline.md"],
+    "operational_paths": ["docs/ops/reindex.md"],
+    "support_paths": [],
+    "policy_paths": []
+  },
+  "secret_locations": [
+    {"path": "services/retrieval/.env.example", "category": "model_provider", "confidence": 0.7, "source_type": "example_env"}
+  ],
+  "infrastructure": {
+    "container_tools": ["docker"],
+    "orchestration": ["kubernetes"],
+    "cloud_indicators": ["gcp"],
+    "ci_cd": ["gitlab-ci"],
+    "infrastructure_as_code": ["terraform"],
+    "deployment_paths": ["deploy/k8s/"]
+  },
+  "naming_patterns": {
+    "entity_names": ["Embedding", "Document", "Collection"],
+    "prefixes": ["rag", "model"],
+    "suffixes": ["Pipeline", "Service"],
+    "environment_terms": ["OPENAI_API_KEY", "VECTOR_DB_URL"],
+    "team_terms": ["ml-platform"],
+    "domain_terms": ["embedding", "vector", "retrieval", "model", "pipeline", "feature"]
+  },
+  "ai_surfaces": [
+    {"surface_type": "rag_collection", "path_or_resource": "collections/support-kb", "provider_or_framework": "langchain", "confidence": 0.9},
+    {"surface_type": "mcp_server", "path_or_resource": "mcp/knowledge", "provider_or_framework": "mcp", "confidence": 0.7}
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "languages": [{"name": "Java", "confidence": 0.85, "representative_paths": ["src/main/java/App.java"]}],
+  "frameworks": [{"name": "Spring Boot", "category": "web", "representative_paths": ["src/main/java/config/"]}],
+  "package_managers": [{"name": "maven", "manifest_paths": ["pom.xml"]}],
+  "services": [
+    {"name": "scheduling-service", "service_type": "api", "representative_paths": ["services/scheduling/"]},
+    {"name": "claims-processor", "service_type": "worker", "representative_paths": ["services/claims/"]}
+  ],
+  "databases": [
+    {"engine": "PostgreSQL", "usage": "oltp", "schema_or_migration_paths": ["db/"], "data_domain_terms": ["patient", "provider", "claims", "scheduling"]}
+  ],
+  "documentation": {
+    "runbook_paths": [],
+    "architecture_paths": ["docs/architecture/clinical-domain.md"],
+    "operational_paths": [],
+    "support_paths": ["docs/support/patient-access.md"],
+    "policy_paths": ["docs/compliance/hipaa-controls.md"]
+  },
+  "secret_locations": [
+    {"path": "services/claims/.env.example", "category": "phi_datastore", "confidence": 0.8, "source_type": "example_env"}
+  ],
+  "naming_patterns": {
+    "entity_names": ["Patient", "Provider", "Claim", "Encounter"],
+    "prefixes": ["clinical"],
+    "suffixes": ["Service"],
+    "environment_terms": ["PHI_DB_URL"],
+    "team_terms": ["clinical-platform"],
+    "domain_terms": ["patient", "clinical", "provider", "claims", "scheduling"]
+  },
+  "ai_surfaces": []
+}

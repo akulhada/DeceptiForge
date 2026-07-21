@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.api.admin import router as admin_router
 from app.api.agent_sensor import router as agent_sensor_router
 from app.api.ai_tripwire import router as ai_tripwire_router
+from app.api.analysis import router as analysis_router
 from app.api.browser_sensor import router as browser_sensor_router
 from app.api.capacity import router as capacity_router
 from app.api.coverage import router as coverage_router
@@ -37,6 +38,9 @@ def build_api_router(settings: Settings) -> APIRouter:
     router.include_router(capacity_router)
     router.include_router(admin_router)
     router.include_router(reliability_router)
+    # Interactive Demo Lab: deterministic, stateless preview analysis. A core product route, always
+    # mounted, authenticated + org-scoped (analysis:preview) — never under the /demo namespace.
+    router.include_router(analysis_router)
     # Decoy deployment routes mount only when the feature is explicitly enabled.
     if settings.decoy_deployment_enabled:
         router.include_router(deployments_router)

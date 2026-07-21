@@ -1,0 +1,131 @@
+{
+  "schema": "analysis-signals-v1",
+  "note": "Fictional, deterministic scenario fixtures for the Interactive Demo Lab. No real secrets or organizations. Shared by backend inference tests and the frontend scenario selector.",
+  "scenarios": [
+    {
+      "id": "fintech-payments",
+      "name": "Fintech / payment platform",
+      "description": "Payment processing with reconciliation, settlement, and PCI-sensitive services.",
+      "file": "01-fintech-payments.json",
+      "expected": {
+        "business_domain": "fintech",
+        "repository_type": ["microservices", "service-oriented", "monorepo"],
+        "key_vocabulary": ["payment", "settlement", "reconciliation"],
+        "sensitive_zone_categories": ["payment", "billing", "secrets_and_credentials"],
+        "recommendation_zone_types": ["environment_file", "example_environment_file", "config_file", "documentation_file"],
+        "warning_codes_absent": ["sparse_input", "no_business_domain"],
+        "overall_confidence_min": 0.5,
+        "data_sensitivity": "high"
+      }
+    },
+    {
+      "id": "saas-crm",
+      "name": "SaaS customer-management system",
+      "description": "Multi-tenant CRM with subscriptions, accounts, support, and admin.",
+      "file": "02-saas-crm.json",
+      "expected": {
+        "business_domain": "saas_crm",
+        "key_vocabulary": ["tenant", "subscription", "account"],
+        "sensitive_zone_categories": ["customer_data", "support_operations", "administration"],
+        "warning_codes_absent": ["sparse_input"],
+        "overall_confidence_min": 0.45
+      }
+    },
+    {
+      "id": "healthcare",
+      "name": "Healthcare application",
+      "description": "Clinical scheduling and claims with regulated-data sensitivity.",
+      "file": "03-healthcare.json",
+      "expected": {
+        "business_domain": "healthcare",
+        "key_vocabulary": ["patient", "clinical", "claims"],
+        "sensitive_zone_categories": ["customer_data", "compliance_documentation"],
+        "warning_codes_present": ["no_infrastructure"],
+        "overall_confidence_max": 0.75,
+        "data_sensitivity": "high"
+      }
+    },
+    {
+      "id": "ecommerce",
+      "name": "E-commerce platform",
+      "description": "Catalog, orders, checkout, fulfillment, and inventory.",
+      "file": "04-ecommerce.json",
+      "expected": {
+        "business_domain": "ecommerce",
+        "key_vocabulary": ["catalog", "order", "checkout"],
+        "sensitive_zone_categories": ["payment", "customer_data", "support_operations"],
+        "overall_confidence_min": 0.45
+      }
+    },
+    {
+      "id": "ml-rag",
+      "name": "Data / ML platform with RAG",
+      "description": "Model pipelines, embeddings, vector store, and RAG retrieval surfaces.",
+      "file": "05-ml-rag.json",
+      "expected": {
+        "business_domain": "ml_data",
+        "key_vocabulary": ["embedding", "vector", "retrieval"],
+        "sensitive_zone_categories": ["ai_or_rag_systems", "data_pipelines"],
+        "warning_codes_present": [],
+        "ai_exposure_min": 0.5
+      }
+    },
+    {
+      "id": "k8s-microservices",
+      "name": "Kubernetes microservices repository",
+      "description": "Many independently named services with Kubernetes and CI/CD.",
+      "file": "06-k8s-microservices.json",
+      "expected": {
+        "repository_type": ["microservices", "monorepo", "service-oriented"],
+        "service_architecture": "microservices",
+        "sensitive_zone_categories": ["deployment", "infrastructure"],
+        "overall_confidence_min": 0.45
+      }
+    },
+    {
+      "id": "monorepo",
+      "name": "Monorepo (multiple domains)",
+      "description": "Several applications across distinct business domains in one repository.",
+      "file": "07-monorepo.json",
+      "expected": {
+        "repository_type": ["monorepo"],
+        "warning_codes_present": ["conflicting_business_domain"],
+        "conflict_min": 0.4
+      }
+    },
+    {
+      "id": "sparse",
+      "name": "Sparse / empty repository",
+      "description": "Almost no signals; must not fabricate a domain.",
+      "file": "08-sparse.json",
+      "expected": {
+        "business_domain": "unknown",
+        "warning_codes_present": ["sparse_input", "no_business_domain"],
+        "overall_confidence_max": 0.4
+      }
+    },
+    {
+      "id": "conflicting",
+      "name": "Misleading / conflicting signals",
+      "description": "Healthcare and e-commerce vocabulary mixed to trigger conflict handling.",
+      "file": "09-conflicting.json",
+      "expected": {
+        "warning_codes_present": ["conflicting_business_domain"],
+        "conflict_min": 0.4,
+        "overall_confidence_max": 0.7
+      }
+    },
+    {
+      "id": "high-risk-secrets-ai",
+      "name": "High-risk secrets and AI exposure",
+      "description": "Many secret locations and AI surfaces; strong safety warnings expected.",
+      "file": "10-high-risk-secrets-ai.json",
+      "expected": {
+        "sensitive_zone_categories": ["secrets_and_credentials", "ai_or_rag_systems"],
+        "top_zone_category": "secrets_and_credentials",
+        "ai_exposure_min": 0.5,
+        "data_sensitivity": "high"
+      }
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "languages": [
+    {"name": "TypeScript", "confidence": 0.9, "representative_paths": ["apps/web/src/index.ts"]},
+    {"name": "Python", "confidence": 0.8, "representative_paths": ["apps/api/app/main.py"]},
+    {"name": "Go", "confidence": 0.6, "representative_paths": ["apps/edge/main.go"]}
+  ],
+  "frameworks": [
+    {"name": "Next.js", "category": "web", "representative_paths": ["apps/web/"]},
+    {"name": "FastAPI", "category": "web", "representative_paths": ["apps/api/"]}
+  ],
+  "package_managers": [
+    {"name": "pnpm", "manifest_paths": ["package.json"]},
+    {"name": "poetry", "manifest_paths": ["apps/api/pyproject.toml"]}
+  ],
+  "services": [
+    {"name": "payment-api", "service_type": "api", "representative_paths": ["apps/payments/"]},
+    {"name": "catalog-web", "service_type": "web", "representative_paths": ["apps/catalog/"]},
+    {"name": "tenant-admin", "service_type": "api", "representative_paths": ["apps/admin/"]},
+    {"name": "analytics-pipeline", "service_type": "batch", "representative_paths": ["apps/analytics/"]}
+  ],
+  "databases": [
+    {"engine": "PostgreSQL", "usage": "shared", "schema_or_migration_paths": ["db/"], "data_domain_terms": ["payment", "catalog", "order", "tenant", "subscription"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/monorepo-release.md"],
+    "architecture_paths": ["docs/architecture/monorepo.md"],
+    "operational_paths": ["docs/ops/ci.md"],
+    "support_paths": [],
+    "policy_paths": []
+  },
+  "secret_locations": [
+    {"path": "apps/payments/.env.example", "category": "payment_gateway", "confidence": 0.7, "source_type": "example_env"}
+  ],
+  "infrastructure": {
+    "container_tools": ["docker"],
+    "orchestration": ["kubernetes"],
+    "cloud_indicators": ["aws"],
+    "ci_cd": ["turborepo", "github-actions"],
+    "infrastructure_as_code": ["terraform"],
+    "deployment_paths": ["deploy/"]
+  },
+  "naming_patterns": {
+    "entity_names": ["Order", "Payment", "Tenant", "Product"],
+    "prefixes": ["app"],
+    "suffixes": ["Api", "Web"],
+    "environment_terms": ["ROOT_ENV"],
+    "team_terms": ["platform"],
+    "domain_terms": ["payment", "catalog", "order", "tenant", "subscription", "checkout"]
+  },
+  "ai_surfaces": []
+}

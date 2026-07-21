@@ -1,0 +1,42 @@
+{
+  "languages": [{"name": "TypeScript", "confidence": 0.9, "representative_paths": ["apps/storefront/src/index.ts"]}],
+  "frameworks": [{"name": "Next.js", "category": "web", "representative_paths": ["apps/storefront/next.config.ts"]}],
+  "package_managers": [{"name": "pnpm", "manifest_paths": ["package.json"]}],
+  "services": [
+    {"name": "catalog-service", "service_type": "api", "representative_paths": ["services/catalog/"]},
+    {"name": "order-service", "service_type": "api", "representative_paths": ["services/order/"]},
+    {"name": "checkout-service", "service_type": "api", "representative_paths": ["services/checkout/"], "dependencies": ["payment-gateway"]},
+    {"name": "fulfillment-worker", "service_type": "worker", "representative_paths": ["services/fulfillment/"]},
+    {"name": "inventory-service", "service_type": "api", "representative_paths": ["services/inventory/"]}
+  ],
+  "databases": [
+    {"engine": "MySQL", "usage": "oltp", "schema_or_migration_paths": ["db/"], "data_domain_terms": ["catalog", "order", "inventory", "customer"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/order-ops.md"],
+    "architecture_paths": ["docs/architecture/commerce.md"],
+    "operational_paths": ["docs/ops/peak-season.md"],
+    "support_paths": ["docs/support/refunds.md"],
+    "policy_paths": []
+  },
+  "secret_locations": [
+    {"path": "services/checkout/.env.example", "category": "payment_gateway", "confidence": 0.85, "source_type": "example_env"}
+  ],
+  "infrastructure": {
+    "container_tools": ["docker"],
+    "orchestration": ["kubernetes"],
+    "cloud_indicators": ["aws"],
+    "ci_cd": ["github-actions"],
+    "infrastructure_as_code": ["terraform"],
+    "deployment_paths": ["deploy/k8s/"]
+  },
+  "naming_patterns": {
+    "entity_names": ["Order", "Cart", "Product", "Shipment"],
+    "prefixes": ["order", "cart"],
+    "suffixes": ["Service", "Worker"],
+    "environment_terms": ["STRIPE_KEY"],
+    "team_terms": ["commerce"],
+    "domain_terms": ["catalog", "order", "checkout", "fulfillment", "inventory"]
+  },
+  "ai_surfaces": []
+}

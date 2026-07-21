@@ -1,0 +1,46 @@
+{
+  "languages": [
+    {"name": "Go", "confidence": 0.9, "representative_paths": ["services/gateway/main.go"]},
+    {"name": "Rust", "confidence": 0.5, "representative_paths": ["services/pricing/src/main.rs"]}
+  ],
+  "frameworks": [{"name": "gRPC", "category": "rpc", "representative_paths": ["proto/"]}],
+  "package_managers": [{"name": "go-modules", "manifest_paths": ["go.mod"]}],
+  "services": [
+    {"name": "gateway", "service_type": "api", "representative_paths": ["services/gateway/"]},
+    {"name": "pricing", "service_type": "api", "representative_paths": ["services/pricing/"]},
+    {"name": "notifications", "service_type": "worker", "representative_paths": ["services/notifications/"]},
+    {"name": "search", "service_type": "api", "representative_paths": ["services/search/"]},
+    {"name": "profile", "service_type": "api", "representative_paths": ["services/profile/"]},
+    {"name": "audit", "service_type": "worker", "representative_paths": ["services/audit/"]}
+  ],
+  "databases": [
+    {"engine": "PostgreSQL", "usage": "oltp", "schema_or_migration_paths": ["services/profile/db/"], "data_domain_terms": ["profile", "pricing"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/deploy-rollback.md", "docs/runbooks/scale-service.md"],
+    "architecture_paths": ["docs/architecture/service-topology.md"],
+    "operational_paths": ["docs/ops/oncall.md"],
+    "support_paths": [],
+    "policy_paths": []
+  },
+  "secret_locations": [
+    {"path": "deploy/k8s/secrets.example.yaml", "category": "cluster_secret", "confidence": 0.7, "source_type": "example_config"}
+  ],
+  "infrastructure": {
+    "container_tools": ["docker", "containerd"],
+    "orchestration": ["kubernetes", "helm"],
+    "cloud_indicators": ["aws", "eks"],
+    "ci_cd": ["argocd", "github-actions"],
+    "infrastructure_as_code": ["terraform", "kustomize"],
+    "deployment_paths": ["deploy/k8s/gateway.yaml", "deploy/helm/", "deploy/k8s/pricing.yaml"]
+  },
+  "naming_patterns": {
+    "entity_names": ["Service", "Deployment"],
+    "prefixes": ["svc"],
+    "suffixes": ["Service"],
+    "environment_terms": ["CLUSTER_TOKEN"],
+    "team_terms": ["platform-infra"],
+    "domain_terms": ["gateway", "pricing", "search"]
+  },
+  "ai_surfaces": []
+}

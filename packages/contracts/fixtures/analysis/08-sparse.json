@@ -1,0 +1,3 @@
+{
+  "languages": [{"name": "JavaScript", "confidence": 0.4, "representative_paths": ["index.js"]}]
+}

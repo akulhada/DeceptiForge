@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     monitoring_rate_limit_per_minute: int = 60
     narrative_rate_limit_per_minute: int = 10
     admin_rate_limit_per_minute: int = 30
+    # Interactive Demo Lab preview analysis: read-only but compute-bearing, so it gets its own
+    # per-organization+actor budget rather than reusing the monitoring-ingest limit.
+    analysis_preview_rate_limit_per_minute: int = 30
     narrative_revision_retention_count: int = 20
     monitoring_event_retention_days: int = 30
     alert_retention_days: int = 90

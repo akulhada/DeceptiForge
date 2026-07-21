@@ -1,0 +1,45 @@
+{
+  "languages": [
+    {"name": "Python", "confidence": 0.9, "representative_paths": ["services/payment/main.py"]},
+    {"name": "Go", "confidence": 0.6, "representative_paths": ["services/ledger/main.go"]}
+  ],
+  "frameworks": [{"name": "FastAPI", "category": "web", "representative_paths": ["services/payment/app.py"]}],
+  "package_managers": [{"name": "poetry", "manifest_paths": ["services/payment/pyproject.toml"]}],
+  "services": [
+    {"name": "payment-service", "service_type": "api", "representative_paths": ["services/payment/"], "dependencies": ["ledger-api"]},
+    {"name": "settlement-worker", "service_type": "worker", "representative_paths": ["services/settlement/"]},
+    {"name": "reconciliation-service", "service_type": "batch", "representative_paths": ["services/reconciliation/"]},
+    {"name": "ledger-api", "service_type": "api", "representative_paths": ["services/ledger/"]}
+  ],
+  "databases": [
+    {"engine": "PostgreSQL", "usage": "oltp", "schema_or_migration_paths": ["db/migrations/"], "data_domain_terms": ["payment", "ledger", "settlement", "reconciliation"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/payment-ops.md", "docs/runbooks/settlement-reconciliation.md"],
+    "architecture_paths": ["docs/architecture/payments.md"],
+    "operational_paths": ["docs/oncall.md"],
+    "support_paths": ["docs/support/chargeback-handling.md"],
+    "policy_paths": ["docs/compliance/pci-scope.md"]
+  },
+  "secret_locations": [
+    {"path": "services/payment/.env.example", "category": "payment_gateway", "confidence": 0.9, "source_type": "example_env"},
+    {"path": "services/ledger/config/credentials.example.yaml", "category": "database", "confidence": 0.7, "source_type": "example_config"}
+  ],
+  "infrastructure": {
+    "container_tools": ["docker"],
+    "orchestration": ["kubernetes"],
+    "cloud_indicators": ["aws"],
+    "ci_cd": ["github-actions"],
+    "infrastructure_as_code": ["terraform"],
+    "deployment_paths": ["deploy/k8s/payment.yaml"]
+  },
+  "naming_patterns": {
+    "entity_names": ["Invoice", "Settlement", "Chargeback", "Payout"],
+    "prefixes": ["pay", "settle"],
+    "suffixes": ["Service", "Worker"],
+    "environment_terms": ["PAYMENT_API_KEY", "ACQUIRER_SECRET"],
+    "team_terms": ["payments-platform"],
+    "domain_terms": ["payment", "settlement", "reconciliation", "ledger", "psp"]
+  },
+  "ai_surfaces": []
+}

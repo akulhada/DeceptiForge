@@ -1,0 +1,32 @@
+{
+  "languages": [{"name": "Python", "confidence": 0.7, "representative_paths": ["app/main.py"]}],
+  "frameworks": [
+    {"name": "Django", "category": "web", "representative_paths": ["app/"]},
+    {"name": "Flask", "category": "web", "representative_paths": ["legacy/"]}
+  ],
+  "package_managers": [{"name": "pip", "manifest_paths": ["requirements.txt"]}],
+  "services": [
+    {"name": "patient-portal", "service_type": "api", "representative_paths": ["services/patient/"]},
+    {"name": "checkout-service", "service_type": "api", "representative_paths": ["services/checkout/"]}
+  ],
+  "databases": [
+    {"engine": "PostgreSQL", "usage": "oltp", "schema_or_migration_paths": ["db/"], "data_domain_terms": ["patient", "clinical", "order", "catalog", "checkout"]}
+  ],
+  "documentation": {
+    "runbook_paths": ["docs/runbooks/ops.md"],
+    "architecture_paths": [],
+    "operational_paths": [],
+    "support_paths": [],
+    "policy_paths": []
+  },
+  "secret_locations": [],
+  "naming_patterns": {
+    "entity_names": ["Patient", "Order", "Claim", "Cart"],
+    "prefixes": [],
+    "suffixes": ["Service"],
+    "environment_terms": [],
+    "team_terms": [],
+    "domain_terms": ["patient", "clinical", "claims", "catalog", "order", "checkout"]
+  },
+  "ai_surfaces": []
+}
