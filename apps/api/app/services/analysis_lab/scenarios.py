@@ -9,10 +9,28 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-# apps/api/app/services/analysis_lab/scenarios.py -> repo root is parents[5].
-_FIXTURE_DIR = (
-    Path(__file__).resolve().parents[5] / "packages" / "contracts" / "fixtures" / "analysis"
-)
+
+def _find_fixture_dir() -> Path:
+    """Find the shared fixtures in a source checkout or the packaged API image.
+
+    Source checkouts keep the authoritative fixtures under ``packages/contracts``. The API image
+    copies those same files to ``/app/fixtures`` because its build context does not retain the
+    monorepo layout. Walking ancestors avoids assumptions about either layout depth.
+    """
+    module_path = Path(__file__).resolve()
+    for ancestor in module_path.parents:
+        candidates = (
+            ancestor / "packages" / "contracts" / "fixtures" / "analysis",
+            ancestor / "fixtures" / "analysis",
+        )
+        for candidate in candidates:
+            if candidate.is_dir():
+                return candidate
+    # Keep import-time behavior safe if an installation omits optional fixtures.
+    return module_path.parent / "fixtures" / "analysis"
+
+
+_FIXTURE_DIR = _find_fixture_dir()
 
 
 class Scenario:

@@ -28,7 +28,8 @@ services:
 
   api:
     build:
-      context: ./apps/api
+      context: .
+      dockerfile: apps/api/Dockerfile
     environment:
       APP_ENV: development
       CORS_ORIGINS: '["http://localhost:3000"]'

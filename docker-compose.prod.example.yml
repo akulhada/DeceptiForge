@@ -26,7 +26,7 @@ services:
       retries: 10
 
   api:
-    build: { context: ./apps/api }
+    build: { context: ., dockerfile: apps/api/Dockerfile }
     # Run 2+ replicas: rate limits and replay nonces are shared through Redis.
     deploy: { replicas: 2 }
     environment:
@@ -58,7 +58,7 @@ services:
   # Reconstruction worker: drains the incident-reconstruction queue off the API hot path.
   # Wrap in a scheduler/loop in your orchestrator, or run as a periodic Job.
   reconstruction-worker:
-    build: { context: ./apps/api }
+    build: { context: ., dockerfile: apps/api/Dockerfile }
     command: ['python', '-m', 'app.jobs.reconstruction']
     environment:
       APP_ENV: production
@@ -76,7 +76,7 @@ services:
   #   python -m app.jobs.retention
   #   python -m app.jobs.incident_lifecycle
   lifecycle-cron:
-    build: { context: ./apps/api }
+    build: { context: ., dockerfile: apps/api/Dockerfile }
     command: ['python', '-m', 'app.jobs.incident_lifecycle']
     environment:
       APP_ENV: production
@@ -92,7 +92,7 @@ services:
     # Run `alembic upgrade head` as a one-off release step BEFORE rolling out (not at startup).
 
   retention-cron:
-    build: { context: ./apps/api }
+    build: { context: ., dockerfile: apps/api/Dockerfile }
     command: ['python', '-m', 'app.jobs.retention']
     environment:
       APP_ENV: production

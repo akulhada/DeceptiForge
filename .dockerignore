@@ -1,0 +1,21 @@
+# Keep the root build context small and exclude local or secret material.
+.git/
+.claude/
+.env
+.env.*
+!.env.example
+!.env.staging.example
+node_modules/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/tests/
+**/.next/
+**/dist/
+**/build/
+**/.plasmo/
+*.DS_Store

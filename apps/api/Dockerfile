@@ -10,10 +10,12 @@ WORKDIR /app
 
 # Install dependencies first for better layer caching. (No lockfile exists yet; ranges live in
 # pyproject. FUTURE_HARDENING: generate and install from a lockfile / hashes.)
-COPY pyproject.toml ./
-COPY app ./app
-COPY migrations ./migrations
-COPY alembic.ini ./
+# The build context is the monorepo root so the API image can package the shared analysis fixtures.
+COPY apps/api/pyproject.toml ./pyproject.toml
+COPY apps/api/app ./app
+COPY apps/api/migrations ./migrations
+COPY apps/api/alembic.ini ./
+COPY packages/contracts/fixtures/analysis ./fixtures/analysis
 
 RUN pip install --no-cache-dir . \
     && adduser --disabled-password --gecos "" --uid 10001 appuser \
