@@ -16,6 +16,9 @@ DEPLOYMENT_MODES = frozenset({"development", "test", "judge", "staging", "produc
 # Environments where the curated demo story may be mounted, and only with DEMO_ENABLED=true.
 _DEMO_MODES = frozenset({"development", "judge"})
 
+# The restricted judge workspace: development builds it, judge hosts it, tenants never see it.
+_JUDGE_WORKSPACE_MODES = frozenset({"development", "judge"})
+
 # The Analysis Lab is an internal fixture surface. It is never mounted in a hosted environment.
 _ANALYSIS_LAB_MODES = frozenset({"development", "test"})
 
@@ -56,6 +59,18 @@ class Settings(BaseSettings):
     worker_max_failed_jobs: int = 50
     analysis_lab_enabled: bool = False
     analysis_preview_rate_limit_per_minute: int = 30
+
+    # ---- restricted judge workspace -------------------------------------------------------------
+    # Budgets are per SANDBOX SESSION rather than sliding windows: a session is already TTL-bound,
+    # so a spent budget is bounded in time by the session itself. Quota accounting deliberately
+    # survives reset — resetting the sandbox restores its data, not its budget.
+    judge_workspace_enabled: bool = False
+    judge_sandbox_ttl_hours: int = 8
+    judge_max_analysis_runs: int = 50
+    judge_max_interactions: int = 10
+    judge_max_exports: int = 20
+    # Reset is the one action worth pacing: it deletes and re-seeds, so a tight loop is expensive.
+    judge_reset_cooldown_seconds: int = 60
 
     # ---- Controlled learning + calibration ------------------------------------------------------
     # Off by default. Learning only ever records normalized features/outcomes and produces CANDIDATE
@@ -407,6 +422,12 @@ class Settings(BaseSettings):
         # Checked last so that a security misconfiguration is always reported first. The demo story
         # is fictional but still a write surface driving the real pipeline, so it may exist only in
         # development and in the hosted judge environment.
+        if self.judge_workspace_enabled and not self.allows_judge_workspace:
+            raise RuntimeError(
+                f"JUDGE_WORKSPACE_ENABLED=true is not permitted in {self.app_env}; the sandbox "
+                "provisions organizations and deletes records, which has no place in a tenant "
+                "deployment"
+            )
         if self.demo_enabled and not self.allows_demo_surface:
             raise RuntimeError(
                 f"DEMO_ENABLED=true is not permitted in {self.app_env}; the curated demo story is "
@@ -460,6 +481,15 @@ class Settings(BaseSettings):
         deployment even if the flag is set.
         """
         return self.app_env in _DEMO_MODES
+
+    @property
+    def allows_judge_workspace(self) -> bool:
+        """Whether the restricted judge workspace may be mounted.
+
+        Development (for building it) and judge (its purpose). A tenant deployment never exposes it:
+        the sandbox provisions organizations and deletes records, which has no place in production.
+        """
+        return self.app_env in _JUDGE_WORKSPACE_MODES
 
     @property
     def allows_analysis_lab(self) -> bool:

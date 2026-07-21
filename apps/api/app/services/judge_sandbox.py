@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config.settings import Settings
+from app.database.base import Base
 from app.models.records import JudgeSandboxRecord
 from app.services.api_keys import ApiKeyService
 
@@ -194,3 +195,67 @@ def _expired(record: JudgeSandboxRecord, now: datetime) -> bool:
         # naive to aware and raising.
         deadline = deadline.replace(tzinfo=UTC)
     return deadline <= now
+
+
+# ---- reset -----------------------------------------------------------------------------------
+
+# Exactly the tables the judge workspace can cause rows in. An allowlist, not "everything in this
+# organization": reset must never become a generic org-wipe that a future table silently joins.
+#
+# Deliberately ABSENT, and asserted so in tests:
+#   ApiKeyRecord      — reset preserves authentication; deleting it would log the judge out.
+#   JudgeSandboxRecord — preserves the organization assignment and the quota accounting, so reset
+#                        restores data without refilling budget.
+#   SecurityAuditRecord — the audit trail is append-only; a judge must not be able to erase it.
+def _resettable_models() -> tuple[type[Base], ...]:
+    from app.models.records import (
+        AlertRecord,
+        ContextProfileRecord,
+        DecoyPlanRecord,
+        DetectionEventRecord,
+        IncidentRecord,
+        NarrativeRevisionRecord,
+        PlacementPlanRecord,
+        ReconstructionJobRecord,
+        RepositoryRecord,
+        ValidationReportRecord,
+    )
+
+    return (
+        # Deleted in dependency order: derived records first, source records last.
+        NarrativeRevisionRecord,
+        IncidentRecord,
+        ReconstructionJobRecord,
+        AlertRecord,
+        DetectionEventRecord,
+        ValidationReportRecord,
+        DecoyPlanRecord,
+        PlacementPlanRecord,
+        ContextProfileRecord,
+        RepositoryRecord,
+    )
+
+
+class SandboxResetService:
+    """Clear a sandbox's own generated records, and nothing else."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def reset(self, namespace: SandboxNamespace) -> dict[str, int]:
+        """Delete this sandbox's generated records. Idempotent; returns per-table counts.
+
+        Every statement is filtered on the sandbox's own organization id. Because that id is
+        generated per session and used nowhere else, the filter cannot match a tenant's rows, a
+        demo record, or another judge's data even if the caller lied about which sandbox they are:
+        the organization comes from the resolved sandbox row, never from the request body.
+        """
+        deleted: dict[str, int] = {}
+        for model in _resettable_models():
+            result = self._session.execute(
+                delete(model).where(
+                    model.organization_id == namespace.organization_id  # type: ignore[attr-defined]
+                )
+            )
+            deleted[str(model.__tablename__)] = int(getattr(result, "rowcount", 0) or 0)
+        return deleted

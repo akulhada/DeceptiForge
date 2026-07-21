@@ -53,6 +53,7 @@ def build_client(
     onboarding_detection_test_enabled: bool = False,
     learning_enabled: bool = False,
     analysis_lab_enabled: bool = False,
+    judge_workspace_enabled: bool = False,
 ) -> Iterator[TestClient]:
     # Production-like environments must enforce signatures; default the flag on there unless a test
     # explicitly overrides it. Development defaults off (migration-friendly). Derived from the
@@ -83,6 +84,7 @@ def build_client(
         "SECURITY_INTEGRATIONS_ENABLED": "true" if security_integrations_enabled else "false",
         "LEARNING_ENABLED": "true" if learning_enabled else "false",
         "ANALYSIS_LAB_ENABLED": "true" if analysis_lab_enabled else "false",
+        "JUDGE_WORKSPACE_ENABLED": "true" if judge_workspace_enabled else "false",
         "ONBOARDING_ENABLED": "true" if onboarding_enabled else "false",
         "ONBOARDING_DETECTION_TEST_ENABLED": (
             "true" if onboarding_detection_test_enabled else "false"

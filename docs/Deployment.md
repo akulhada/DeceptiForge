@@ -78,13 +78,13 @@ are covered in `docs/DisasterRecovery.md`, `docs/BackupPolicy.md`, `docs/Regiona
 `APP_ENV` is validated against a closed set, so a typo fails startup instead of silently
 resolving to "not development" and picking some middle behaviour.
 
-| Mode | Security contract | `/demo` | Analysis Lab |
-| --- | --- | --- | --- |
-| `development` | relaxed (local scanning, demo-key bypass, plaintext HTTP allowed) | with `DEMO_ENABLED=true` | with `ANALYSIS_LAB_ENABLED=true` |
-| `test` | hardened | never | with `ANALYSIS_LAB_ENABLED=true` |
-| `judge` | **hardened — identical to production** | with `DEMO_ENABLED=true` | never (404) |
-| `staging` | hardened | never | never (404) |
-| `production` | hardened | never | never (404) |
+| Mode | Security contract | `/demo` | Judge workspace | Analysis Lab |
+| --- | --- | --- | --- | --- |
+| `development` | relaxed (local scanning, demo-key bypass, plaintext HTTP allowed) | with `DEMO_ENABLED=true` | with `JUDGE_WORKSPACE_ENABLED=true` | with `ANALYSIS_LAB_ENABLED=true` |
+| `test` | hardened | never | never | with `ANALYSIS_LAB_ENABLED=true` |
+| `judge` | **hardened — identical to production** | with `DEMO_ENABLED=true` | with `JUDGE_WORKSPACE_ENABLED=true` | never (404) |
+| `staging` | hardened | never | never | never (404) |
+| `production` | hardened | never | never | never (404) |
 
 `judge` is a hosted, internet-reachable demonstration environment. It is deliberately *not* a
 development mode: authentication, Redis fail-closed behaviour, signed ingestion and the ban on
@@ -95,6 +95,19 @@ Both demonstration surfaces need an explicit feature flag *and* an environment t
 Startup validation and router composition enforce this independently, so neither is the only gate.
 Setting `DEMO_ENABLED=true` or `ANALYSIS_LAB_ENABLED=true` in an environment that forbids it fails
 startup rather than leaving a deployment whose configuration and behaviour disagree.
+
+### Restricted judge workspace
+
+`JUDGE_WORKSPACE_ENABLED=true` mounts `/api/v1/judge/*`. Each judge gets a TTL-bound sandbox: a
+freshly generated organization used nowhere else, a `judge`-role credential expiring with the
+session, and per-session budgets (`JUDGE_MAX_ANALYSIS_RUNS`, `JUDGE_MAX_INTERACTIONS`,
+`JUDGE_MAX_EXPORTS`, `JUDGE_RESET_COOLDOWN_SECONDS`).
+
+Sandboxes are provisioned **out-of-band**, not by a public endpoint: `judge` is absent from
+`TENANT_GRANTABLE_ROLES`, so no tenant administrator can mint one and there is no anonymous
+fallback. Budgets are per session rather than sliding windows — the session is already TTL-bound —
+and the accounting deliberately survives reset, so resetting restores the sandbox's data and never
+its remaining allowance.
 
 ## Required environment (multi-worker production)
 

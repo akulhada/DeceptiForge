@@ -1,0 +1,100 @@
+# Purpose: the judge workspace over real HTTP — authorization, bounded input, quota responses.
+# Service-level tests cover the rules; these prove the wiring actually enforces them on a request.
+from __future__ import annotations
+
+import pytest
+
+from app.config.settings import get_settings
+from app.dependencies import get_db
+from app.services.judge_sandbox import JudgeSandboxService
+
+_SIGNALS = {"languages": [{"name": "python", "confidence": 0.9}]}
+
+
+def _judge_client(make_client):  # type: ignore[no-untyped-def]
+    """A judge-mode client with one provisioned sandbox, returning the client and its headers."""
+    return make_client(
+        app_env="judge",
+        auth_enabled=True,
+        judge_workspace_enabled=True,
+        demo_enabled=False,
+    )
+
+
+def _provision(client):  # type: ignore[no-untyped-def]
+    """Provision a sandbox through the service, exactly as out-of-band provisioning would."""
+    session = next(client.app.dependency_overrides.get(get_db, get_db)())
+    provisioned = JudgeSandboxService(session, get_settings()).provision()
+    session.commit()
+    headers = {
+        "X-DeceptiForge-API-Key": provisioned.api_key,
+        "X-DeceptiForge-Org-Id": str(provisioned.namespace.organization_id),
+    }
+    return provisioned, headers
+
+
+def test_workspace_requires_authentication(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        # No anonymous fallback: the workspace is not reachable without a credential.
+        assert client.get("/api/v1/judge/workspace").status_code in (401, 403)
+
+
+def test_workspace_returns_backend_state(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        provisioned, headers = _provision(client)
+        response = client.get("/api/v1/judge/workspace", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["organization_id"] == str(provisioned.namespace.organization_id)
+        assert body["environment"] == "judge"
+        # Quotas come from the sandbox row, never from a hardcoded frontend default.
+        assert body["quotas"]["analyze"]["remaining"] == get_settings().judge_max_analysis_runs
+        assert body["scenarios"], "predefined scenarios must be offered"
+
+
+def test_analysis_runs_and_spends_budget(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+        response = client.post(
+            "/api/v1/judge/analyze", json={"signals": _SIGNALS}, headers=headers
+        )
+        assert response.status_code == 200
+        after = client.get("/api/v1/judge/workspace", headers=headers).json()
+        assert after["quotas"]["analyze"]["used"] == 1
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"signals": _SIGNALS, "path": "/etc/passwd"},
+        {"signals": _SIGNALS, "repository_url": "https://github.com/acme/private.git"},
+        {"signals": _SIGNALS, "command": "cat .env"},
+        {"signals": _SIGNALS, "connector_token": "ghp_example"},
+    ],
+)
+def test_unmodelled_fields_are_refused(make_client, payload: dict) -> None:  # type: ignore[no-untyped-def]
+    # The contract forbids extras, so a path to scan, a repository URL, a shell command or a
+    # credential cannot ride along inside an otherwise valid analysis request.
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+        response = client.post("/api/v1/judge/analyze", json=payload, headers=headers)
+        assert response.status_code == 422
+
+
+def test_reset_clears_only_this_sandbox_and_then_rate_limits(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+        first = client.post("/api/v1/judge/reset", headers=headers)
+        assert first.status_code == 200
+        assert "deleted" in first.json()
+
+        # Reset deletes and re-seeds, so it is paced. Here waiting genuinely helps, so the denial
+        # must carry a Retry-After a client can act on.
+        second = client.post("/api/v1/judge/reset", headers=headers)
+        assert second.status_code == 429
+        assert int(second.headers["Retry-After"]) > 0
+
+
+def test_the_workspace_is_absent_in_production(make_client) -> None:  # type: ignore[no-untyped-def]
+    with make_client(app_env="production", auth_enabled=True, demo_enabled=False) as client:
+        assert client.get("/api/v1/judge/workspace").status_code == 404

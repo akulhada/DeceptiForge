@@ -16,6 +16,7 @@ from app.api.demo import router as demo_router
 from app.api.deployments import router as deployments_router
 from app.api.health import router as health_router
 from app.api.integrations import router as integrations_router
+from app.api.judge import router as judge_router
 from app.api.learning import router as learning_router
 from app.api.narrative import router as narrative_router
 from app.api.onboarding import router as onboarding_router
@@ -68,6 +69,9 @@ def build_api_router(settings: Settings) -> APIRouter:
         router.include_router(integrations_router)
     if settings.onboarding_enabled:
         router.include_router(onboarding_router)
+    # Restricted judge workspace: development builds it, judge hosts it, tenants never see it.
+    if settings.judge_workspace_enabled and settings.allows_judge_workspace:
+        router.include_router(judge_router)
     if settings.demo_enabled and settings.allows_demo_surface:
         router.include_router(demo_router)
     return router
