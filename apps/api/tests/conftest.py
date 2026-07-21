@@ -48,6 +48,7 @@ def build_client(
     security_integrations_enabled: bool = False,
     onboarding_enabled: bool = False,
     onboarding_detection_test_enabled: bool = False,
+    learning_enabled: bool = False,
 ) -> Iterator[TestClient]:
     # Production-like environments must enforce signatures; default the flag on there unless a test
     # explicitly overrides it. Development defaults off (migration-friendly).
@@ -77,6 +78,7 @@ def build_client(
         "AGENT_SENSOR_ENABLED": "true" if agent_sensor_enabled else "false",
         "COVERAGE_ENGINE_ENABLED": "true" if coverage_engine_enabled else "false",
         "SECURITY_INTEGRATIONS_ENABLED": "true" if security_integrations_enabled else "false",
+        "LEARNING_ENABLED": "true" if learning_enabled else "false",
         "ONBOARDING_ENABLED": "true" if onboarding_enabled else "false",
         "ONBOARDING_DETECTION_TEST_ENABLED": (
             "true" if onboarding_detection_test_enabled else "false"

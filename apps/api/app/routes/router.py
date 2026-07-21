@@ -16,6 +16,7 @@ from app.api.demo import router as demo_router
 from app.api.deployments import router as deployments_router
 from app.api.health import router as health_router
 from app.api.integrations import router as integrations_router
+from app.api.learning import router as learning_router
 from app.api.narrative import router as narrative_router
 from app.api.onboarding import router as onboarding_router
 from app.api.pipeline import router as pipeline_router
@@ -41,6 +42,9 @@ def build_api_router(settings: Settings) -> APIRouter:
     # Interactive Demo Lab: deterministic, stateless preview analysis. A core product route, always
     # mounted, authenticated + org-scoped (analysis:preview) — never under the /demo namespace.
     router.include_router(analysis_router)
+    # Controlled learning mounts only when explicitly enabled; it never activates weights itself.
+    if settings.learning_enabled:
+        router.include_router(learning_router)
     # Decoy deployment routes mount only when the feature is explicitly enabled.
     if settings.decoy_deployment_enabled:
         router.include_router(deployments_router)
