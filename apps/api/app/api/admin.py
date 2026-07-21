@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session
 from app.config.settings import get_settings
 from app.dependencies import get_db
 from app.security import require_scope
-from app.services.api_keys import ROLE_SCOPES, ApiKeyService, AuthContext, AuthError, write_audit
+from app.services.api_keys import (
+    ApiKeyService,
+    AuthContext,
+    AuthError,
+    assert_grantable,
+    write_audit,
+)
 from app.services.monitor_credentials import MonitorCredentialService
 from app.services.rate_limit import get_rate_limiter, rate_limit_key
 
@@ -76,11 +82,19 @@ def create_api_key(
     session: Session = Depends(get_db),
 ) -> CreateApiKeyResponse:
     _rate_limit("admin:api_keys:create", auth)
-    if body.role not in ROLE_SCOPES:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown role")
+    # Centralized guard: refuses unknown roles, platform/sensor roles, and any grant that would
+    # exceed the issuing actor's own scope. Never trust the requested role alone.
+    try:
+        assert_grantable(auth.scopes, body.role)
+    except AuthError as error:
+        raise HTTPException(error.status_code, error.message) from error
     try:
         record, plaintext = ApiKeyService(session).create(
-            auth.organization_id, body.name, body.role, expires_at=body.expires_at
+            auth.organization_id,
+            body.name,
+            body.role,
+            issuer_scopes=auth.scopes,
+            expires_at=body.expires_at,
         )
     except AuthError as error:
         raise HTTPException(error.status_code, error.message) from None
