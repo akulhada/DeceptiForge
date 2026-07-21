@@ -1,0 +1,2 @@
+# Documented Python dependency-audit exceptions, one advisory id per line (e.g. GHSA-xxxx-xxxx-xxxx
+# or PYSEC-YYYY-NN). Each entry must be justified in review; an empty file suppresses nothing.
