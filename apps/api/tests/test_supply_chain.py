@@ -131,3 +131,38 @@ def test_restore_drill_makes_no_legal_hold_claim() -> None:
     assert (
         '_check("legal_holds_present"' not in source
     ), "the restore drill must not emit a passing legal-hold check while holds are unimplemented"
+
+
+def test_service_images_are_pinned_by_digest() -> None:
+    """A mutable tag lets a rebuild pull different database or cache contents."""
+    compose = (REPO / "docker-compose.prod.example.yml").read_text()
+    for line in compose.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("image:"):
+            reference = stripped.split("image:", 1)[1].strip()
+            assert "@sha256:" in reference, f"unpinned image: {reference}"
+
+
+def test_sbom_generator_is_pinned() -> None:
+    ci = _ci()
+    assert "@latest" not in ci, "CI must not resolve a tool at build time via @latest"
+
+
+def test_analysis_lab_flags_cannot_drift_apart() -> None:
+    """The lab has two independent flags; a deployment must not enable one without the other.
+
+    The backend refuses ANALYSIS_LAB_ENABLED outside development, but the NEXT_PUBLIC_ flag is
+    baked into the web build and the API cannot police it. The frontend page must therefore gate on
+    its own flag, and no committed environment template may turn it on.
+    """
+    page = (REPO / "apps" / "web" / "app" / "analysis-lab" / "page.tsx").read_text()
+    assert "NEXT_PUBLIC_ANALYSIS_LAB_ENABLED" in page
+    assert "notFound()" in page, "the route must 404 when disabled, not merely hide navigation"
+
+    for template in REPO.rglob(".env*.example"):
+        for line in template.read_text().splitlines():
+            entry = line.strip()
+            if entry.startswith("NEXT_PUBLIC_ANALYSIS_LAB_ENABLED"):
+                assert (
+                    entry.split("=", 1)[1].strip().lower() != "true"
+                ), f"{template} enables the analysis lab by default"

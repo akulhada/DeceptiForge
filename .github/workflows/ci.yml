@@ -373,7 +373,7 @@ jobs:
           set -euo pipefail
           mkdir -p sbom
           cyclonedx-py environment --of JSON -o sbom/api-dependencies.cdx.json
-          pnpm dlx @cyclonedx/cyclonedx-npm@latest --output-format JSON \
+          pnpm dlx @cyclonedx/cyclonedx-npm@6.0.0 --output-format JSON \
             --output-file sbom/web-dependencies.cdx.json ||
             echo 'web SBOM generation unavailable; API SBOM still produced'
       # Every SBOM is tied to the exact revision it describes.
