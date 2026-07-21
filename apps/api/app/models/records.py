@@ -9,8 +9,11 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -1278,4 +1281,196 @@ class ReliabilityAuditRecord(Base):
     request_id: Mapped[str] = mapped_column(String(64))
     deployment_region: Mapped[str] = mapped_column(String(64), default="")
     safe_metadata: Mapped[str] = mapped_column(String(1024), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# ---- controlled learning + calibration -----------------------------------------------------------
+# Every table is organization-scoped. Learning stores ONLY normalized categories, buckets, scores,
+# hashes, enumerations, and bounded reason codes — never source content, secrets, customer records,
+# prompts, or model output.
+
+
+class FeatureSnapshotRecord(Base):
+    """Immutable, schema-versioned normalized features. Deduplicated by (organization, hash)."""
+
+    __tablename__ = "feature_snapshots"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "feature_hash", name="uq_feature_snapshot"),
+        Index("ix_feature_snapshots_org_captured", "organization_id", "captured_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    source_type: Mapped[str] = mapped_column(String(32))
+    # Hashed source reference: never a path, repository name, or other identifying string.
+    source_id_hash: Mapped[str] = mapped_column(String(64))
+    feature_schema_version: Mapped[str] = mapped_column(String(32))
+    normalized_features: Mapped[str] = mapped_column(Text)
+    feature_hash: Mapped[str] = mapped_column(String(64))
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LearningRecommendationRecord(Base):
+    """A deterministic recommendation as issued, pinned to the engine + model version that made it.
+
+    Named distinctly from the coverage-engine PlacementRecommendationRecord above, which is a
+    different aggregate stored in `coverage_recommendations`.
+    """
+
+    __tablename__ = "placement_recommendation_records"
+    __table_args__ = (
+        Index("ix_placement_reco_org_created", "organization_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    source_feature_snapshot_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("feature_snapshots.id"), nullable=True, index=True
+    )
+    recommendation_type: Mapped[str] = mapped_column(String(64))
+    target_zone: Mapped[str] = mapped_column(String(64), index=True)
+    target_category: Mapped[str] = mapped_column(String(64), default="")
+    decoy_type: Mapped[str] = mapped_column(String(64), default="")
+    rank: Mapped[int] = mapped_column(Integer, default=0)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    reasoning_codes: Mapped[str] = mapped_column(Text, default="[]")
+    engine_version: Mapped[str] = mapped_column(String(32), default="")
+    model_version_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PlacementOutcomeRecord(Base):
+    """An observed outcome for a recommendation. Idempotent per (recommendation, outcome type)."""
+
+    __tablename__ = "placement_outcomes"
+    __table_args__ = (
+        UniqueConstraint("recommendation_id", "outcome_type", name="uq_placement_outcome"),
+        Index("ix_placement_outcomes_org_observed", "organization_id", "observed_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    recommendation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("placement_recommendation_records.id"), index=True
+    )
+    outcome_type: Mapped[str] = mapped_column(String(32), index=True)
+    outcome_reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    safe_metadata: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AnalystFeedbackRecord(Base):
+    """Human feedback. One record per (actor, target, revision) — revisions never overwrite."""
+
+    __tablename__ = "analyst_feedback"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id", "actor_id", "target_kind", "target_id", "revision",
+            name="uq_analyst_feedback_revision",
+        ),
+        Index("ix_analyst_feedback_target", "organization_id", "target_kind", "target_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    target_kind: Mapped[str] = mapped_column(String(24))
+    target_id: Mapped[UUID] = mapped_column(Uuid)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    feedback_type: Mapped[str] = mapped_column(String(32), index=True)
+    original_value: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    corrected_value: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Bounded + sanitized; never used in online scoring.
+    normalized_comment: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LearningEventRecord(Base):
+    """Append-only learning history. Corrections append a new event; rows are never rewritten."""
+
+    __tablename__ = "learning_events"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "event_hash", name="uq_learning_event"),
+        Index(
+            "ix_learning_events_org_type_occurred",
+            "organization_id",
+            "event_type",
+            "occurred_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    event_type: Mapped[str] = mapped_column(String(48))
+    feature_snapshot_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    recommendation_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    placement_outcome_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    analyst_feedback_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    operational_result_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    source_event_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    engine_version: Mapped[str] = mapped_column(String(32), default="")
+    feature_schema_version: Mapped[str] = mapped_column(String(32), default="")
+    event_hash: Mapped[str] = mapped_column(String(64))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LearningModelVersionRecord(Base):
+    """Immutable versioned weights with a reviewed lifecycle. Only one ACTIVE per org+algorithm."""
+
+    __tablename__ = "learning_model_versions"
+    __table_args__ = (
+        Index("ix_learning_versions_org_status", "organization_id", "status"),
+        Index("ix_learning_versions_algorithm", "algorithm_name", "algorithm_version"),
+        Index("ix_learning_versions_window", "training_window_start", "training_window_end"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    # NULL organization means a global-scope version (operations plane only).
+    organization_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(16), default="organization")
+    algorithm_name: Mapped[str] = mapped_column(String(64))
+    algorithm_version: Mapped[str] = mapped_column(String(32))
+    feature_schema_version: Mapped[str] = mapped_column(String(32))
+    methodology_version: Mapped[str] = mapped_column(String(32), default="")
+    training_window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    training_window_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    training_event_count: Mapped[int] = mapped_column(Integer, default=0)
+    weights: Mapped[str] = mapped_column(Text, default="{}")
+    metrics: Mapped[str] = mapped_column(Text, default="{}")
+    report: Mapped[str] = mapped_column(Text, default="{}")
+    parent_version_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="candidate", index=True)
+    # Separation of duties: the approving actor must differ from the requesting actor.
+    requested_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    approved_by_actor_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rollback_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    safety_constraints_preserved: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class OperationalResultRecord(Base):
+    """Operational health, kept separate so a platform failure never scores a placement down."""
+
+    __tablename__ = "operational_results"
+    __table_args__ = (
+        Index("ix_operational_results_org_observed", "organization_id", "observed_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    operation_type: Mapped[str] = mapped_column(String(48), index=True)
+    source_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    status: Mapped[str] = mapped_column(String(24))
+    latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    failure_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sensor_health: Mapped[float | None] = mapped_column(Float, nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

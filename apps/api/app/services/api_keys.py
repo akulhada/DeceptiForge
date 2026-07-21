@@ -101,6 +101,13 @@ PERMISSIONS: frozenset[str] = frozenset(
         "onboarding:accept_recommendation",
         "onboarding:view_activation_metrics",
         "analysis:preview",
+        "learning:read",
+        "learning:feedback",
+        "learning:calibrate",
+        "learning:review",
+        "learning:approve",
+        "learning:activate",
+        "learning:rollback",
         "admin:manage_keys",
         "admin:manage_monitors",
         "admin:read_audit",
@@ -111,14 +118,26 @@ PERMISSIONS: frozenset[str] = frozenset(
 # out-of-band for the operations plane, so ordinary tenant administrators cannot read global
 # capacity.
 PLATFORM_PERMISSIONS: frozenset[str] = frozenset(
-    {"capacity:read", "capacity:manage", "performance_runs:read", "performance_runs:execute"}
+    {
+        "capacity:read",
+        "capacity:manage",
+        "performance_runs:read",
+        "performance_runs:execute",
+        # Cross-tenant aggregate learning is operations-plane only; no tenant role may hold it.
+        "learning:manage_global",
+    }
 )
+
+# Separation of duties: whoever generates or reviews a candidate must not also approve/activate it.
+_LEARNING_APPROVAL: frozenset[str] = frozenset({"learning:approve", "learning:activate"})
 
 _READS = frozenset(p for p in PERMISSIONS if p.endswith(":read"))
 
 ROLE_SCOPES: dict[str, frozenset[str]] = {
     "owner": PERMISSIONS,
-    "admin": PERMISSIONS,
+    # Admin may generate and review calibration candidates but not approve/activate them; that
+    # decision belongs to the owner (separation of duties).
+    "admin": PERMISSIONS - _LEARNING_APPROVAL,
     "analyst": _READS
     | frozenset(
         {
@@ -134,6 +153,7 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "alerts:export",
             "coverage:export",
             "analysis:preview",
+            "learning:feedback",
         }
     ),
     "viewer": _READS | frozenset({"analysis:preview"}),

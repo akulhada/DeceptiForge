@@ -37,6 +37,30 @@ class Settings(BaseSettings):
     # Interactive Demo Lab preview analysis: read-only but compute-bearing, so it gets its own
     # per-organization+actor budget rather than reusing the monitoring-ingest limit.
     analysis_preview_rate_limit_per_minute: int = 30
+
+    # ---- Controlled learning + calibration ------------------------------------------------------
+    # Off by default. Learning only ever records normalized features/outcomes and produces CANDIDATE
+    # weights; nothing reaches production without human approval (LEARNING_REQUIRE_APPROVAL).
+    learning_enabled: bool = False
+    learning_event_retention_days: int = 180
+    learning_min_events_for_calibration: int = 50
+    learning_min_distinct_outcomes: int = 10
+    # Distinct human actors required before analyst feedback can move a weight (anti-poisoning).
+    learning_min_distinct_actors: int = 3
+    # Maximum share of a single cohort's evidence one actor may contribute (anti-poisoning).
+    learning_max_actor_contribution: float = 0.34
+    learning_calibration_interval_hours: int = 24
+    learning_require_approval: bool = True
+    learning_org_specific_enabled: bool = False
+    global_aggregate_learning_enabled: bool = False
+    learning_min_global_cohort_size: int = 25
+    learning_max_feedback_comment_length: int = 500
+    learning_methodology_version: str = "calibration-v1"
+    learning_feedback_rate_limit_per_minute: int = 20
+    # Outcome attribution: a placement is never scored negatively before these are satisfied.
+    learning_min_observation_hours: int = 72
+    learning_min_healthy_monitoring_ratio: float = 0.8
+    external_intelligence_enabled: bool = False
     narrative_revision_retention_count: int = 20
     monitoring_event_retention_days: int = 30
     alert_retention_days: int = 90
@@ -297,6 +321,18 @@ class Settings(BaseSettings):
         if self.capacity_management_enabled and self.redis_url is None:
             raise RuntimeError(
                 "capacity management requires REDIS_URL for shared tenant quota enforcement"
+            )
+        # Calibration must never silently reach production: approval is mandatory outside
+        # development, and cross-tenant aggregation requires an explicit reviewed decision.
+        if self.learning_enabled and not self.learning_require_approval:
+            raise RuntimeError(
+                "LEARNING_REQUIRE_APPROVAL=false is not permitted outside development; "
+                "candidate weights must be human-approved before activation"
+            )
+        if self.global_aggregate_learning_enabled and self.learning_min_global_cohort_size < 10:
+            raise RuntimeError(
+                "global aggregate learning requires LEARNING_MIN_GLOBAL_COHORT_SIZE >= 10 to "
+                "prevent rare-category re-identification"
             )
         if self.evidence_encryption_mode == "disabled":
             raise RuntimeError(
