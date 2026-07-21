@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # per-organization+actor budget rather than reusing the monitoring-ingest limit.
     # The Interactive Analysis Lab is a demonstration/testing surface, not a production capability.
     # Off by default and refused outside development even when explicitly enabled.
+    # Operational readiness thresholds for asynchronous reconstruction work. These gate
+    # /ready/operational only — never HTTP instance readiness.
+    worker_max_queue_age_seconds: int = 900
+    worker_max_failed_jobs: int = 50
     analysis_lab_enabled: bool = False
     analysis_preview_rate_limit_per_minute: int = 30
 
