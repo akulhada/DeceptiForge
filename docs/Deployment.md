@@ -73,18 +73,105 @@ are covered in `docs/DisasterRecovery.md`, `docs/BackupPolicy.md`, `docs/Regiona
 `docs/RegionalFailback.md`, with automation in `scripts/reliability/` and runbooks in
 `docs/runbooks/`.
 
+## Deployment modes (`APP_ENV`)
+
+`APP_ENV` is validated against a closed set, so a typo fails startup instead of silently
+resolving to "not development" and picking some middle behaviour.
+
+| Mode | Security contract | `/demo` | Judge workspace | Analysis Lab |
+| --- | --- | --- | --- | --- |
+| `development` | relaxed (local scanning, demo-key bypass, plaintext HTTP allowed) | with `DEMO_ENABLED=true` | with `JUDGE_WORKSPACE_ENABLED=true` | with `ANALYSIS_LAB_ENABLED=true` |
+| `test` | hardened | never | never | with `ANALYSIS_LAB_ENABLED=true` |
+| `judge` | **hardened — identical to production** | with `DEMO_ENABLED=true` | with `JUDGE_WORKSPACE_ENABLED=true` | never (404) |
+| `staging` | hardened | never | never | never (404) |
+| `production` | hardened | never | never | never (404) |
+
+`judge` is a hosted, internet-reachable demonstration environment. It is deliberately *not* a
+development mode: authentication, Redis fail-closed behaviour, signed ingestion and the ban on
+arbitrary filesystem scanning all apply exactly as in production. The only thing it relaxes is
+which demonstration surface may be mounted.
+
+Both demonstration surfaces need an explicit feature flag *and* an environment that permits them.
+Startup validation and router composition enforce this independently, so neither is the only gate.
+Setting `DEMO_ENABLED=true` or `ANALYSIS_LAB_ENABLED=true` in an environment that forbids it fails
+startup rather than leaving a deployment whose configuration and behaviour disagree.
+
+### Frontend route model
+
+| Route | Purpose | Available when |
+| --- | --- | --- |
+| `/` | restricted judge workspace, or the ordinary tenant workspace | workspace in development/judge with `NEXT_PUBLIC_JUDGE_WORKSPACE_ENABLED=true`; tenant dashboard otherwise |
+| `/demo` | the curated fictional story used in the video | development/judge with `NEXT_PUBLIC_DEMO_MODE=true` |
+| `/analysis-lab` | internal deterministic fixtures | development/test with `NEXT_PUBLIC_ANALYSIS_LAB_ENABLED=true` |
+
+There is no `/judge` route. The root route serves the judge workspace directly, so there is no
+second component duplicating its state.
+
+`NEXT_PUBLIC_APP_ENV` selects the frontend mode. An unrecognised or absent value resolves to
+`production` — the most restrictive mode — so a misconfigured build hides demonstration surfaces
+rather than revealing them. Each gated route calls the shared eligibility helper itself and returns
+a real 404: hiding a navigation link is not a control.
+
+**These pages are rendered per request, not prerendered.** The nonce CSP and static prerendering are
+incompatible: a prerendered page is built once with no nonce, while the middleware sends a fresh
+per-request nonce, and under `strict-dynamic` a nonce is the only thing that authorises a script.
+A prerendered page therefore has every script blocked and never hydrates — silently, with no console
+error. `app/layout.tsx` reads a request header to opt out of prerendering, and CI asserts the nonce
+in the served HTML matches the one in the header.
+
+### Curated demo access
+
+Reads and writes are split. The four `GET` routes are **open**: the curated story is fictional and
+fixed, it is meant to be the first thing a judge sees, and requiring a credential to *look* at it
+buys nothing.
+
+The five mutating routes are different — they seed data, drive the real pipeline, reset state and
+replay runs, so hosted they would let anyone reshape what every other viewer sees. In development
+they stay open for local convenience, the same way the demo API-key bypass is development-only.
+Anywhere the demo can be **hosted** — today that means `judge` — they require a `demo:run`
+credential bound to the demo organization.
+
+Mint one out-of-band:
+
+```
+python scripts/provision_judge_sandbox.py --demo-credential
+```
+
+The `demo` role carries `demo:run` plus the reads needed to display the story, and nothing else: no
+tenant writes, no administration, no platform scopes and no judge scopes. It is absent from
+`TENANT_GRANTABLE_ROLES`, so no tenant administrator can mint one. A demo credential cannot open the
+judge workspace and a judge credential cannot open the demo; the demo drives the fixed demo
+organization while judge sandboxes use generated ones, so neither can read the other's records.
+
+### Restricted judge workspace
+
+`JUDGE_WORKSPACE_ENABLED=true` mounts `/api/v1/judge/*`. Each judge gets a TTL-bound sandbox: a
+freshly generated organization used nowhere else, a `judge`-role credential expiring with the
+session, and per-session budgets (`JUDGE_MAX_ANALYSIS_RUNS`, `JUDGE_MAX_INTERACTIONS`,
+`JUDGE_MAX_EXPORTS`, `JUDGE_RESET_COOLDOWN_SECONDS`).
+
+Size `--ttl-hours` to the whole evaluation window, not the default 8 hours: a credential that
+expires mid-review looks like a broken product rather than an expired session. See
+[JudgeAccess](runbooks/JudgeAccess.md) for provisioning, sizing and teardown.
+
+Sandboxes are provisioned **out-of-band**, not by a public endpoint: `judge` is absent from
+`TENANT_GRANTABLE_ROLES`, so no tenant administrator can mint one and there is no anonymous
+fallback. Budgets are per session rather than sliding windows — the session is already TTL-bound —
+and the accounting deliberately survives reset, so resetting restores the sandbox's data and never
+its remaining allowance.
+
 ## Required environment (multi-worker production)
 
 | Variable | Purpose |
 | --- | --- |
-| `APP_ENV=production` | disables demo routes, local scanning, and auth bypass |
+| `APP_ENV=production` | disables demo routes, local scanning, and auth bypass (see modes above) |
 | `DATABASE_URL` | PostgreSQL DSN (private network) |
 | `AUTH_ENABLED=true` | bypass rejected outside development |
 | `REDIS_URL` | required when a Redis-backed backend is selected (private network) |
 | `RATE_LIMIT_MODE` | `app` (with `RATE_LIMIT_BACKEND=redis`) or `gateway` (edge enforces) |
 | `RATE_LIMIT_BACKEND=redis` | required in `app` mode; production refuses in-memory |
 | `REPLAY_BACKEND=redis` | required in production; production refuses in-memory |
-| `REDIS_FAIL_MODE` | `closed` (reject on outage, default) or `open` (degrade to allow) |
+| `REDIS_FAIL_MODE=closed` | **required** outside development; `open` is refused at startup in judge, staging and production |
 | `MONITOR_SIGNATURE_REQUIRED=true` | require HMAC-signed ingestion (see `monitor-signing.md`) |
 | `EVIDENCE_ENCRYPTION_MODE` | `local` (with `EVIDENCE_ENCRYPTION_KEY`) or a documented KMS strategy |
 | `BOOTSTRAP_KEYS_ENABLED` | `false` in steady state (see `bootstrap-and-encryption.md`) |
@@ -92,8 +179,14 @@ are covered in `docs/DisasterRecovery.md`, `docs/BackupPolicy.md`, `docs/Regiona
 | `CAPACITY_MANAGEMENT_ENABLED=true` | enables Redis-backed tenant monitoring and queue admission |
 
 Production **fails fast at startup** on: in-memory rate-limit/replay backends, missing `REDIS_URL`
-when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled`, or unrestricted
-(no-expiry) bootstrap keys.
+when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled`, unrestricted
+(no-expiry) bootstrap keys, `REDIS_FAIL_MODE=open`, `AUTH_ENABLED=false`,
+`MONITOR_SIGNATURE_REQUIRED=false`, and any demonstration surface flag the deployment mode forbids
+(`ANALYSIS_LAB_ENABLED`, `DEMO_ENABLED`, `JUDGE_WORKSPACE_ENABLED`).
+
+Refusing to boot is deliberate: a deployment whose configuration says one thing and whose behaviour
+says another is worse than one that does not start. Every item above applies to `judge` as well —
+it is a hosted mode and shares the production contract.
 
 When capacity management is enabled, keep `REDIS_URL` private and set the tenant defaults, queue
 backlog threshold, pool budgets, and headroom settings from a staging certification. See

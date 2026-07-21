@@ -3,6 +3,8 @@ node_modules/
 .pnpm-store/
 .turbo/
 .next/
+# Second dev server's build output (see distDir in apps/web/next.config.ts).
+.next-judge/
 dist/
 .plasmo/
 apps/extension/build/

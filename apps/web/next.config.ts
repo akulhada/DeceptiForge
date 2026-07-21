@@ -33,6 +33,12 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   transpilePackages: ['@deceptiforge/contracts'],
   outputFileTracingRoot: monorepoRoot,
+  // Two dev servers in this directory (the ordinary one and the judge-mode one on 3100) would
+  // otherwise share `.next` and overwrite each other's build output. The symptom is subtle: the
+  // page still server-renders, but its client chunks belong to the other server's compilation, so
+  // React never hydrates and the UI freezes on whatever the server rendered — with no console
+  // error. Giving each server its own directory keeps them independent.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   // Headers are emitted by the app itself so a misconfigured proxy cannot silently drop all
   // protection; the proxy is expected to preserve, not to be the only source.
   async headers() {

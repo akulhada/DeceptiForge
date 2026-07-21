@@ -1474,3 +1474,35 @@ class OperationalResultRecord(Base):
     sensor_health: Mapped[float | None] = mapped_column(Float, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class JudgeSandboxRecord(Base):
+    """One TTL-bound judge sandbox session.
+
+    Each session owns a freshly generated organization id, so judge data never shares a namespace
+    with a tenant or with another judge. The row is the authority on whether a session is still
+    alive: expiry is evaluated server-side on every request rather than trusted from the client.
+    Holds no judge-supplied content — only identifiers, lifetime and quota accounting.
+    """
+
+    __tablename__ = "judge_sandboxes"
+    __table_args__ = (Index("ix_judge_sandboxes_org_session", "organization_id", "session_id"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    # Generated per session and never reused; this is the isolation boundary.
+    organization_id: Mapped[UUID] = mapped_column(Uuid, index=True, unique=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, index=True, unique=True)
+    # The deployment mode that issued the session. Namespaced keys include it so a development
+    # sandbox can never collide with a hosted judge one in a shared cache.
+    environment: Mapped[str] = mapped_column(String(16))
+    api_key_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    label: Mapped[str] = mapped_column(String(64), default="DeceptiForge Judge Sandbox")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # Quota accounting survives reset: resetting the sandbox must not refill the budget.
+    analysis_runs: Mapped[int] = mapped_column(Integer, default=0)
+    interactions: Mapped[int] = mapped_column(Integer, default=0)
+    exports: Mapped[int] = mapped_column(Integer, default=0)
+    resets: Mapped[int] = mapped_column(Integer, default=0)
+    last_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

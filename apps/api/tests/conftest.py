@@ -16,10 +16,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.config.settings import get_settings
+from app.config.settings import PRODUCTION_LIKE_MODES, get_settings
 from app.database.base import Base
 from app.dependencies import get_db
 from app.models import records as _records  # noqa: F401  (register tables)
+
+# Imported, never restated: see PRODUCTION_LIKE_MODES in app.config.settings.
 
 
 @contextmanager
@@ -50,11 +52,13 @@ def build_client(
     onboarding_detection_test_enabled: bool = False,
     learning_enabled: bool = False,
     analysis_lab_enabled: bool = False,
+    judge_workspace_enabled: bool = False,
 ) -> Iterator[TestClient]:
     # Production-like environments must enforce signatures; default the flag on there unless a test
-    # explicitly overrides it. Development defaults off (migration-friendly).
+    # explicitly overrides it. Development defaults off (migration-friendly). Derived from the
+    # settings contract rather than a literal set so a new hosted mode cannot be tested unsigned.
     if monitor_signature_required is None:
-        monitor_signature_required = app_env in {"production", "staging"}
+        monitor_signature_required = app_env in PRODUCTION_LIKE_MODES
     overrides = {
         "DEMO_ENABLED": "true" if demo_enabled else "false",
         "APP_ENV": app_env,
@@ -79,6 +83,7 @@ def build_client(
         "SECURITY_INTEGRATIONS_ENABLED": "true" if security_integrations_enabled else "false",
         "LEARNING_ENABLED": "true" if learning_enabled else "false",
         "ANALYSIS_LAB_ENABLED": "true" if analysis_lab_enabled else "false",
+        "JUDGE_WORKSPACE_ENABLED": "true" if judge_workspace_enabled else "false",
         "ONBOARDING_ENABLED": "true" if onboarding_enabled else "false",
         "ONBOARDING_DETECTION_TEST_ENABLED": (
             "true" if onboarding_detection_test_enabled else "false"

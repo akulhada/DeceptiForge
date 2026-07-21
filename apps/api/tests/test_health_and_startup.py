@@ -32,6 +32,9 @@ def _prod_settings(**overrides: object) -> Settings:
         "evidence_encryption_mode": "local",
         "monitor_signature_required": True,
         "auth_enabled": True,
+        # Pinned so a local .env cannot leak surface flags into a production assertion.
+        "demo_enabled": False,
+        "judge_workspace_enabled": False,
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]

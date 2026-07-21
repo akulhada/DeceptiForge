@@ -10,10 +10,22 @@ const middleware = readFileSync(resolve(WEB, 'middleware.ts'), 'utf8');
 const config = readFileSync(resolve(WEB, 'next.config.ts'), 'utf8');
 
 describe('content security policy', () => {
-  it('does not allow inline or eval scripts', () => {
-    const scriptSrc = /script-src[^`]*?(?=`|\n)/.exec(middleware)?.[0] ?? '';
-    expect(scriptSrc).not.toContain("'unsafe-inline'");
-    expect(scriptSrc).not.toContain("'unsafe-eval'");
+  it('does not allow inline or eval scripts outside development', () => {
+    // `next dev` needs eval for HMR, so development relaxes script-src. Assert the PRODUCTION
+    // branch specifically — matching the first script-src in the file would now match the dev one
+    // and make this guard hollow.
+    const production = /return `script-src 'self' 'nonce-\$\{nonce\}'[^`]*`/.exec(middleware)?.[0];
+    expect(production, 'production script-src not found').toBeTruthy();
+    expect(production).not.toContain("'unsafe-inline'");
+    expect(production).not.toContain("'unsafe-eval'");
+    expect(production).toContain("'strict-dynamic'");
+  });
+
+  it('gates the development relaxation on NODE_ENV', () => {
+    // If this were not gated, a production build would ship eval-enabled scripts.
+    expect(middleware).toContain("process.env.NODE_ENV === 'development'");
+    const dev = /if \(IS_DEV\) \{[\s\S]*?\}/.exec(middleware)?.[0] ?? '';
+    expect(dev).toContain("'unsafe-eval'");
   });
 
   it('uses a per-request nonce rather than a static allow-list', () => {

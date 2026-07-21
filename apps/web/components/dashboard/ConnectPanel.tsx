@@ -10,8 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { clearSession, setSession } from '@/services/authSession';
 import { tenantApi, TenantApiError } from '@/services/tenantApi';
 
+// Default to the API this build was configured for. The CSP's connect-src allows only 'self' and
+// NEXT_PUBLIC_API_URL, so any other origin typed here is refused by the browser before a request
+// leaves — offering a hardcoded default that the policy forbids would just look like an outage.
+const DEFAULT_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+
 export function ConnectPanel({ onConnected }: { onConnected: () => void }) {
-  const [baseUrl, setBaseUrl] = useState('http://localhost:8000');
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL);
   const [organizationId, setOrganizationId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState<string | null>(null);

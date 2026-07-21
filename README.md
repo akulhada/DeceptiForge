@@ -39,8 +39,10 @@ claim of production certification.
 
 ## Interactive Analysis Lab
 
-An authenticated, organization-scoped product route (`/analysis-lab`) that turns the single prepared
-demo into a testable prototype. Paste or edit **structured repository signals** as JSON (languages,
+An authenticated, organization-scoped **development and test** route (`/analysis-lab`) that turns
+the single prepared demo into a testable prototype. It is an internal fixture surface, not a
+product capability: it returns a real 404 in the hosted judge environment and in production, on
+both the frontend and the API, rather than merely being hidden from navigation. Paste or edit **structured repository signals** as JSON (languages,
 frameworks, services, databases, naming patterns, infrastructure, documentation, secret locations,
 AI surfaces), pick one of **ten prepared fictional scenarios** (fintech, SaaS/CRM, healthcare,
 e-commerce, ML/RAG, Kubernetes microservices, monorepo, sparse, conflicting, high-risk secrets+AI),
@@ -53,7 +55,8 @@ Boundary: the lab accepts only structured signals. It **does not scan a filesyst
 repository, execute code, or call GPT**, and it does not persist input or results. Path-like strings
 are descriptive metadata only and are never opened. The endpoint is
 `POST /api/v1/analysis/preview` (permission `analysis:preview`; viewer/analyst/admin/owner; sensors
-excluded), authenticated and org-scoped, with payload and rate limits — see [Pipeline API](docs/Api.md).
+and judges excluded), authenticated and org-scoped, with payload and rate limits — see
+[Pipeline API](docs/Api.md).
 
 ## Architecture
 
@@ -113,6 +116,42 @@ Open `http://localhost:3000`. With the development templates, `DEMO_ENABLED=true
 confirm repository context, placement reasoning, synthetic validation, event, alert, incident,
 coverage, and an AI-assisted or deterministic-fallback narrative. Refreshing the page is safe.
 `POST http://localhost:8000/demo/reset` clears only the demo organization.
+
+### Routes
+
+| Route | What it is | Where it exists |
+| --- | --- | --- |
+| `/` | the live restricted judge and testing workspace | development and the hosted judge environment; elsewhere it is the ordinary authenticated tenant workspace |
+| `/demo` | the curated fictional story used in the video | development and the hosted judge environment, with `NEXT_PUBLIC_DEMO_MODE=true` |
+| `/analysis-lab` | internal deterministic fixtures | development and test only |
+
+There is no separate `/judge` flow. The root route serves the judge workspace directly, so there is
+no second component duplicating its state, and nothing to redirect.
+
+All judge and demo data is fictional. Arbitrary filesystem scanning is unavailable: the workspace
+accepts bounded structured signals only, and path-like values inside them are descriptive metadata
+that the backend never opens. Production integrations and connectors are disabled in the sandbox.
+
+**Judges use the hosted URL, not localhost.** The `localhost` instructions above are for
+contributors running the stack themselves. Hosted links are published with the submission rather
+than committed here, since no judge credentials belong in this repository.
+
+### Judge workspace access
+
+Judge access requires a server-verified credential; there is no anonymous fallback. Each judge gets
+an isolated, time-limited sandbox with its own organization, so no judge can see another's work:
+
+```sh
+cd apps/api
+python scripts/provision_judge_sandbox.py            # judge sandbox: org id + key + expiry
+python scripts/provision_judge_sandbox.py --demo-credential   # demo writes, hosted only
+```
+
+Each prints its credential once. Pass `--ttl-hours` to cover the full evaluation window (the
+default is 8 hours, which suits a single sitting) — see
+[JudgeAccess](docs/runbooks/JudgeAccess.md). The `judge` and `demo` roles cannot be minted through
+tenant administration, and neither can reach tenant administration, platform operations, or the other's
+data. Reading `/demo` needs no credential; changing what every other viewer sees does.
 
 For detailed setup, API, security, and deployment instructions, use the linked durable documents.
 No judge credentials, production secrets, or customer data belong in this repository.

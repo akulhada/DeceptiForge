@@ -136,6 +136,47 @@ PLATFORM_PERMISSIONS: frozenset[str] = frozenset(
     }
 )
 
+# ---- judge sandbox scopes ------------------------------------------------------------------------
+
+# Judge scopes are deliberately EXCLUDED from PERMISSIONS. If they were members, the `owner` role
+# (which is PERMISSIONS) would hand every tenant owner the sandbox-reset and controlled-interaction
+# capabilities, and a
+# judge credential would become indistinguishable from an ordinary tenant one. This mirrors how
+# PLATFORM_PERMISSIONS is kept separate, and in the opposite direction: a judge holds none of
+# PERMISSIONS' write scopes, and no tenant role holds any of these.
+JUDGE_PERMISSIONS: frozenset[str] = frozenset(
+    {
+        # Enter the restricted workspace at all.
+        "judge:workspace",
+        # Run bounded analysis over approved structured signals. Distinct from `analysis:preview`,
+        # which belongs to the development-only Analysis Lab.
+        "judge:analyze",
+        # Trigger ONE controlled interaction. The scope authorises asking the server to drive its
+        # own pipeline; it deliberately does not include `monitoring:ingest`, so a judge credential
+        # cannot post arbitrary events even to its own sandbox.
+        "judge:interact",
+        "judge:export",
+        # Reset only the caller's own sandbox namespace.
+        "judge:reset",
+    }
+)
+
+# Reads a judge needs to inspect the result of their own bounded run. Enumerated rather than derived
+# from _READS: that set includes connector, policy, billing and learning reads which a judge has no
+# reason to hold.
+_JUDGE_READS: frozenset[str] = frozenset(
+    {
+        "repositories:read",
+        "placements:read",
+        "decoys:read",
+        "validation:read",
+        "monitoring:read",
+        "alerts:read",
+        "incidents:read",
+        "narratives:read",
+    }
+)
+
 # Roles a tenant administrator may mint through /admin/api-keys. Sensor identities are provisioned
 # at enrollment and platform roles are provisioned out-of-band, so neither is listed here.
 TENANT_GRANTABLE_ROLES: tuple[str, ...] = ("viewer", "analyst", "admin", "owner", "service")
@@ -206,8 +247,41 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
             "agent_events:ingest",
         }
     ),
+    # The curated demo story. Enough to drive the fixed narrative and read its results, and nothing
+    # else: no tenant writes, no administration, no judge scopes. A demo session must never become a
+    # judge, tenant or platform actor. Bound at the request boundary to the demo organization, so it
+    # cannot read another organization even with these scopes.
+    "demo": frozenset(
+        {
+            "demo:run",
+            "repositories:read",
+            "placements:read",
+            "decoys:read",
+            "validation:read",
+            "monitoring:read",
+            "alerts:read",
+            "incidents:read",
+            "narratives:read",
+        }
+    ),
+    # A judge credential is provisioned out-of-band per sandbox session, never minted by a tenant.
+    # It holds no write scope on tenant data, no administration, and nothing from the platform
+    # plane: the only mutations it can cause are the ones the sandbox endpoints perform on its own
+    # namespace on its behalf.
+    "judge": JUDGE_PERMISSIONS | _JUDGE_READS,
     "operator": PLATFORM_PERMISSIONS,
 }
+
+# Invariants that must hold for every build. Asserted here rather than only in tests so an
+# inconsistent catalog cannot be imported at all.
+assert not (JUDGE_PERMISSIONS & PERMISSIONS), "judge scopes must not leak into tenant roles"
+assert not (JUDGE_PERMISSIONS & PLATFORM_PERMISSIONS), "judge scopes must not be platform scopes"
+assert not (ROLE_SCOPES["judge"] & PLATFORM_PERMISSIONS), "judge must hold no platform scope"
+assert not (ROLE_SCOPES["demo"] & PLATFORM_PERMISSIONS), "demo must hold no platform scope"
+assert not (ROLE_SCOPES["demo"] & JUDGE_PERMISSIONS), "a demo session must not become a judge"
+assert not any(
+    scope.startswith("admin:") for scope in ROLE_SCOPES["demo"]
+), "demo must hold no administration"
 
 
 def assert_grantable(issuer_scopes: frozenset[str], target_role: str) -> None:
@@ -245,6 +319,16 @@ class AuthError(Exception):
         super().__init__(message)
         self.status_code = status_code
         self.message = message
+
+
+def _as_utc(moment: datetime) -> datetime:
+    """Treat a stored deadline as UTC when the driver returns it without a timezone.
+
+    Expiry is a security control. A backend that round-trips naive datetimes previously raised
+    TypeError here, turning a 401 into a 500 — so an expired key produced a server error rather
+    than a clean rejection, and the failure looked like a bug rather than a denied credential.
+    """
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
 def hash_key(plaintext: str) -> str:
@@ -317,7 +401,7 @@ class ApiKeyService:
             raise AuthError(401, "invalid API key")
         if record.status != "active":
             raise AuthError(401, "API key is not active")
-        if record.expires_at is not None and record.expires_at < datetime.now(UTC):
+        if record.expires_at is not None and _as_utc(record.expires_at) < datetime.now(UTC):
             raise AuthError(401, "API key has expired")
         record.last_used_at = datetime.now(UTC)
         self._session.flush()
