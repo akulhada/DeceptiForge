@@ -11,12 +11,26 @@ import type { NextRequest } from 'next/server';
 // script cannot post a stolen key to an attacker-controlled origin.
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+// `next dev` serves its HMR and React Refresh runtime through eval, and its chunk tags are not
+// nonced. Under the production policy those scripts are blocked, so the page server-renders and
+// then never hydrates — silently, with no console error. Development therefore relaxes script-src;
+// production and every hosted build keep the strict policy, and CI asserts that by checking the
+// served HTML nonce against the response header.
+const IS_DEV = process.env.NODE_ENV === 'development';
+
+function scriptSrc(nonce: string): string {
+  if (IS_DEV) {
+    return `script-src 'self' 'unsafe-eval' 'unsafe-inline' 'nonce-${nonce}'`;
+  }
+  // 'strict-dynamic' lets Next's nonced bootstrap load its own chunks without allowing arbitrary
+  // hosts. No 'unsafe-inline' and no 'unsafe-eval'.
+  return `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+}
+
 function buildPolicy(nonce: string): string {
   return [
     "default-src 'self'",
-    // 'strict-dynamic' lets Next's nonced bootstrap load its own chunks without allowing arbitrary
-    // hosts. No 'unsafe-inline' and no 'unsafe-eval' for scripts.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    scriptSrc(nonce),
     // Styles remain 'unsafe-inline': Next injects inline style attributes and there is no nonce
     // channel for them. Style injection is materially less dangerous than script execution, and
     // script-src above is what protects the session key.
