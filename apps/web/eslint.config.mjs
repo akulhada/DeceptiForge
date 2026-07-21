@@ -3,5 +3,6 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(eslint.configs.recommended, ...tseslint.configs.recommended, {
-  ignores: ['.next/**', 'coverage/**', 'next-env.d.ts'],
+  // '.next-judge/**' is the second dev server's build output (see distDir in next.config.ts).
+  ignores: ['.next/**', '.next-judge/**', 'coverage/**', 'next-env.d.ts'],
 });
