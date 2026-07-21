@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config.settings import Settings
@@ -32,7 +33,20 @@ def worker_status(session: Session, settings: Settings) -> dict[str, object]:
     a dedicated heartbeat exists.
     """
     now = datetime.now(UTC)
+    try:
+        return _collect(session, settings, now)
+    except SQLAlchemyError:
+        # This function backs unauthenticated probes: it must never raise. When the datastore is
+        # unreachable the database check in dependency_status already reports the outage, so report
+        # worker state as unknown rather than turning /ready into a 500.
+        return {
+            "status": "unknown",
+            "reason": "datastore_unavailable",
+            "heartbeat_source": "derived_from_last_completed_job",
+        }
 
+
+def _collect(session: Session, settings: Settings, now: datetime) -> dict[str, object]:
     queue_depth = int(
         session.execute(
             select(func.count())
@@ -104,4 +118,5 @@ def worker_status(session: Session, settings: Settings) -> dict[str, object]:
 
 
 def workers_healthy(status: dict[str, object]) -> bool:
+    """Unknown is not healthy: an unreadable job table is not evidence that workers are fine."""
     return status.get("status") == "ok"

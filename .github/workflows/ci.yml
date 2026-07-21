@@ -503,8 +503,9 @@ jobs:
       - name: Tear down
         if: always()
         run: |
+          # `down` still interpolates the compose file, so .env must survive until after it runs.
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml down -v || true
           rm -f seed.env .env
-          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml down -v
 
   secret-scan:
     runs-on: ubuntu-latest

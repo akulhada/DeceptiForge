@@ -146,3 +146,32 @@ def test_readiness_exposes_no_tenant_identifiers(make_client) -> None:  # type: 
         body = client.get("/ready/operational").text
         assert str(organization_id) not in body
         assert "secret-trace" not in body
+
+
+def test_readiness_degrades_rather_than_erroring_when_the_datastore_is_down(make_client) -> None:  # type: ignore[no-untyped-def]
+    """Regression: an unguarded worker query turned /ready into a 500 when the database was down.
+
+    The probes back load-balancer decisions, so they must degrade (503) rather than error (500).
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from app.services.reliability import worker_health
+
+    with _client(make_client) as client:
+        broken = worker_health.worker_status.__globals__["_collect"]
+
+        def _explode(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+        worker_health.worker_status.__globals__["_collect"] = _explode
+        try:
+            instance = client.get("/ready")
+            operational = client.get("/ready/operational")
+        finally:
+            worker_health.worker_status.__globals__["_collect"] = broken
+
+        assert instance.status_code != 500
+        assert operational.status_code != 500
+        assert instance.json()["workers"]["status"] == "unknown"
+        # Unknown worker state is not evidence of health, so operational readiness degrades.
+        assert operational.status_code == 503
