@@ -121,11 +121,15 @@ in the served HTML matches the one in the header.
 
 ### Curated demo access
 
-Five of the nine `/demo/*` routes mutate: they seed data, drive the pipeline and reset state. In
-development they stay open for local convenience, the same way the demo API-key bypass is
-development-only. Anywhere the demo can be **hosted** — today that means `judge` — they require a
-`demo:run` credential bound to the demo organization, because a hosted deployment makes them
-internet-reachable.
+Reads and writes are split. The four `GET` routes are **open**: the curated story is fictional and
+fixed, it is meant to be the first thing a judge sees, and requiring a credential to *look* at it
+buys nothing.
+
+The five mutating routes are different — they seed data, drive the real pipeline, reset state and
+replay runs, so hosted they would let anyone reshape what every other viewer sees. In development
+they stay open for local convenience, the same way the demo API-key bypass is development-only.
+Anywhere the demo can be **hosted** — today that means `judge` — they require a `demo:run`
+credential bound to the demo organization.
 
 Mint one out-of-band:
 

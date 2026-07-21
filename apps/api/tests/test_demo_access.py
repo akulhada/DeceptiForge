@@ -47,15 +47,24 @@ class TestHostedDemoRequiresACredential:
             assert client.post(path).status_code in (401, 403)
 
     @pytest.mark.parametrize("path", _READING)
-    def test_reading_routes_are_not_open_either(self, make_client, path: str) -> None:  # type: ignore[no-untyped-def]
+    def test_reading_routes_stay_open(self, make_client, path: str) -> None:  # type: ignore[no-untyped-def]
+        # The curated story is fictional, fixed, and meant to be the first thing a judge sees.
+        # Requiring a credential to LOOK at it buys nothing; only changing what every other viewer
+        # sees is gated.
         with _hosted_demo_client(make_client) as client:
-            assert client.get(path).status_code in (401, 403)
+            assert client.get(path).status_code == 200
 
-    def test_a_demo_credential_opens_them(self, make_client) -> None:  # type: ignore[no-untyped-def]
+    def test_a_demo_credential_opens_the_writes(self, make_client) -> None:  # type: ignore[no-untyped-def]
         with _hosted_demo_client(make_client) as client:
             headers = _mint(client, "demo", DEMO_ORGANIZATION_ID)
-            assert client.get("/demo/state", headers=headers).status_code == 200
             assert client.post("/demo/seed", headers=headers).status_code == 200
+
+    def test_an_anonymous_reader_cannot_change_what_others_see(self, make_client) -> None:  # type: ignore[no-untyped-def]
+        # The point of the split: reading is free, reshaping the shared story is not.
+        with _hosted_demo_client(make_client) as client:
+            assert client.get("/demo/state").status_code == 200
+            assert client.post("/demo/reset").status_code in (401, 403)
+            assert client.get("/demo/state").status_code == 200
 
     def test_development_keeps_the_demo_open_for_local_use(self, make_client) -> None:  # type: ignore[no-untyped-def]
         # Unchanged behaviour: local development needs no credential, the same way the demo API key
@@ -82,17 +91,17 @@ class TestDemoCredentialIsMinimal:
             assert_grantable(ROLE_SCOPES["owner"], "demo")
 
     def test_it_is_refused_when_bound_to_another_organization(self, make_client) -> None:  # type: ignore[no-untyped-def]
-        # These routes only ever touch the demo organization, so a demo key issued for a different
-        # one is refused rather than silently operating on demo data.
+        # Demo writes only ever touch the demo organization, so a demo key issued for a different
+        # one is refused rather than silently mutating demo data.
         from uuid import uuid4
 
         with _hosted_demo_client(make_client) as client:
             headers = _mint(client, "demo", uuid4())
-            assert client.get("/demo/state", headers=headers).status_code == 403
+            assert client.post("/demo/seed", headers=headers).status_code == 403
 
 
 class TestDemoAndJudgeCannotReachEachOther:
-    def test_a_judge_credential_cannot_open_the_demo(self, make_client) -> None:  # type: ignore[no-untyped-def]
+    def test_a_judge_credential_cannot_write_to_the_demo(self, make_client) -> None:  # type: ignore[no-untyped-def]
         with make_client(
             app_env="judge", auth_enabled=True, demo_enabled=True, judge_workspace_enabled=True
         ) as client:
@@ -103,7 +112,7 @@ class TestDemoAndJudgeCannotReachEachOther:
                 "X-DeceptiForge-API-Key": provisioned.api_key,
                 "X-DeceptiForge-Org-Id": str(provisioned.namespace.organization_id),
             }
-            assert client.get("/demo/state", headers=headers).status_code == 403
+            assert client.post("/demo/seed", headers=headers).status_code == 403
 
     def test_a_demo_credential_cannot_open_the_judge_workspace(self, make_client) -> None:  # type: ignore[no-untyped-def]
         with make_client(
