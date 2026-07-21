@@ -132,3 +132,43 @@ failback is manual (`docs/RegionalFailback.md`). Runbooks: `docs/runbooks/`. Cer
 restore drill + regional rehearsal (`docs/RestoreDrills.md`). CI runs the reliability fencing,
 restore-verify, and failover tests plus a scripts + docs check — no real cloud infrastructure is
 contacted.
+
+## Dashboard security headers
+
+The dashboard holds a tenant API key in `sessionStorage`, so a single injected script is enough to
+exfiltrate a working credential. Next.js therefore emits, on every document response:
+
+| Header | Value | Purpose |
+| --- | --- | --- |
+| `Content-Security-Policy` | per-request nonce + `strict-dynamic` | no `'unsafe-inline'`/`'unsafe-eval'` for scripts; `connect-src` limited to `self` and `NEXT_PUBLIC_API_URL`, so a stolen key cannot be posted elsewhere |
+| `X-Frame-Options` | `DENY` | clickjacking (with `frame-ancestors 'none'` in the CSP for modern agents) |
+| `X-Content-Type-Options` | `nosniff` | MIME confusion |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | keeps paths and query out of cross-origin referrers |
+| `Permissions-Policy` | camera/microphone/geolocation/payment/USB denied | powerful features are never needed here |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | honoured only over HTTPS |
+
+`style-src` deliberately retains `'unsafe-inline'`: Next injects inline style attributes with no
+nonce channel. Style injection is materially less dangerous than script execution, and `script-src`
+is the control that protects the session key.
+
+CI boots the production build and asserts these headers on real HTTP responses, including that
+`script-src` contains no `'unsafe-inline'` and that the CSP carries a nonce. `apps/web/services/
+securityHeaders.test.ts` locks the policy contract itself.
+
+### Deployment requirement (not proven by CI)
+
+**CI proves only that the application emits these headers.** It does not prove that a deployed edge
+preserves them, because no ingress, reverse proxy, or CDN configuration ships in this repository —
+`docker-compose.prod.example.yml` publishes no web service, and ingress terminates in front of the
+API by assumption. Before any internet-facing deployment the operator must:
+
+1. Confirm the ingress or CDN forwards `Content-Security-Policy` unchanged rather than stripping,
+   caching, or rewriting it — a cached CSP would pin one nonce across users and break the page.
+2. Ensure the CSP response is not cached by a shared cache, or that the edge revalidates per request.
+3. Re-add any header the edge strips, and set `Strict-Transport-Security` at the TLS terminator if it
+   is not the Next.js process.
+4. Set `NEXT_PUBLIC_API_URL` to the real API origin at **build** time; `connect-src` is baked from it,
+   and a wrong value blocks every API call.
+5. Re-run the same header assertions against the deployed hostname, not against localhost.
+
+Until step 5 is evidenced against a real environment, treat ingress header preservation as unverified.
