@@ -1,7 +1,9 @@
 # Purpose: package the API service for a non-root, production-safe runtime.
 # Responsibilities: install the backend, run as an unprivileged user, and start the server WITHOUT
 #   auto-running migrations. Migrations are a separate, documented release step (see docs/Deployment).
-FROM python:3.12-slim
+# Pinned by immutable digest so a rebuild cannot silently pull different base contents.
+# Human-readable tag: python:3.12-slim (update the digest and this comment together).
+FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1

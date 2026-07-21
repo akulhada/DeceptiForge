@@ -235,6 +235,23 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Build API image
         run: docker build -t deceptiforge-api -f apps/api/Dockerfile .
+      - name: Assert base image is pinned by digest
+        run: |
+          set -euo pipefail
+          grep -qE '^FROM .+@sha256:[0-9a-f]{64}' apps/api/Dockerfile \
+            || { echo 'API base image must be pinned by digest'; exit 1; }
+          echo 'base image digest pin ok'
+      # Container vulnerability scan. CRITICAL/HIGH block the build; lower severities are reported
+      # but do not fail, so a scanner finding is never silently discarded.
+      - name: Scan API image (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: deceptiforge-api
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          trivyignores: .trivyignore
       - name: Assert container runs as UID 10001 (non-root)
         run: |
           uid="$(docker run --rm deceptiforge-api id -u)"
@@ -299,6 +316,95 @@ jobs:
       - name: Stop container
         if: always()
         run: docker rm -f df-api || true
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Enable Corepack
+        run: corepack enable
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install tooling
+        run: pip install --upgrade pip pip-audit cyclonedx-bom
+      # Tier 1 (blocking): the dependency set that actually ships in the production image. The image
+      # installs runtime deps only, so this is the set an attacker can reach at runtime.
+      - name: Runtime dependency audit (blocking)
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/rtaudit
+          /tmp/rtaudit/bin/pip install --upgrade pip >/dev/null
+          /tmp/rtaudit/bin/pip install ./apps/api >/dev/null
+          /tmp/rtaudit/bin/pip install pip-audit >/dev/null
+          ignores=""
+          if [ -f .pip-audit-ignore ]; then
+            while read -r id; do
+              case "$id" in ''|'#'*) continue ;; esac
+              ignores="$ignores --ignore-vuln $id"
+            done < .pip-audit-ignore
+          fi
+          # shellcheck disable=SC2086
+          /tmp/rtaudit/bin/pip-audit --skip-editable --progress-spinner off $ignores
+      - name: Install API dependencies (dev group)
+        working-directory: apps/api
+        run: pip install -e '.[dev]'
+      # Tier 2 (reported, non-blocking): developer tooling never reaches the production image, so a
+      # finding here is surfaced in the log rather than blocking a release. It is never hidden.
+      - name: Development dependency audit (reported)
+        continue-on-error: true
+        working-directory: apps/api
+        run: pip-audit --skip-editable --progress-spinner off
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+      # Tier 1 (blocking): production JavaScript dependencies. The lockfile is authoritative.
+      - name: JavaScript dependency audit (blocking, production)
+        run: pnpm audit --audit-level high --prod
+      # Tier 2 (reported): build toolchain findings are surfaced but do not block a release, since
+      # they are not present in any shipped artifact.
+      - name: JavaScript dependency audit (reported, all groups)
+        continue-on-error: true
+        run: pnpm audit --audit-level moderate
+      - name: Generate SBOMs (CycloneDX)
+        run: |
+          set -euo pipefail
+          mkdir -p sbom
+          cyclonedx-py environment --of JSON -o sbom/api-dependencies.cdx.json
+          pnpm dlx @cyclonedx/cyclonedx-npm@latest --output-format JSON \
+            --output-file sbom/web-dependencies.cdx.json ||
+            echo 'web SBOM generation unavailable; API SBOM still produced'
+      # Every SBOM is tied to the exact revision it describes.
+      - name: Stamp SBOMs with the build revision
+        run: |
+          set -euo pipefail
+          python -c "
+          import glob, json, os
+          for path in glob.glob('sbom/*.cdx.json'):
+              with open(path) as handle:
+                  doc = json.load(handle)
+              doc.setdefault('metadata', {}).setdefault('properties', []).append(
+                  {'name': 'deceptiforge:build-revision', 'value': os.environ['GITHUB_SHA']}
+              )
+              with open(path, 'w') as handle:
+                  json.dump(doc, handle, indent=2)
+              print('stamped', path)
+          "
+      # An SBOM lists package metadata only; assert no credential material leaked into it.
+      - name: Assert SBOMs contain no secret material
+        run: |
+          set -euo pipefail
+          if grep -rniE 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|dfk_[A-Za-z0-9_-]{16,}|AWS_SECRET_ACCESS_KEY' sbom/; then
+            echo 'secret-like material found in SBOM'; exit 1
+          fi
+          echo 'SBOM secret check passed'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/
+          retention-days: 30
 
   secret-scan:
     runs-on: ubuntu-latest

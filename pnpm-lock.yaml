@@ -17,9 +17,6 @@ importers:
 
   apps/extension:
     dependencies:
-      plasmo:
-        specifier: ^0.90.3
-        version: 0.90.5(@swc/core@1.15.43(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(@types/node@22.20.1)(postcss@8.5.19)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -42,6 +39,9 @@ importers:
       eslint:
         specifier: ^9.20.1
         version: 9.39.5(jiti@2.7.0)
+      plasmo:
+        specifier: ^0.90.3
+        version: 0.90.5(@swc/core@1.15.43(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(@types/node@22.20.1)(postcss@8.5.19)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

@@ -85,16 +85,8 @@ PERMISSIONS: frozenset[str] = frozenset(
         "integrations:deliveries:retry",
         "incidents:export",
         "alerts:export",
-        "reliability:read",
-        "backups:read",
-        "restore_drills:run",
-        "failover:request",
-        "failover:approve",
-        "failback:manage",
-        "reliability_policy:manage",
         "usage:read",
         "limits:read",
-        "organization_limits:manage",
         "onboarding:read",
         "onboarding:manage",
         "onboarding:run_detection_test",
@@ -125,8 +117,29 @@ PLATFORM_PERMISSIONS: frozenset[str] = frozenset(
         "performance_runs:execute",
         # Cross-tenant aggregate learning is operations-plane only; no tenant role may hold it.
         "learning:manage_global",
+        # Control plane: reliability, regional failover/failback, backups, and global capacity are
+        # infrastructure operations. A tenant role must never carry them, so they live only here.
+        "platform:reliability",
+        "platform:failover",
+        "platform:failback",
+        "platform:capacity",
+        "platform:learning_global",
+        "platform:organization_admin",
+        "reliability:read",
+        "backups:read",
+        "restore_drills:run",
+        "failover:request",
+        "failover:approve",
+        "failback:manage",
+        "reliability_policy:manage",
+        "organization_limits:manage",
     }
 )
+
+# Roles a tenant administrator may mint through /admin/api-keys. Sensor identities are provisioned
+# at enrollment and platform roles are provisioned out-of-band, so neither is listed here.
+TENANT_GRANTABLE_ROLES: tuple[str, ...] = ("viewer", "analyst", "admin", "owner", "service")
+PLATFORM_ROLES: frozenset[str] = frozenset({"operator"})
 
 # Separation of duties: whoever generates or reviews a candidate must not also approve/activate it.
 _LEARNING_APPROVAL: frozenset[str] = frozenset({"learning:approve", "learning:activate"})
@@ -197,6 +210,26 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
 }
 
 
+def assert_grantable(issuer_scopes: frozenset[str], target_role: str) -> None:
+    """Centralized rule for what a tenant issuer may mint.
+
+    Fails closed on unknown roles, refuses platform and sensor roles outright, and refuses any role
+    whose scopes exceed what the issuing actor itself holds — so a credential can never be minted
+    with broader authority than its issuer.
+    """
+    if target_role not in ROLE_SCOPES:
+        raise AuthError(400, "unknown role")
+    if target_role in PLATFORM_ROLES:
+        raise AuthError(403, "platform roles are not grantable through tenant administration")
+    if target_role not in TENANT_GRANTABLE_ROLES:
+        raise AuthError(403, "role is provisioned out-of-band and is not grantable here")
+    target_scopes = ROLE_SCOPES[target_role]
+    if target_scopes & PLATFORM_PERMISSIONS:
+        raise AuthError(403, "platform permissions are not grantable through tenant administration")
+    if not target_scopes <= issuer_scopes:
+        raise AuthError(403, "cannot grant permissions beyond the issuing actor's own scope")
+
+
 @dataclass(frozen=True)
 class AuthContext:
     organization_id: UUID
@@ -235,11 +268,15 @@ class ApiKeyService:
         organization_id: UUID,
         name: str,
         role: str,
+        issuer_scopes: frozenset[str] | None = None,
         *,
         expires_at: datetime | None = None,
     ) -> tuple[ApiKeyRecord, str]:
         if role not in ROLE_SCOPES:
             raise AuthError(400, "unknown role")
+        # When an issuer is known, the mint may never exceed what that issuer may grant.
+        if issuer_scopes is not None:
+            assert_grantable(issuer_scopes, role)
         plaintext, prefix, key_hash = generate_key()
         record = ApiKeyRecord(
             organization_id=organization_id,

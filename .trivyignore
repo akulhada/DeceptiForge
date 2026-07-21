@@ -1,0 +1,3 @@
+# Documented container-scan exceptions. Each entry MUST carry a CVE id, the reason it is accepted,
+# and a review date. An empty file means nothing is suppressed. Never add a blanket wildcard.
+# Format: CVE-YYYY-NNNNN  # reason (reviewed YYYY-MM-DD)
