@@ -3,7 +3,7 @@
 //   sections without any seed/simulate/demo controls. Dependencies: connect panel, tenant hook.
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -126,7 +126,22 @@ function handleConnected(setConnected: (value: boolean) => void): () => void {
 }
 
 export function TenantDashboard() {
-  const [connected, setConnected] = useState(() => getSession() !== null);
+  // The session lives in sessionStorage, which does not exist during server rendering. Seeding this
+  // from getSession() made the server render the connect panel while the client rendered the
+  // connected dashboard, so React discarded the server tree and warned about a hydration mismatch.
+  // Start disconnected — matching what the server can know — and read the session after mount.
+  const [connected, setConnected] = useState(false);
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    setConnected(getSession() !== null);
+    setRestored(true);
+  }, []);
+
+  // Render nothing until the session has been read, so a stored session does not flash the connect
+  // panel for a frame before the dashboard appears.
+  if (!restored) return null;
+
   if (!connected) {
     return (
       <div className="mx-auto max-w-7xl px-6 py-16">
