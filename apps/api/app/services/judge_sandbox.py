@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from sqlalchemy import delete, select
@@ -125,6 +126,16 @@ class JudgeSandboxService:
         )
         self._session.add(record)
         self._session.flush()
+
+        # Seed the predefined fictional data so a judge lands on a populated workspace rather than
+        # an empty one they must first figure out how to fill.
+        SandboxSeeder(self._session).seed(
+            SandboxNamespace(
+                environment=record.environment,
+                organization_id=organization_id,
+                session_id=session_id,
+            )
+        )
 
         return ProvisionedSandbox(
             namespace=SandboxNamespace(
@@ -258,4 +269,79 @@ class SandboxResetService:
                 )
             )
             deleted[str(model.__tablename__)] = int(getattr(result, "rowcount", 0) or 0)
+        # Restore the predefined sandbox data. Reset returns the judge to a known good starting
+        # point, not to an empty organization they cannot do anything with.
+        SandboxSeeder(self._session).seed(namespace)
         return deleted
+
+
+# ---- seeding ---------------------------------------------------------------------------------
+
+# The sandbox is seeded from the repository's own bundled fictional fixture. The path is a constant
+# here, never anything a judge supplies: this is what lets the workspace demonstrate a real scan
+# without exposing arbitrary filesystem scanning. `allows_local_path_scan` stays false in judge mode
+# and the generic scan endpoint remains closed.
+_SANDBOX_FIXTURE = Path(__file__).resolve().parent.parent / "demo" / "acme-payments"
+_SANDBOX_FIXTURE_NAME = "acme-payments"
+
+
+@dataclass(frozen=True)
+class SeededSandbox:
+    """Identifiers for the predefined data a sandbox starts (and restarts) with."""
+
+    repository_id: UUID
+    decoy_plan_id: UUID
+    trace_identifier: str | None
+
+
+class SandboxSeeder:
+    """Populate a sandbox with predefined fictional data through the real pipeline."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def seed(self, namespace: SandboxNamespace) -> SeededSandbox:
+        """Run scan -> plan -> generate -> evaluate into the sandbox's own organization.
+
+        Uses the ordinary PipelineService, so a judge sees the product's real behaviour rather than
+        fixtures dressed up to look like output. The decoy namespace includes the sandbox namespace,
+        so generated assets from two sessions can never collide.
+        """
+        from app.repositories.artifacts import ArtifactRepository
+        from app.services.decoy_generation import DecoyGenerationConfig
+        from app.services.pipeline import PipelineService
+
+        repository = ArtifactRepository(self._session)
+        pipeline = PipelineService(repository, namespace.organization_id)
+
+        repository_id, _ = pipeline.scan(str(_SANDBOX_FIXTURE), _SANDBOX_FIXTURE_NAME)
+        pipeline.plan(repository_id)
+        decoy_plan_id, plan = pipeline.generate(
+            repository_id,
+            DecoyGenerationConfig(namespace=namespace.key("decoys")),
+        )
+        reports = pipeline.evaluate(decoy_plan_id)
+        return SeededSandbox(
+            repository_id=repository_id,
+            decoy_plan_id=decoy_plan_id,
+            trace_identifier=_first_accepted_trace(plan, reports),
+        )
+
+
+def _first_accepted_trace(plan: object, reports: object) -> str | None:
+    """The trace of the first decoy that passed believability/safety review.
+
+    Only accepted assets are ever monitored, so an interaction must target one of those; touching a
+    rejected asset would demonstrate a path the product does not actually deploy.
+    """
+    from app.models.domain.decoy import BelievabilityDecision
+
+    accepted = {
+        report.decoy_id
+        for report in reports  # type: ignore[attr-defined]
+        if report.decision is BelievabilityDecision.ACCEPT
+    }
+    for asset in plan.assets:  # type: ignore[attr-defined]
+        if asset.decoy_id in accepted:
+            return str(asset.trigger_metadata.trace_identifier)
+    return None

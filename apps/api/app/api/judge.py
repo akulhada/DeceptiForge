@@ -7,6 +7,8 @@
 # Dependencies: judge sandbox + quota services, the shared analysis contract, auth, settings.
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -23,7 +25,15 @@ from app.security import require_scope
 from app.services.analysis_lab import AnalysisPreviewService
 from app.services.analysis_lab.scenarios import load_scenarios
 from app.services.api_keys import AuthContext
-from app.services.judge_quota import ANALYZE, RESET, JudgeQuotaService, QuotaDenial
+from app.services.judge_interaction import JudgeInteractionService
+from app.services.judge_quota import (
+    ANALYZE,
+    EXPORT,
+    INTERACT,
+    RESET,
+    JudgeQuotaService,
+    QuotaDenial,
+)
 from app.services.judge_sandbox import (
     JudgeSandboxService,
     SandboxError,
@@ -80,6 +90,15 @@ class WorkspaceView(BaseModel):
 class ResetResult(BaseModel):
     deleted: dict[str, int]
     quotas: dict[str, QuotaView]
+
+
+def _namespace_of(record) -> SandboxNamespace:  # type: ignore[no-untyped-def]
+    """Build the namespace from the RESOLVED sandbox row, never from anything client-supplied."""
+    return SandboxNamespace(
+        environment=record.environment,
+        organization_id=record.organization_id,
+        session_id=record.session_id,
+    )
 
 
 def _request_id(request: Request) -> str:
@@ -199,13 +218,113 @@ def reset(
         emit("judge_quota_denied", organization_id=org, request_id=request_id, action=RESET)
         raise _deny(denial)
 
-    namespace = SandboxNamespace(
-        environment=record.environment,
-        organization_id=record.organization_id,
-        session_id=record.session_id,
-    )
-    deleted = SandboxResetService(session).reset(namespace)
+    deleted = SandboxResetService(session).reset(_namespace_of(record))
     quota.consume(record, RESET)
     session.commit()
     emit("judge_reset", organization_id=org, request_id=request_id)
     return ResetResult(deleted=deleted, quotas=_quota_view(dict(quota.state(record))))
+
+
+class InteractionResult(BaseModel):
+    """What the real pipeline produced. Every field is read back from persisted state."""
+
+    trace_identifier: str
+    event_recorded: bool
+    alert_id: str | None
+    incident_id: str | None
+    quotas: dict[str, QuotaView]
+
+
+class ExportResult(BaseModel):
+    """A safe, self-describing snapshot of the judge's own sandbox."""
+
+    organization_id: str
+    session_id: str
+    environment: str
+    exported_at: str
+    repositories: int
+    decoy_assets: int
+    monitoring_events: int
+    alerts: int
+    incidents: int
+    quotas: dict[str, QuotaView]
+
+
+@router.post("/interact", response_model=InteractionResult)
+def interact(
+    request: Request,
+    session: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_scope("judge:interact")),
+) -> InteractionResult:
+    """Trigger ONE controlled interaction against a decoy in this sandbox.
+
+    The event goes through the ordinary monitoring pipeline, which is what creates the alert and
+    schedules reconstruction. Nothing is inserted directly into alerts or incidents: if the pipeline
+    would not have produced them, the judge does not see them. The target is chosen server-side from
+    the sandbox's own accepted decoys — the request carries no identifiers at all, so a judge cannot
+    aim an interaction at another organization's asset.
+    """
+    settings = get_settings()
+    record = _resolve(session, auth)
+    quota = JudgeQuotaService(settings)
+    request_id = _request_id(request)
+    org = str(record.organization_id)
+
+    denial = quota.check(record, INTERACT)
+    if denial is not None:
+        emit("judge_quota_denied", organization_id=org, request_id=request_id, action=INTERACT)
+        raise _deny(denial)
+
+    result = JudgeInteractionService(session).interact(_namespace_of(record))
+    if result is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "this sandbox has no accepted decoy to interact with; reset it and try again",
+        )
+
+    quota.consume(record, INTERACT)
+    session.commit()
+    emit("judge_interaction", organization_id=org, request_id=request_id)
+    return InteractionResult(
+        trace_identifier=result.trace_identifier,
+        event_recorded=result.event_recorded,
+        alert_id=str(result.alert_id) if result.alert_id else None,
+        incident_id=str(result.incident_id) if result.incident_id else None,
+        quotas=_quota_view(dict(quota.state(record))),
+    )
+
+
+@router.get("/export", response_model=ExportResult)
+def export(
+    request: Request,
+    session: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_scope("judge:export")),
+) -> ExportResult:
+    """Export counts describing this sandbox's own state.
+
+    Deliberately aggregate: the export carries no decoy content, no trace tokens and no event
+    payloads, so a judge cannot walk away with material that would help defeat a real deployment.
+    """
+    settings = get_settings()
+    record = _resolve(session, auth)
+    quota = JudgeQuotaService(settings)
+    request_id = _request_id(request)
+    org = str(record.organization_id)
+
+    denial = quota.check(record, EXPORT)
+    if denial is not None:
+        emit("judge_quota_denied", organization_id=org, request_id=request_id, action=EXPORT)
+        raise _deny(denial)
+
+    counts = JudgeInteractionService(session).summarize(_namespace_of(record))
+    quota.consume(record, EXPORT)
+    session.commit()
+    emit("judge_export", organization_id=org, request_id=request_id)
+    return ExportResult(
+        organization_id=org,
+        session_id=str(record.session_id),
+        environment=record.environment,
+        exported_at=datetime.now(UTC).isoformat(),
+        quotas=_quota_view(dict(quota.state(record))),
+        **counts,
+    )

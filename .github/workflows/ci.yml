@@ -42,7 +42,8 @@ jobs:
           echo "ruff: $(ruff --version)"
           echo "mypy: $(mypy --version)"
       - name: Ruff
-        run: ruff check app tests
+        # scripts/ ships in the image and provisions credentials; it is held to the same bar.
+        run: ruff check app tests scripts
       - name: MyPy
         run: mypy app
       - name: Pytest (unit + fakeredis integration)

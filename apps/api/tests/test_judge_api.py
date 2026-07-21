@@ -98,3 +98,99 @@ def test_reset_clears_only_this_sandbox_and_then_rate_limits(make_client) -> Non
 def test_the_workspace_is_absent_in_production(make_client) -> None:  # type: ignore[no-untyped-def]
     with make_client(app_env="production", auth_enabled=True, demo_enabled=False) as client:
         assert client.get("/api/v1/judge/workspace").status_code == 404
+
+
+def test_interaction_drives_the_real_pipeline(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+
+        before = client.get("/api/v1/judge/export", headers=headers).json()
+        assert before["decoy_assets"] > 0, "the sandbox must start with predefined decoys"
+        assert before["alerts"] == 0 and before["incidents"] == 0
+
+        response = client.post("/api/v1/judge/interact", headers=headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["event_recorded"] is True
+        assert body["alert_id"], "the pipeline must have produced an alert"
+        assert body["incident_id"], "reconstruction must have produced an incident"
+
+        # Read back from persisted state, not from the interaction response: this proves the alert
+        # and incident really exist rather than having been reported optimistically.
+        after = client.get("/api/v1/judge/export", headers=headers).json()
+        assert after["monitoring_events"] == before["monitoring_events"] + 1
+        assert after["alerts"] == 1
+        assert after["incidents"] >= 1
+
+
+def test_the_interaction_endpoint_accepts_no_target(make_client) -> None:  # type: ignore[no-untyped-def]
+    # The decoy is chosen server-side from the sandbox's own accepted assets. A judge supplying a
+    # decoy id, organization or trace must not be able to aim the interaction anywhere.
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+        response = client.post(
+            "/api/v1/judge/interact",
+            json={"decoy_plan_id": "00000000-0000-0000-0000-000000000001"},
+            headers=headers,
+        )
+        # The body is ignored entirely; the interaction still targets this sandbox's own decoy.
+        assert response.status_code == 200
+        assert response.json()["alert_id"]
+
+
+def test_export_carries_no_decoy_content_or_traces(make_client) -> None:  # type: ignore[no-untyped-def]
+    # A judge must not walk away with material that would help defeat a real deployment.
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+        client.post("/api/v1/judge/interact", headers=headers)
+        body = client.get("/api/v1/judge/export", headers=headers).json()
+        assert set(body) == {
+            "organization_id",
+            "session_id",
+            "environment",
+            "exported_at",
+            "repositories",
+            "decoy_assets",
+            "monitoring_events",
+            "alerts",
+            "incidents",
+            "quotas",
+        }
+        rendered = str(body)
+        assert "trace" not in rendered.lower()
+
+
+def test_interaction_and_export_spend_their_own_budgets(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        _, headers = _provision(client)
+        client.post("/api/v1/judge/interact", headers=headers)
+        client.get("/api/v1/judge/export", headers=headers)
+        quotas = client.get("/api/v1/judge/workspace", headers=headers).json()["quotas"]
+        assert quotas["interact"]["used"] == 1
+        assert quotas["export"]["used"] == 1
+        # Analysis is a separate budget and must be untouched by either.
+        assert quotas["analyze"]["used"] == 0
+
+
+def test_one_sandbox_cannot_see_another(make_client) -> None:  # type: ignore[no-untyped-def]
+    with _judge_client(make_client) as client:
+        mine, my_headers = _provision(client)
+        _, their_headers = _provision(client)
+
+        client.post("/api/v1/judge/interact", headers=my_headers)
+
+        # The other judge's sandbox shows none of my activity.
+        theirs = client.get("/api/v1/judge/export", headers=their_headers).json()
+        assert theirs["alerts"] == 0
+        assert theirs["incidents"] == 0
+
+        # And presenting my key against their organization id is refused outright.
+        crossed = client.get(
+            "/api/v1/judge/workspace",
+            headers={
+                "X-DeceptiForge-API-Key": my_headers["X-DeceptiForge-API-Key"],
+                "X-DeceptiForge-Org-Id": theirs["organization_id"],
+            },
+        )
+        assert crossed.status_code in (401, 403)
+        assert mine.namespace.organization_id != theirs["organization_id"]

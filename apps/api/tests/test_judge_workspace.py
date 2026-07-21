@@ -143,21 +143,33 @@ class TestScopedReset:
         )
         db_session.commit()
 
-    def test_reset_clears_this_sandbox(self, db_session, settings) -> None:  # type: ignore[no-untyped-def]
+    def _repositories(  # type: ignore[no-untyped-def]
+        self, db_session: Session, organization_id
+    ) -> list[RepositoryRecord]:
+        return list(
+            db_session.execute(
+                select(RepositoryRecord).where(
+                    RepositoryRecord.organization_id == organization_id
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    def test_reset_restores_the_predefined_data(self, db_session, settings) -> None:  # type: ignore[no-untyped-def]
         provisioned = JudgeSandboxService(db_session, settings).provision()
         db_session.commit()
+        # A judge's own extra work, on top of the predefined seed.
         self._seed(db_session, provisioned.namespace.organization_id)
 
-        deleted = SandboxResetService(db_session).reset(provisioned.namespace)
+        SandboxResetService(db_session).reset(provisioned.namespace)
         db_session.commit()
-        assert deleted["repositories"] == 1
-        assert deleted["alerts"] == 1
-        remaining = db_session.execute(
-            select(RepositoryRecord).where(
-                RepositoryRecord.organization_id == provisioned.namespace.organization_id
-            )
-        ).all()
-        assert remaining == []
+
+        # Back to a known good starting point: the predefined fixture only, with the judge's own
+        # records gone. Reset restores, it does not empty.
+        org = provisioned.namespace.organization_id
+        names = {row.name for row in self._repositories(db_session, org)}
+        assert names == {"acme-payments"}
 
     def test_reset_never_touches_another_organization(self, db_session, settings) -> None:  # type: ignore[no-untyped-def]
         service = JudgeSandboxService(db_session, settings)
@@ -172,17 +184,14 @@ class TestScopedReset:
         SandboxResetService(db_session).reset(mine.namespace)
         db_session.commit()
 
-        for survivor in (theirs.namespace.organization_id, tenant_organization_id):
-            rows = (
-                db_session.execute(
-                    select(RepositoryRecord).where(
-                        RepositoryRecord.organization_id == survivor
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            assert len(rows) == 1, "reset escaped its own organization"
+        # The other judge keeps both their predefined seed and their own work; the tenant keeps
+        # theirs untouched. Neither is a sandbox reset can reach.
+        their_names = {
+            row.name for row in self._repositories(db_session, theirs.namespace.organization_id)
+        }
+        assert their_names == {"acme-payments", "fictional-fixture"}, "reset hit another sandbox"
+        tenant_names = {row.name for row in self._repositories(db_session, tenant_organization_id)}
+        assert tenant_names == {"fictional-fixture"}, "reset escaped into a tenant organization"
 
     def test_reset_preserves_authentication_and_accounting(self, db_session, settings) -> None:  # type: ignore[no-untyped-def]
         provisioned = JudgeSandboxService(db_session, settings).provision()
@@ -231,16 +240,23 @@ class TestScopedReset:
         assert len(rows) == 1, "a judge must not be able to delete their own audit trail"
 
     def test_reset_is_idempotent(self, db_session, settings) -> None:  # type: ignore[no-untyped-def]
+        # Idempotent in END STATE, not in delete counts: every reset re-seeds, so the second call
+        # removes what the first one restored and lands on the same place again.
         provisioned = JudgeSandboxService(db_session, settings).provision()
         db_session.commit()
         self._seed(db_session, provisioned.namespace.organization_id)
         service = SandboxResetService(db_session)
-        first = service.reset(provisioned.namespace)
+
+        service.reset(provisioned.namespace)
         db_session.commit()
-        second = service.reset(provisioned.namespace)
+        org = provisioned.namespace.organization_id
+        after_first = {r.name for r in self._repositories(db_session, org)}
+
+        service.reset(provisioned.namespace)
         db_session.commit()
-        assert first["repositories"] == 1
-        assert second["repositories"] == 0
+        after_second = {r.name for r in self._repositories(db_session, org)}
+
+        assert after_first == after_second == {"acme-payments"}
 
     def test_the_reset_allowlist_excludes_identity_and_audit(self) -> None:
         # Guards against a future table joining the sweep by accident.
