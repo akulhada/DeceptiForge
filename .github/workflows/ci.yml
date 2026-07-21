@@ -406,6 +406,106 @@ jobs:
           path: sbom/
           retention-days: 30
 
+  # Boots the ACTUAL production-shaped topology. `docker compose config` only proves the YAML
+  # renders; this proves the stack starts, migrates, serves, and carries one real signed event all
+  # the way to an alert and an incident.
+  production-topology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Compose environment (CI-only values; no production secret is used)
+        run: |
+          set -euo pipefail
+          cat > .env <<'ENVEOF'
+          POSTGRES_DB=deceptiforge_ci
+          POSTGRES_USER=ci
+          POSTGRES_PASSWORD=ci-test-only
+          EVIDENCE_ENCRYPTION_KEY=ci-evidence-key-0000000000000000000000
+          ENVEOF
+      - name: Build images
+        run: docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml build
+      - name: Start data services and wait for health
+        run: |
+          set -euo pipefail
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml up -d postgres redis
+          for service in postgres redis; do
+            for i in $(seq 1 40); do
+              cid="$(docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml ps -q "$service")"
+              state="$(docker inspect --format '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo starting)"
+              [ "$state" = "healthy" ] && { echo "$service healthy"; break; }
+              [ "$i" = "40" ] && { echo "$service never became healthy"; exit 1; }
+              sleep 3
+            done
+          done
+      # Migrations are a separate release step, never run at container startup.
+      - name: Run migrations as a release step
+        run: |
+          set -euo pipefail
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml \
+            run --rm --entrypoint alembic api upgrade head
+      - name: Start API and workers
+        run: |
+          set -euo pipefail
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml up -d
+      - name: API becomes live and ready
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health || true)"
+            [ "$code" = "200" ] && { echo "health ok"; break; }
+            [ "$i" = "40" ] && { echo "API never became live"; exit 1; }
+            sleep 3
+          done
+          for i in $(seq 1 20); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/ready || true)"
+            [ "$code" = "200" ] && { echo "ready ok"; break; }
+            [ "$i" = "20" ] && { curl -s http://127.0.0.1:8000/ready; echo; exit 1; }
+            sleep 3
+          done
+          curl -sf http://127.0.0.1:8000/ready | grep -q '"database"' || exit 1
+      - name: Mandatory workers ran successfully
+        run: |
+          set -euo pipefail
+          for worker in reconstruction-worker lifecycle-cron retention-cron; do
+            cid="$(docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml ps -aq "$worker")"
+            [ -n "$cid" ] || { echo "$worker did not start"; exit 1; }
+            for i in $(seq 1 20); do
+              running="$(docker inspect --format '{{.State.Running}}' "$cid")"
+              [ "$running" = "false" ] && break
+              sleep 3
+            done
+            code="$(docker inspect --format '{{.State.ExitCode}}' "$cid")"
+            [ "$code" = "0" ] || { echo "$worker exited $code"; docker logs "$cid"; exit 1; }
+            echo "$worker completed cleanly"
+          done
+      # One real signed event must reach an alert and an incident through the production topology.
+      - name: Seed a tenant and drive one signed event to an alert
+        run: |
+          set -euo pipefail
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml \
+            run --rm --entrypoint python -e PYTHONPATH=/app \
+            -v "$PWD/scripts:/scripts:ro" api /scripts/ci/seed_topology.py > seed.env
+          set -a; . ./seed.env; set +a
+          BASE_URL=http://127.0.0.1:8000 bash scripts/staging/smoke_test.sh
+      - name: Reconstruction produces an incident
+        run: |
+          set -euo pipefail
+          set -a; . ./seed.env; set +a
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml \
+            run --rm --entrypoint python api -m app.jobs.reconstruction
+          incidents="$(curl -sf http://127.0.0.1:8000/incidents \
+            -H "X-DeceptiForge-API-Key: $READ_API_KEY" -H "X-DeceptiForge-Org-Id: $ORG_ID" || echo '{}')"
+          echo "$incidents" | python3 -c "import json,sys; d=json.load(sys.stdin); n=len(d.get('incidents', [])); print('incidents:', n); sys.exit(0 if n >= 1 else 1)"
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml logs --tail 200
+      - name: Tear down
+        if: always()
+        run: |
+          rm -f seed.env .env
+          docker compose -p deceptiforge-ci -f docker-compose.prod.example.yml -f docker-compose.ci.yml down -v
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
