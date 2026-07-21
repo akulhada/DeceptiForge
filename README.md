@@ -2,102 +2,75 @@
 
 ## Context-aware deception for the AI era
 
-DeceptiForge analyzes how an organization works, creates believable synthetic business assets,
-places them where attackers and AI agents are likely to look, and reconstructs the incident when
-those assets are touched.
+DeceptiForge analyzes repository and organizational signals, proposes believable synthetic business assets, explains where they should be placed, and reconstructs an incident when those assets are touched.
 
-**Submission links:** public demo video and hosted judge sandbox are not published from this
-repository. Do not submit until their public URLs and restricted test access have been verified.
+**OpenAI Build Week category:** Developer Tools.
 
-## Problem and approach
+**Public video:** Pending public upload. Add the verified YouTube URL before submission.
 
-Generic honeytokens can look detached from the code, documentation, and business workflows around
-them. DeceptiForge derives repository context, naming patterns, sensitive paths, and placement
-signals before producing schema-constrained synthetic decoys. The product then validates safety and
-believability, records a tripwire touch, creates a deterministic alert, and reconstructs a
-minimized-evidence incident timeline.
+**Hosted judge workspace:** Distributed to judges through the submission channel. Its URL and credentials are intentionally not committed to this repository.
 
-The core flow is **Context → Decoy → Placement → Detection → Incident**. The built-in development
-demo uses fictional data only and demonstrates this complete backend-driven flow.
+## Problem
 
-## Implemented capabilities
+Conventional honeytokens can be useful, but a generic credential often looks disconnected from the repository, documentation, and business workflow where it appears. That problem is more visible when engineers, coding agents, retrieval systems, and operational services encounter the same internal material.
 
-- Repository intelligence, naming-pattern inference, organization context, and placement reasoning.
-- Deterministic template-constrained secret, document, and database-record decoys with safety and
-  believability checks.
-- Trace monitoring, normalized alerting and deduplication, deterministic incident reconstruction,
-  coverage estimates, and a tenant-scoped dashboard.
-- Organization-scoped API keys, permissions, audit records, evidence minimization, replay controls,
-  bounded payloads, and optional Redis-backed protections.
-- Development-only controlled demo orchestration. Demo routes are mounted only when
-  `APP_ENV=development` and `DEMO_ENABLED=true`.
+## Approach
 
-Feature-flagged modules such as deployment workflows, database honey records, AI/browser/agent
-sensors, measured coverage, SIEM export, reliability, and capacity controls are documented in the
-links below. They are disabled by default and exercised with deterministic fakes. They are not a
-claim of production certification.
+DeceptiForge normalizes repository and organizational signals such as technologies, naming conventions, documentation zones, infrastructure indicators, databases, and AI-facing surfaces. It builds a context profile, ranks sensitive zones, recommends plausible placements, and evaluates synthetic assets for safety and believability.
 
-## Interactive Analysis Lab
+When a registered trace is observed, deterministic services validate the event, minimize evidence, create a deduplicated alert, and reconstruct an incident timeline. The core flow is **Context → Decoy → Placement → Detection → Incident**.
 
-An authenticated, organization-scoped **development and test** route (`/analysis-lab`) that turns
-the single prepared demo into a testable prototype. It is an internal fixture surface, not a
-product capability: it returns a real 404 in the hosted judge environment and in production, on
-both the frontend and the API, rather than merely being hidden from navigation. Paste or edit **structured repository signals** as JSON (languages,
-frameworks, services, databases, naming patterns, infrastructure, documentation, secret locations,
-AI surfaces), pick one of **ten prepared fictional scenarios** (fintech, SaaS/CRM, healthcare,
-e-commerce, ML/RAG, Kubernetes microservices, monorepo, sparse, conflicting, high-risk secrets+AI),
-and run DeceptiForge's **deterministic** analysis: inferred context profile, vocabulary/naming,
-ranked sensitive zones, ranked placement recommendations, layered confidence, and explainable
-warnings — each showing which input signals drove it. Compare two scenarios side by side and export
-the result as JSON or Markdown.
+## Implemented features
 
-Boundary: the lab accepts only structured signals. It **does not scan a filesystem, clone a
-repository, execute code, or call GPT**, and it does not persist input or results. Path-like strings
-are descriptive metadata only and are never opened. The endpoint is
-`POST /api/v1/analysis/preview` (permission `analysis:preview`; viewer/analyst/admin/owner; sensors
-and judges excluded), authenticated and org-scoped, with payload and rate limits — see
-[Pipeline API](docs/Api.md).
+- Repository intelligence, naming-pattern inference, organization context, sensitive-zone ranking, and explainable placement reasoning.
+- Template-constrained secret, document, and database-record decoy concepts with deterministic safety and believability assessment.
+- Trace registration, signed monitoring ingestion, replay protection, normalized alerting, deduplication, deterministic incident reconstruction, and bounded evidence.
+- Organization-scoped API keys, roles, permissions, audit records, payload limits, and Redis-backed distributed replay and rate-limit controls.
+- A restricted judge workspace with a TTL-bound fictional organization, per-session quotas, safe export, and reset isolation.
+- An Interactive Analysis Lab for development and test, with ten fictional structured-signal scenarios, comparison, and JSON or Markdown export.
+
+Feature-flagged deployment workflows, database honey records, AI/browser/agent sensors, measured coverage, SIEM export, reliability, and capacity controls are disabled by default and covered with deterministic fakes where applicable. They are not a claim of production certification.
 
 ## Architecture
 
-Next.js provides the dashboard. FastAPI hosts the API and deterministic security pipeline.
-PostgreSQL persists tenant-scoped artifacts; Redis is used for distributed replay and rate-limit
-stores when configured. Expensive reconstruction is queued. GPT is optional and isolated from the
-authoritative detection path.
+Next.js provides the dashboard; FastAPI hosts the deterministic security pipeline. PostgreSQL stores organization-scoped artifacts, while Redis provides distributed replay and rate-limit state in hardened modes. Reconstruction is queued so ingestion remains on the hot path. GPT is optional and cannot change authoritative security facts.
 
-## GPT runtime use
+## How GPT-5.6 Is Used
 
-The current implementation uses a configurable OpenAI model for an **AI-assisted analyst summary**
-of an already reconstructed incident. It receives bounded, sanitized timeline context; output is
-validated and a deterministic fallback is returned when the model, credential, or response is
-unavailable. In the demo, a repository trace touch still produces its event, alert, severity, and
-incident if the model is disabled.
+The runtime integration is model-configurable. It can use an approved OpenAI model to turn an already verified, deterministic incident timeline into an analyst-readable narrative. Input is minimized and sanitized, output is schema-validated and bounded, and model failure, missing credentials, or invalid output falls back to a deterministic narrative.
 
-GPT does not authorize access, approve deployments, assign severity, alter evidence, select an
-organization, accept monitoring events, or decide whether an incident exists. Decoy generation is
-deterministic in the current implementation; it does not require GPT.
+The current checked-in default is `gpt-4o-mini`. If the Build Week recording uses GPT-5.6, set `OPENAI_INCIDENT_MODEL` to the approved GPT-5.6 model identifier and verify that exact model in the recording before claiming it on Devpost.
+
+GPT does not assign severity, authorize deployment, accept monitoring events, alter evidence, choose an organization, or determine that an incident exists. Decoy generation is deterministic in the current implementation. A concrete demo example is a repository-trace touch that still produces its event, alert, severity, and incident when model access is disabled; only the analyst prose falls back.
 
 ## How We Built DeceptiForge with Codex
 
-Codex acted as a development collaborator for repository navigation, domain/API and frontend work,
-test generation, authorization and signed-ingestion review, migrations, CI diagnosis, error
-handling, and demo reliability. Generated changes and recommendations were inspected, tested,
-revised, and validated by the author.
+Codex accelerated codebase navigation, backend and frontend implementation, typed contract design, tests, migrations, tenant-isolation and signed-ingestion review, CI troubleshooting, dependency and container hardening, demo reliability, and documentation reconciliation.
 
-The author selected the problem and product concept, kept deterministic security logic
-authoritative, set approval and safety boundaries, chose the demo flow, and made the final tradeoffs
-between realism, privacy, safety, and delivery time. Codex did not autonomously set product policy
-or authorize deployment. GPT is a runtime product capability; Codex was a development tool.
+The project author chose the security problem and context-aware deception thesis, required deterministic authority and human approval boundaries, rejected unsafe filesystem and hosted-demo shortcuts, selected the route model, and reviewed, revised, and tested generated changes. Codex was used to build and refine the project; it did not independently set product policy or security authorization.
 
-Codex Session ID must be added manually from `/feedback` in the primary development thread before
-submission. It is intentionally not invented or stored as a placeholder here.
+## What We Added During OpenAI Build Week
 
-## Quick start and judge testing
+The repository predates Build Week. The following verifiable extensions were added or substantially revised from July 13 through July 21, 2026:
 
-Prerequisites: Docker Desktop, Python 3.12+, Node.js compatible with pnpm 9.15.4, and pnpm 9.15.4.
-The verified local path is Docker Desktop on macOS with Chrome; the web dashboard is expected to
-work in current Chromium browsers on Linux and Windows, but those environments have not been
-certified here.
+- Platform-scope authorization separation, tenant-isolation coverage, signed-ingestion hardening, Redis fail-closed behavior, and production-shaped security tests.
+- Interactive Analysis Lab and deterministic scenario comparison, added July 20 (`537fd80`, `fdc2123`).
+- Dependency lockfiles, container and CI hardening, production topology validation, and operational worker readiness, added July 21 (`d561d80`, `f319daa`, `54a5157`).
+- Explicit development, judge, staging, and production deployment modes; a restricted judge workspace; TTL-bound sandbox credentials; quotas; safe export; and isolated reset, added July 21 (`95903a5`, `3e7c0ef`, `5f93967`, `f4ade8c`, `5d327be`).
+
+These commits are evidence of meaningful extension during the event period; they do not imply that the entire project was created during Build Week.
+
+## Codex Session ID
+
+Before submission, obtain the ID from `/feedback` in the principal Codex development thread and add it here once. Do not invent an ID.
+
+## Quick start
+
+### Prerequisites
+
+- Docker Desktop with Compose
+- Node.js compatible with pnpm 9.15.4 and pnpm 9.15.4
+- Python 3.12+ for local API tooling
 
 ```sh
 git clone <repository-url>
@@ -111,76 +84,47 @@ docker compose exec api alembic upgrade head
 pnpm --filter @deceptiforge/web dev
 ```
 
-Open `http://localhost:3000`. With the development templates, `DEMO_ENABLED=true` and
-`NEXT_PUBLIC_DEMO_MODE=true` expose the fictional demo. Select **Run DeceptiForge Demo** and
-confirm repository context, placement reasoning, synthetic validation, event, alert, incident,
-coverage, and an AI-assisted or deterministic-fallback narrative. Refreshing the page is safe.
-`POST http://localhost:8000/demo/reset` clears only the demo organization.
+Open `http://localhost:3000`. The development templates enable fictional demo data. Select **Run DeceptiForge Demo**, then confirm the context, placement, synthetic validation, event, alert, incident, and narrative. A local smoke check is `curl http://localhost:8000/health`.
 
-### Routes
+For detailed environment, API, and deployment instructions, see [Development](docs/Development.md), [Pipeline API](docs/Api.md), and [Deployment](docs/Deployment.md).
 
-| Route | What it is | Where it exists |
-| --- | --- | --- |
-| `/` | the live restricted judge and testing workspace | development and the hosted judge environment; elsewhere it is the ordinary authenticated tenant workspace |
-| `/demo` | the curated fictional story used in the video | development and the hosted judge environment, with `NEXT_PUBLIC_DEMO_MODE=true` |
-| `/analysis-lab` | internal deterministic fixtures | development and test only |
+## Judge testing
 
-There is no separate `/judge` flow. The root route serves the judge workspace directly, so there is
-no second component duplicating its state, and nothing to redirect.
+Use the hosted judge URL supplied through the submission channel, not localhost. Use a current Chromium browser.
 
-All judge and demo data is fictional. Arbitrary filesystem scanning is unavailable: the workspace
-accepts bounded structured signals only, and path-like values inside them are descriptive metadata
-that the backend never opens. Production integrations and connectors are disabled in the sandbox.
+1. Receive a dedicated organization ID and API key through a trusted channel.
+2. Open the root workspace and choose a fictional scenario.
+3. Inspect the inferred context, sensitive zones, placement reasoning, and synthetic decoy concept.
+4. Trigger the controlled interaction, then inspect the deterministic event, alert, incident, and evidence summary.
+5. Review the analyst narrative and its deterministic fallback boundary.
+6. Reset the sandbox. Reset affects only that sandbox and does not restore spent quota.
 
-**Judges use the hosted URL, not localhost.** The `localhost` instructions above are for
-contributors running the stack themselves. Hosted links are published with the submission rather
-than committed here, since no judge credentials belong in this repository.
+Judge credentials are provisioned out of band, shown once, organization-bound, and time-limited. A sandbox expires with HTTP 410; an operator must issue a new one. See [Judge access runbook](docs/runbooks/JudgeAccess.md). The sandbox uses fictional data, accepts bounded structured signals only, disables production connectors, and never scans a local path or clones a repository.
 
-### Judge workspace access
+The curated `/demo` story is development/judge-only. `/analysis-lab` is development/test-only and returns 404 elsewhere.
 
-Judge access requires a server-verified credential; there is no anonymous fallback. Each judge gets
-an isolated, time-limited sandbox with its own organization, so no judge can see another's work:
+## Supported platforms
 
-```sh
-cd apps/api
-python scripts/provision_judge_sandbox.py            # judge sandbox: org id + key + expiry
-python scripts/provision_judge_sandbox.py --demo-credential   # demo writes, hosted only
-```
+- **Tested:** macOS, Docker Desktop, Python 3.12, PostgreSQL 16, Redis 7, Node.js with pnpm 9.15.4, and Chrome for the local dashboard.
+- **Reasonably supported:** current Chromium browsers on Linux and Windows, including Docker through WSL2.
+- **Untested:** other operating systems and non-Chromium browsers. They are not claimed as certified.
 
-Each prints its credential once. Pass `--ttl-hours` to cover the full evaluation window (the
-default is 8 hours, which suits a single sitting) — see
-[JudgeAccess](docs/runbooks/JudgeAccess.md). The `judge` and `demo` roles cannot be minted through
-tenant administration, and neither can reach tenant administration, platform operations, or the other's
-data. Reading `/demo` needs no credential; changing what every other viewer sees does.
+## Security and privacy boundaries
 
-For detailed setup, API, security, and deployment instructions, use the linked durable documents.
-No judge credentials, production secrets, or customer data belong in this repository.
+Demo and judge assets are fictional and synthetic. API keys are organization-bound; tenant actors cannot mint platform or judge roles. Hardened modes require signed monitoring ingestion, distributed replay protection, and fail-closed Redis behavior. Evidence is minimized, and model input excludes raw payloads.
 
-## Security, privacy, and limitations
+The development demo drives the deterministic pipeline in-process, not through a registered signed-monitor HTTP client. Signed ingestion is separately implemented and tested; the demo should not be represented as proving that boundary end to end.
 
-All demo assets are fictional and synthetic. The local demo trigger uses the real deterministic
-pipeline but currently invokes it inside the development-only API rather than through a registered
-signed monitor HTTP client. Signed monitoring ingestion, replay rejection, and monitor credentials
-exist separately and remain the production boundary. A signed-demo-trigger integration is required
-before claiming the demo proves that boundary end to end.
+## Current limitations
 
-This repository is a controlled-staging project, not a production-certified security service.
-Current limitations include no live GitHub/GitLab provider, no full user OAuth/SSO implementation,
-and no API-key rotation. See [Production readiness](docs/ProductionReadiness.md).
+DeceptiForge is a controlled staging and judge-sandbox project, not a production-certified security service. Current limitations include no live GitHub/GitLab provider, no complete user OAuth/SSO implementation, no API-key rotation workflow, and no legal-hold implementation. GPT-assisted narratives are optional; all detection and incident decisions have deterministic fallback.
 
-## Supported Platforms
+## Detailed documentation
 
-- Tested: macOS, Docker Desktop, Python 3.12, PostgreSQL 16, Redis 7, Node.js with pnpm 9.15.4,
-  and Chrome for the local dashboard.
-- Expected but not certified: current Chromium browsers on Linux and Windows, including Docker via
-  WSL2.
+- [Architecture](docs/Architecture.md), [Security model](docs/SecurityModel.md), and [Production readiness](docs/ProductionReadiness.md)
+- [Development](docs/Development.md), [Deployment](docs/Deployment.md), and [Judge access](docs/runbooks/JudgeAccess.md)
+- [Pipeline API](docs/Api.md), [Incident narrative](docs/IncidentNarrative.md), and [Disaster recovery](docs/DisasterRecovery.md)
 
-## Documentation and license
+## License
 
-- [Architecture](docs/Architecture.md), [Development](docs/Development.md), and
-  [Dashboard](docs/Dashboard.md)
-- [Pipeline API](docs/Api.md), [Security model](docs/SecurityModel.md), and
-  [Production boundary](docs/ProductionBoundary.md)
-- [Incident narrative](docs/IncidentNarrative.md), [Performance architecture](docs/PerformanceArchitecture.md),
-  [Capacity planning](docs/CapacityPlanning.md), and [Disaster recovery](docs/DisasterRecovery.md)
-- [MIT License](LICENSE)
+[MIT License](LICENSE)
