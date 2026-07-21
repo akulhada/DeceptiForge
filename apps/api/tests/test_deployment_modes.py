@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from pydantic import ValidationError
 
-from app.config.settings import DEPLOYMENT_MODES, Settings
+from app.config.settings import DEPLOYMENT_MODES, PRODUCTION_LIKE_MODES, Settings
 from app.routes.router import build_api_router
 
 # A configuration satisfying every startup guard, so a failure below is attributable to the control
@@ -149,13 +149,11 @@ class TestAnalysisLab:
         assert not any("/analysis" in path for path in paths)
 
 
-def test_the_test_harness_agrees_with_the_settings_contract() -> None:
-    """conftest duplicates the production-like set to default signing on. Keep them in step.
+def test_the_hardened_mode_set_has_exactly_one_definition() -> None:
+    """`is_production_like` must be derived from PRODUCTION_LIKE_MODES, not a restated literal.
 
-    If a new hosted mode were added to Settings but not to conftest, every test in that mode would
-    silently run with unsigned ingestion permitted.
+    The test harness defaults signed ingestion on for exactly this set. When it was duplicated, a
+    newly added hosted mode could be hardened in Settings but tested unsigned by conftest.
     """
-    from tests.conftest import _PRODUCTION_LIKE_MODES
-
     for mode in DEPLOYMENT_MODES:
-        assert _settings(app_env=mode).is_production_like == (mode in _PRODUCTION_LIKE_MODES)
+        assert _settings(app_env=mode).is_production_like == (mode in PRODUCTION_LIKE_MODES)

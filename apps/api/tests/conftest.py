@@ -16,13 +16,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.config.settings import get_settings
+from app.config.settings import PRODUCTION_LIKE_MODES, get_settings
 from app.database.base import Base
 from app.dependencies import get_db
 from app.models import records as _records  # noqa: F401  (register tables)
 
-# Modes that share the hardened runtime contract. Kept in sync with Settings.is_production_like.
-_PRODUCTION_LIKE_MODES = {"judge", "staging", "production"}
+# Imported, never restated: see PRODUCTION_LIKE_MODES in app.config.settings.
 
 
 @contextmanager
@@ -59,7 +58,7 @@ def build_client(
     # explicitly overrides it. Development defaults off (migration-friendly). Derived from the
     # settings contract rather than a literal set so a new hosted mode cannot be tested unsigned.
     if monitor_signature_required is None:
-        monitor_signature_required = app_env in _PRODUCTION_LIKE_MODES
+        monitor_signature_required = app_env in PRODUCTION_LIKE_MODES
     overrides = {
         "DEMO_ENABLED": "true" if demo_enabled else "false",
         "APP_ENV": app_env,

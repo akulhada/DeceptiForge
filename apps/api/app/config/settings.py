@@ -13,6 +13,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # and differs from production only in which demonstration surfaces may be mounted.
 DEPLOYMENT_MODES = frozenset({"development", "test", "judge", "staging", "production"})
 
+# Modes that share the hardened runtime contract. Exported so callers — including the test harness,
+# which must default signed ingestion on for exactly these — derive it rather than restating it. A
+# duplicated literal would let a newly added hosted mode be treated as lenient somewhere.
+PRODUCTION_LIKE_MODES = frozenset({"judge", "staging", "production"})
+
 # Environments where the curated demo story may be mounted, and only with DEMO_ENABLED=true.
 _DEMO_MODES = frozenset({"development", "judge"})
 
@@ -470,7 +475,7 @@ class Settings(BaseSettings):
         Judge is included: it is hosted, so unsigned ingestion, fail-open Redis, disabled auth and
         filesystem scanning are as unacceptable there as in production.
         """
-        return self.app_env in {"judge", "staging", "production"}
+        return self.app_env in PRODUCTION_LIKE_MODES
 
     @property
     def allows_demo_surface(self) -> bool:
