@@ -23,3 +23,7 @@ __pycache__/
 .DS_Store
 *.tsbuildinfo
 .env.local
+
+# pnpm monorepo — reject non-pnpm lockfiles that break Next workspace-root inference
+package-lock.json
+yarn.lock
