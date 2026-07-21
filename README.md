@@ -147,8 +147,10 @@ python scripts/provision_judge_sandbox.py            # judge sandbox: org id + k
 python scripts/provision_judge_sandbox.py --demo-credential   # demo writes, hosted only
 ```
 
-Each prints its credential once. The `judge` and `demo` roles cannot be minted through tenant
-administration, and neither can reach tenant administration, platform operations, or the other's
+Each prints its credential once. Pass `--ttl-hours` to cover the full evaluation window (the
+default is 8 hours, which suits a single sitting) — see
+[JudgeAccess](docs/runbooks/JudgeAccess.md). The `judge` and `demo` roles cannot be minted through
+tenant administration, and neither can reach tenant administration, platform operations, or the other's
 data. Reading `/demo` needs no credential; changing what every other viewer sees does.
 
 For detailed setup, API, security, and deployment instructions, use the linked durable documents.

@@ -150,6 +150,10 @@ freshly generated organization used nowhere else, a `judge`-role credential expi
 session, and per-session budgets (`JUDGE_MAX_ANALYSIS_RUNS`, `JUDGE_MAX_INTERACTIONS`,
 `JUDGE_MAX_EXPORTS`, `JUDGE_RESET_COOLDOWN_SECONDS`).
 
+Size `--ttl-hours` to the whole evaluation window, not the default 8 hours: a credential that
+expires mid-review looks like a broken product rather than an expired session. See
+[JudgeAccess](runbooks/JudgeAccess.md) for provisioning, sizing and teardown.
+
 Sandboxes are provisioned **out-of-band**, not by a public endpoint: `judge` is absent from
 `TENANT_GRANTABLE_ROLES`, so no tenant administrator can mint one and there is no anonymous
 fallback. Budgets are per session rather than sliding windows — the session is already TTL-bound —
@@ -167,7 +171,7 @@ its remaining allowance.
 | `RATE_LIMIT_MODE` | `app` (with `RATE_LIMIT_BACKEND=redis`) or `gateway` (edge enforces) |
 | `RATE_LIMIT_BACKEND=redis` | required in `app` mode; production refuses in-memory |
 | `REPLAY_BACKEND=redis` | required in production; production refuses in-memory |
-| `REDIS_FAIL_MODE` | `closed` (reject on outage, default) or `open` (degrade to allow) |
+| `REDIS_FAIL_MODE=closed` | **required** outside development; `open` is refused at startup in judge, staging and production |
 | `MONITOR_SIGNATURE_REQUIRED=true` | require HMAC-signed ingestion (see `monitor-signing.md`) |
 | `EVIDENCE_ENCRYPTION_MODE` | `local` (with `EVIDENCE_ENCRYPTION_KEY`) or a documented KMS strategy |
 | `BOOTSTRAP_KEYS_ENABLED` | `false` in steady state (see `bootstrap-and-encryption.md`) |
@@ -175,8 +179,14 @@ its remaining allowance.
 | `CAPACITY_MANAGEMENT_ENABLED=true` | enables Redis-backed tenant monitoring and queue admission |
 
 Production **fails fast at startup** on: in-memory rate-limit/replay backends, missing `REDIS_URL`
-when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled`, or unrestricted
-(no-expiry) bootstrap keys.
+when required, an unreachable required Redis, `EVIDENCE_ENCRYPTION_MODE=disabled`, unrestricted
+(no-expiry) bootstrap keys, `REDIS_FAIL_MODE=open`, `AUTH_ENABLED=false`,
+`MONITOR_SIGNATURE_REQUIRED=false`, and any demonstration surface flag the deployment mode forbids
+(`ANALYSIS_LAB_ENABLED`, `DEMO_ENABLED`, `JUDGE_WORKSPACE_ENABLED`).
+
+Refusing to boot is deliberate: a deployment whose configuration says one thing and whose behaviour
+says another is worse than one that does not start. Every item above applies to `judge` as well —
+it is a hosted mode and shares the production contract.
 
 When capacity management is enabled, keep `REDIS_URL` private and set the tenant defaults, queue
 backlog threshold, pool budgets, and headroom settings from a staging certification. See

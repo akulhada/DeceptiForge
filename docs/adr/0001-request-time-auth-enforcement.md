@@ -1,6 +1,6 @@
 # ADR 0001 — Request-time auth enforcement over startup rejection
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0006](0006-startup-rejection-for-unusable-configuration.md)
 
 ## Context
 

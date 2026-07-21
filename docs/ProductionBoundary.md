@@ -87,10 +87,14 @@ curl -sX POST localhost:8000/incidents/<id>/narrative \
 
 ## Demo route gating
 
-Demo routes (`/demo/*`) mount **only when `DEMO_ENABLED=true` AND `APP_ENV=development`**. They can
-never be exposed on a production-like deployment, even if `DEMO_ENABLED` is set to true. Auth-bypass
-(`AUTH_ENABLED=false`) is likewise restricted to development; in a production environment a disabled
-auth flag is rejected with `401` rather than silently bypassed.
+Demo routes (`/demo/*`) mount **only when `DEMO_ENABLED=true` AND the deployment mode permits the
+demo surface** — that is `development` or the hosted `judge` mode, never `staging` or `production`,
+which refuse the flag at startup. In a hosted mode the mutating demo routes additionally require a
+`demo:run` credential bound to the demo organization; reads stay open.
+
+Auth-bypass (`AUTH_ENABLED=false`) is likewise restricted to development. Outside it the flag is no
+longer merely rejected per request — startup refuses to boot, so a deployment cannot report itself
+healthy while every protected route returns `401`.
 
 ## Stabilization sprint (fixed)
 
