@@ -32,8 +32,12 @@ def ready(
     not themselves make the API unready (a standby still serves reads); side-effect workers gate.
     """
     from app.services.reliability.degraded import dependency_status, is_ready
+    from app.services.reliability.worker_health import worker_status
 
     deps = dependency_status(session, settings)
+    # Reported for visibility but deliberately NOT part of `ok`: a stalled worker must not remove
+    # every API replica from the load balancer. Gate on /ready/operational instead.
+    workers = worker_status(session, settings)
     ok = is_ready(deps)
     if not ok:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -41,6 +45,7 @@ def ready(
         "status": "ok" if ok else "degraded",
         **deps,
         # Safe enforcement flags only — never secrets, signatures, or signing material.
+        "workers": workers,
         "monitor_signatures_enforced": settings.monitor_signature_required,
         "replay_backend": settings.replay_backend,
         "rate_limit_backend": settings.rate_limit_backend,
@@ -49,4 +54,31 @@ def ready(
             "cluster_role": settings.cluster_role,
             "active_region_epoch": settings.active_region_epoch,
         },
+    }
+
+
+@router.get("/ready/operational")
+def operational_ready(
+    response: Response,
+    settings: Settings = Depends(get_settings),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Operational readiness: can this deployment actually reconstruct incidents?
+
+    Distinct from /ready on purpose. /ready answers "may this HTTP instance serve traffic"; a
+    stalled reconstruction worker must not deregister every API replica. This endpoint answers "is
+    the system operationally whole", and is the one alerting and dashboards should watch.
+    """
+    from app.services.reliability.degraded import dependency_status, is_ready
+    from app.services.reliability.worker_health import worker_status, workers_healthy
+
+    deps = dependency_status(session, settings)
+    workers = worker_status(session, settings)
+    ok = is_ready(deps) and workers_healthy(workers)
+    if not ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return {
+        "status": "ok" if ok else "degraded",
+        "dependencies": deps,
+        "workers": workers,
     }

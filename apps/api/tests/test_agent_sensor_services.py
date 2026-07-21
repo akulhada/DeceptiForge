@@ -18,16 +18,22 @@ from app.services.agent_sensor.sequence import detect_escalation
 
 def _policy(**over) -> AgentScopePolicyDoc:  # type: ignore[no-untyped-def]
     base = dict(
-        organization_id="org", name="p",
+        organization_id="org",
+        name="p",
         allowed_paths=("apps/web/components/navigation/**",),
-        denied_paths=(), allowed_tools=(), denied_tools=(), allowed_resource_types=(),
-        maximum_file_reads=200, maximum_sensitive_reads=0,
+        denied_paths=(),
+        allowed_tools=(),
+        denied_tools=(),
+        allowed_resource_types=(),
+        maximum_file_reads=200,
+        maximum_sensitive_reads=0,
     )
     base.update(over)
     return AgentScopePolicyDoc(**base)  # type: ignore[arg-type]
 
 
 # -- path normalization safety ---------------------------------------------------------------
+
 
 def test_normalize_rejects_traversal_and_encoding() -> None:
     assert normalize_path("../../etc/passwd") is None
@@ -51,6 +57,7 @@ def test_path_matches_case_insensitive_and_globs() -> None:
 
 # -- scope normalization ---------------------------------------------------------------------
 
+
 def test_scope_normalization_sanitizes_and_extracts_keywords() -> None:
     scope = normalize_scope(
         task_summary="  Fix the mobile navbar   spacing\x07 bug ",
@@ -62,6 +69,7 @@ def test_scope_normalization_sanitizes_and_extracts_keywords() -> None:
 
 
 # -- path classification ---------------------------------------------------------------------
+
 
 def test_classify_path() -> None:
     allowed = ("apps/web/components/navigation/**",)
@@ -80,12 +88,17 @@ def test_classify_path() -> None:
 
 # -- violation rules -------------------------------------------------------------------------
 
+
 def test_in_scope_not_flagged() -> None:
     d = evaluate(
         event_type=AgentEventType.FILE_READ,
         normalized_path="apps/web/components/navigation/navbar.tsx",
-        tool_name=None, resource_type=None, decoy_id=None,
-        policy=_policy(), decoy_paths=frozenset(), agg=SessionAggregate(),
+        tool_name=None,
+        resource_type=None,
+        decoy_id=None,
+        policy=_policy(),
+        decoy_paths=frozenset(),
+        agg=SessionAggregate(),
     )
     assert d.violation_type is None
     assert d.path_class == PathClass.TASK_RELEVANT
@@ -93,18 +106,28 @@ def test_in_scope_not_flagged() -> None:
 
 def test_sensitive_file_flagged() -> None:
     d = evaluate(
-        event_type=AgentEventType.FILE_READ, normalized_path="apps/api/.env",
-        tool_name=None, resource_type=None, decoy_id=None,
-        policy=_policy(), decoy_paths=frozenset(), agg=SessionAggregate(),
+        event_type=AgentEventType.FILE_READ,
+        normalized_path="apps/api/.env",
+        tool_name=None,
+        resource_type=None,
+        decoy_id=None,
+        policy=_policy(),
+        decoy_paths=frozenset(),
+        agg=SessionAggregate(),
     )
     assert d.violation_type == ScopeViolationType.SENSITIVE_FILE_ACCESS
 
 
 def test_decoy_touch_high_confidence() -> None:
     d = evaluate(
-        event_type=AgentEventType.FILE_READ, normalized_path="apps/x/decoy.ts",
-        tool_name=None, resource_type=None, decoy_id="decoy-1",
-        policy=_policy(), decoy_paths=frozenset(), agg=SessionAggregate(),
+        event_type=AgentEventType.FILE_READ,
+        normalized_path="apps/x/decoy.ts",
+        tool_name=None,
+        resource_type=None,
+        decoy_id="decoy-1",
+        policy=_policy(),
+        decoy_paths=frozenset(),
+        agg=SessionAggregate(),
     )
     assert d.violation_type == ScopeViolationType.DECOY_ASSET_TOUCH
     assert d.confidence >= 0.9
@@ -112,21 +135,45 @@ def test_decoy_touch_high_confidence() -> None:
 
 
 def test_destructive_and_db_and_network() -> None:
-    assert evaluate(
-        event_type=AgentEventType.DENIED_ACTION_ATTEMPTED, normalized_path=None, tool_name=None,
-        resource_type=None, decoy_id=None, policy=_policy(), decoy_paths=frozenset(),
-        agg=SessionAggregate(),
-    ).violation_type == ScopeViolationType.DESTRUCTIVE_ACTION_ATTEMPT
-    assert evaluate(
-        event_type=AgentEventType.DATABASE_QUERY_REQUESTED, normalized_path=None, tool_name=None,
-        resource_type=None, decoy_id=None, policy=_policy(), decoy_paths=frozenset(),
-        agg=SessionAggregate(),
-    ).violation_type == ScopeViolationType.UNEXPECTED_DATABASE_ACCESS
-    assert evaluate(
-        event_type=AgentEventType.NETWORK_REQUEST_REQUESTED, normalized_path=None, tool_name=None,
-        resource_type=None, decoy_id=None, policy=_policy(), decoy_paths=frozenset(),
-        agg=SessionAggregate(),
-    ).violation_type == ScopeViolationType.UNEXPECTED_NETWORK_ACCESS
+    assert (
+        evaluate(
+            event_type=AgentEventType.DENIED_ACTION_ATTEMPTED,
+            normalized_path=None,
+            tool_name=None,
+            resource_type=None,
+            decoy_id=None,
+            policy=_policy(),
+            decoy_paths=frozenset(),
+            agg=SessionAggregate(),
+        ).violation_type
+        == ScopeViolationType.DESTRUCTIVE_ACTION_ATTEMPT
+    )
+    assert (
+        evaluate(
+            event_type=AgentEventType.DATABASE_QUERY_REQUESTED,
+            normalized_path=None,
+            tool_name=None,
+            resource_type=None,
+            decoy_id=None,
+            policy=_policy(),
+            decoy_paths=frozenset(),
+            agg=SessionAggregate(),
+        ).violation_type
+        == ScopeViolationType.UNEXPECTED_DATABASE_ACCESS
+    )
+    assert (
+        evaluate(
+            event_type=AgentEventType.NETWORK_REQUEST_REQUESTED,
+            normalized_path=None,
+            tool_name=None,
+            resource_type=None,
+            decoy_id=None,
+            policy=_policy(),
+            decoy_paths=frozenset(),
+            agg=SessionAggregate(),
+        ).violation_type
+        == ScopeViolationType.UNEXPECTED_NETWORK_ACCESS
+    )
 
 
 def test_repeated_unrelated_increases_score() -> None:
@@ -135,9 +182,14 @@ def test_repeated_unrelated_increases_score() -> None:
     last = None
     for i in range(10):
         last = evaluate(
-            event_type=AgentEventType.FILE_READ, normalized_path=f"misc/dir/file{i}.py",
-            tool_name=None, resource_type=None, decoy_id=None, policy=policy,
-            decoy_paths=frozenset(), agg=agg,
+            event_type=AgentEventType.FILE_READ,
+            normalized_path=f"misc/dir/file{i}.py",
+            tool_name=None,
+            resource_type=None,
+            decoy_id=None,
+            policy=policy,
+            decoy_paths=frozenset(),
+            agg=agg,
         )
     assert agg.violation_count >= 5
     assert last is not None
@@ -150,9 +202,14 @@ def test_repeated_unrelated_increases_score() -> None:
 def test_encoded_path_cannot_bypass_denied_rule() -> None:
     # An encoded traversal path normalizes to None and never silently counts as in-scope.
     d = evaluate(
-        event_type=AgentEventType.FILE_READ, normalized_path=normalize_path("%2e%2e/secret"),
-        tool_name=None, resource_type=None, decoy_id=None, policy=_policy(),
-        decoy_paths=frozenset(), agg=SessionAggregate(),
+        event_type=AgentEventType.FILE_READ,
+        normalized_path=normalize_path("%2e%2e/secret"),
+        tool_name=None,
+        resource_type=None,
+        decoy_id=None,
+        policy=_policy(),
+        decoy_paths=frozenset(),
+        agg=SessionAggregate(),
     )
     # normalized_path is None -> treated as unrelated non-path event, still in-scope info here,
     # but the point is the raw encoded path never resolved to a real allowed path.
@@ -161,6 +218,7 @@ def test_encoded_path_cannot_bypass_denied_rule() -> None:
 
 
 # -- minimize + sequence ---------------------------------------------------------------------
+
 
 def test_minimize_drops_raw_content() -> None:
     out = minimize_metadata(

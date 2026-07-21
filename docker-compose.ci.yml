@@ -1,0 +1,15 @@
+# Purpose: the smallest overlay that lets CI exercise the production-shaped topology.
+# Responsibilities: publish the API port so the workflow can probe it, and pin a single API replica
+#   for determinism. Everything security-relevant — APP_ENV=production, AUTH_ENABLED=true,
+#   MONITOR_SIGNATURE_REQUIRED=true, Redis-backed rate limiting and replay, REDIS_FAIL_MODE=closed,
+#   the private internal network, and migrations as a separate step — is inherited unchanged from
+#   docker-compose.prod.example.yml. This overlay must never relax a control.
+# Usage: docker compose -f docker-compose.prod.example.yml -f docker-compose.ci.yml <command>
+services:
+  api:
+    # The production file deliberately publishes no host port (ingress terminates in front of it).
+    # CI has no ingress, so expose it on loopback only.
+    ports:
+      - '127.0.0.1:8000:8000'
+    deploy:
+      replicas: 1

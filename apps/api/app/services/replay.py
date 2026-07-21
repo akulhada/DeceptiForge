@@ -15,6 +15,14 @@ from app.config.settings import Settings, get_settings
 from app.services.redis_support import RedisClient, build_redis_client
 
 
+class ReplayUnavailableError(Exception):
+    """The distributed replay store could not be reached and fail-open is not permitted.
+
+    Raised instead of silently allowing (fail-open) or reporting a false "replayed nonce" (409):
+    the caller must be told the control is unavailable so ingestion is refused safely.
+    """
+
+
 class ReplayError(Exception):
     def __init__(self, status_code: int, message: str) -> None:
         super().__init__(message)
@@ -66,9 +74,13 @@ class RedisReplayStore:
     def reserve(self, key: str, ttl_seconds: int) -> bool:
         try:
             created = self._client.set(f"{self._prefix}{key}", "1", nx=True, ex=ttl_seconds)
-        except (RedisError, OSError):
-            # Fail closed rejects the request (treated as not-reserved) unless configured open.
-            return self._fail_open
+        except (RedisError, OSError) as error:
+            if self._fail_open:
+                # Development-only convenience; production startup rejects REDIS_FAIL_MODE=open.
+                return True
+            # Fail closed: signal unavailability distinctly so the caller returns a safe 503 rather
+            # than a misleading 409 "replayed nonce".
+            raise ReplayUnavailableError("replay store unavailable") from error
         return bool(created)
 
     def clear(self) -> None:
@@ -104,7 +116,13 @@ class ReplayGuard:
         if abs(now - event_time) > self._window:
             raise ReplayError(400, "timestamp outside the allowed clock skew")
         # TTL slightly exceeds the skew window so a nonce cannot be reused while still valid.
-        if not self._store.reserve(_scope_key(scope, nonce), self._window + 1):
+        try:
+            reserved = self._store.reserve(_scope_key(scope, nonce), self._window + 1)
+        except ReplayUnavailableError as error:
+            # 503 (not 409): the request may be perfectly valid; we simply cannot prove it is not a
+            # replay, so ingestion is refused without creating an event, alert, or incident.
+            raise ReplayError(503, "replay protection unavailable") from error
+        if not reserved:
             raise ReplayError(409, "replayed nonce")
 
     def clear(self) -> None:

@@ -119,8 +119,8 @@ def test_happy_path_deploys_and_activates_after_merge(make_client) -> None:  # t
     org = str(uuid4())
     with _client(make_client) as c:
         plan_id, repo_id = _seed_plan(c, org)
-        requester = _key(c, org, "analyst")   # creates + submits
-        approver = _key(c, org, "owner")      # approves + deploys
+        requester = _key(c, org, "analyst")  # creates + submits
+        approver = _key(c, org, "owner")  # approves + deploys
         fake = FakeDeploymentClient()
         fake.register_repo(resolve_repo(UUID(org), UUID(repo_id), "main"), base_sha=_BASE)
 
@@ -128,9 +128,12 @@ def test_happy_path_deploys_and_activates_after_merge(make_client) -> None:  # t
         prev = c.get(f"/decoy-deployments/{did}/preview", headers=_headers(requester, org))
         assert prev.status_code == 200
         c.post(f"/decoy-deployments/{did}/submit", headers=_headers(requester, org))
-        assert c.post(
-            f"/decoy-deployments/{did}/approve", json={}, headers=_headers(approver, org)
-        ).json()["status"] == "approved"
+        assert (
+            c.post(
+                f"/decoy-deployments/{did}/approve", json={}, headers=_headers(approver, org)
+            ).json()["status"]
+            == "approved"
+        )
         c.post(f"/decoy-deployments/{did}/deploy", headers=_headers(approver, org))
 
         _run_worker(c, fake)  # execute: opens the PR
@@ -147,7 +150,9 @@ def test_happy_path_deploys_and_activates_after_merge(make_client) -> None:  # t
         from app.repositories.deployments import DeploymentRepository, new_correlation_id
 
         DeploymentRepository(session).enqueue_job(
-            organization_id=UUID(org), deployment_id=UUID(did), job_type="verify",
+            organization_id=UUID(org),
+            deployment_id=UUID(did),
+            job_type="verify",
             correlation_id=new_correlation_id(),
         )
         session.commit()

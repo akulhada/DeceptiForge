@@ -24,10 +24,15 @@ def test_secondary_never_promoted_before_primary_fenced() -> None:
 
 def test_full_failover_path() -> None:
     path = [
-        FailoverState.NORMAL, FailoverState.FAILOVER_REQUESTED, FailoverState.PRIMARY_FENCED,
-        FailoverState.STANDBY_PROMOTING, FailoverState.SECONDARY_ACTIVE,
-        FailoverState.RECOVERY_VALIDATION, FailoverState.FAILBACK_PENDING,
-        FailoverState.NORMAL_RESTORED, FailoverState.NORMAL,
+        FailoverState.NORMAL,
+        FailoverState.FAILOVER_REQUESTED,
+        FailoverState.PRIMARY_FENCED,
+        FailoverState.STANDBY_PROMOTING,
+        FailoverState.SECONDARY_ACTIVE,
+        FailoverState.RECOVERY_VALIDATION,
+        FailoverState.FAILBACK_PENDING,
+        FailoverState.NORMAL_RESTORED,
+        FailoverState.NORMAL,
     ]
     for a, b in zip(path, path[1:], strict=False):
         assert_transition(a, b)

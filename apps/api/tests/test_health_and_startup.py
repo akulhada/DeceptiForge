@@ -31,6 +31,7 @@ def _prod_settings(**overrides: object) -> Settings:
         "redis_url": "fakeredis://startup-tests",
         "evidence_encryption_mode": "local",
         "monitor_signature_required": True,
+        "auth_enabled": True,
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]

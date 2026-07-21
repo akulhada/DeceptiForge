@@ -80,3 +80,54 @@ def test_scanner_exceptions_are_documented_not_blanket() -> None:
 
 def test_local_agent_state_is_ignored() -> None:
     assert ".claude/" in (REPO / ".gitignore").read_text()
+
+
+def test_production_compose_postgres_has_a_healthcheck() -> None:
+    """Every service waits on `condition: service_healthy`; without this the stack cannot start."""
+    compose = (REPO / "docker-compose.prod.example.yml").read_text()
+    assert "pg_isready" in compose, "postgres must define a real healthcheck"
+    # And the dependency it satisfies must still be declared.
+    assert "condition: service_healthy" in compose
+
+
+def test_every_service_awaited_as_healthy_defines_a_healthcheck() -> None:
+    import yaml
+
+    doc = yaml.safe_load((REPO / "docker-compose.prod.example.yml").read_text())
+    services = doc["services"]
+    awaited: set[str] = set()
+    for service in services.values():
+        depends = service.get("depends_on") or {}
+        if isinstance(depends, dict):
+            for name, spec in depends.items():
+                if isinstance(spec, dict) and spec.get("condition") == "service_healthy":
+                    awaited.add(name)
+    for name in awaited:
+        assert (
+            "healthcheck" in services[name]
+        ), f"{name} is awaited as service_healthy but defines no healthcheck"
+
+
+def test_no_document_claims_legal_hold_preservation() -> None:
+    """Legal holds are not implemented; documentation must not claim they survive retention.
+
+    A claim of preservation while retention jobs can delete the records is an operational defect,
+    not stale prose. Delete this test only when holds are genuinely enforced end to end.
+    """
+    claims = (
+        "legal holds survive",
+        "legal holds are preserved",
+        "legal hold is enforced",
+        "legal holds are enforced",
+    )
+    for path in (REPO / "docs").rglob("*.md"):
+        lowered = path.read_text().lower()
+        for claim in claims:
+            assert claim not in lowered, f"{path.name} claims unimplemented legal-hold behaviour"
+
+
+def test_restore_drill_makes_no_legal_hold_claim() -> None:
+    source = (API / "app" / "services" / "reliability" / "restore_verify.py").read_text()
+    assert (
+        '_check("legal_holds_present"' not in source
+    ), "the restore drill must not emit a passing legal-hold check while holds are unimplemented"

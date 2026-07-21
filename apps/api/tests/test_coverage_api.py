@@ -24,7 +24,10 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 def _client(make_client):  # type: ignore[no-untyped-def]
     return make_client(
-        demo_enabled=False, auth_enabled=True, app_env="development", coverage_engine_enabled=True,
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        coverage_engine_enabled=True,
     )
 
 
@@ -33,17 +36,27 @@ def _seed_repo_decoy(client, org: str, *, status="deployed", monitoring=True) ->
 
     session = client.app_session()
     repo = RepositoryRecord(
-        organization_id=UUID(org), name="billing-app", root_path="/r", profile="{}",
+        organization_id=UUID(org),
+        name="billing-app",
+        root_path="/r",
+        profile="{}",
     )
     session.add(repo)
     session.flush()
-    session.add(DecoyDeploymentRecord(
-        organization_id=UUID(org), repository_id=repo.id, decoy_plan_id=uuid4(),
-        validation_report_decision="accepted", status=status, target_branch="main",
-        source_branch="df", base_commit_sha="a" * 40,
-        monitoring_activated_at=datetime.now(UTC) if monitoring else None,
-        deployed_at=datetime.now(UTC),
-    ))
+    session.add(
+        DecoyDeploymentRecord(
+            organization_id=UUID(org),
+            repository_id=repo.id,
+            decoy_plan_id=uuid4(),
+            validation_report_decision="accepted",
+            status=status,
+            target_branch="main",
+            source_branch="df",
+            base_commit_sha="a" * 40,
+            monitoring_activated_at=datetime.now(UTC) if monitoring else None,
+            deployed_at=datetime.now(UTC),
+        )
+    )
     session.commit()
     session.close()
 
@@ -102,9 +115,14 @@ def test_recommendation_accept_is_draft_only(make_client) -> None:  # type: igno
     with _client(make_client) as c:
         # A repo with NO decoy -> a gap + recommendation.
         session = c.app_session()
-        session.add(RepositoryRecord(
-            organization_id=UUID(org), name="auth-service", root_path="/r", profile="{}",
-        ))
+        session.add(
+            RepositoryRecord(
+                organization_id=UUID(org),
+                name="auth-service",
+                root_path="/r",
+                profile="{}",
+            )
+        )
         session.commit()
         session.close()
         admin = _key(c, org, "admin")
@@ -139,11 +157,13 @@ def test_methodology_and_policy(make_client) -> None:  # type: ignore[no-untyped
         assert meth["methodology_version"] == "coverage-v1"
         assert abs(sum(meth["dimension_weights"].values()) - 1.0) < 1e-6
         v1 = c.put(
-            "/coverage/policy", json={"recommendation_risk_tolerance": 0.3},
+            "/coverage/policy",
+            json={"recommendation_risk_tolerance": 0.3},
             headers=_headers(admin, org),
         ).json()["policy_version"]
         v2 = c.put(
-            "/coverage/policy", json={"recommendation_risk_tolerance": 0.4},
+            "/coverage/policy",
+            json={"recommendation_risk_tolerance": 0.4},
             headers=_headers(admin, org),
         ).json()["policy_version"]
         assert v2 > v1
@@ -169,19 +189,28 @@ def test_scheduled_job_idempotent(monkeypatch) -> None:  # type: ignore[no-untyp
     repo = RepositoryRecord(organization_id=org, name="app", root_path="/r", profile="{}")
     seed.add(repo)
     seed.flush()
-    seed.add(DecoyDeploymentRecord(
-        organization_id=org, repository_id=repo.id, decoy_plan_id=uuid4(),
-        validation_report_decision="accepted", status="deployed", target_branch="main",
-        source_branch="df", base_commit_sha="a" * 40, monitoring_activated_at=datetime.now(UTC),
-        deployed_at=datetime.now(UTC),
-    ))
+    seed.add(
+        DecoyDeploymentRecord(
+            organization_id=org,
+            repository_id=repo.id,
+            decoy_plan_id=uuid4(),
+            validation_report_decision="accepted",
+            status="deployed",
+            target_branch="main",
+            source_branch="df",
+            base_commit_sha="a" * 40,
+            monitoring_activated_at=datetime.now(UTC),
+            deployed_at=datetime.now(UTC),
+        )
+    )
     seed.commit()
     seed.close()
 
     monkeypatch.setattr("app.jobs._runtime.get_sessionmaker", lambda: factory)
     settings = Settings(
         database_url="postgresql+psycopg://u:p@localhost/db",  # type: ignore[arg-type]
-        app_env="development", coverage_engine_enabled=True,
+        app_env="development",
+        coverage_engine_enabled=True,
     )
     r1 = run_coverage_job(settings)
     r2 = run_coverage_job(settings)

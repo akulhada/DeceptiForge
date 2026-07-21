@@ -38,7 +38,11 @@ def _session() -> Session:
 
 def _repo(session: Session, org, name="app") -> RepositoryRecord:  # type: ignore[no-untyped-def]
     r = RepositoryRecord(
-        organization_id=org, name=name, root_path="/r", profile="{}", created_at=_NOW,
+        organization_id=org,
+        name=name,
+        root_path="/r",
+        profile="{}",
+        created_at=_NOW,
     )
     session.add(r)
     session.flush()
@@ -46,12 +50,22 @@ def _repo(session: Session, org, name="app") -> RepositoryRecord:  # type: ignor
 
 
 def _decoy(session, org, repo_id, *, status, monitoring=None, expires=None, deployed=_NOW):  # type: ignore[no-untyped-def]
-    session.add(DecoyDeploymentRecord(
-        organization_id=org, repository_id=repo_id, decoy_plan_id=uuid4(),
-        validation_report_decision="accepted", status=status, target_branch="main",
-        source_branch="df", base_commit_sha="a" * 40, monitoring_activated_at=monitoring,
-        expires_at=expires, deployed_at=deployed, created_at=_NOW,
-    ))
+    session.add(
+        DecoyDeploymentRecord(
+            organization_id=org,
+            repository_id=repo_id,
+            decoy_plan_id=uuid4(),
+            validation_report_decision="accepted",
+            status=status,
+            target_branch="main",
+            source_branch="df",
+            base_commit_sha="a" * 40,
+            monitoring_activated_at=monitoring,
+            expires_at=expires,
+            deployed_at=deployed,
+            created_at=_NOW,
+        )
+    )
     session.flush()
 
 
@@ -92,7 +106,11 @@ def test_full_control_beats_expired_and_failed() -> None:
     org = uuid4()
     repo = _repo(session, org)
     _decoy(
-        session, org, repo.id, status="deployed", monitoring=_NOW,
+        session,
+        org,
+        repo.id,
+        status="deployed",
+        monitoring=_NOW,
         expires=_NOW + timedelta(days=30),
     )
     session.commit()

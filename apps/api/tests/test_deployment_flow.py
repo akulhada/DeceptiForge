@@ -58,16 +58,26 @@ class _Ctx:
         self.plan_id = self.art.add_decoy_plan(self.org, self.repo_id, plan)
         self.art.add_validation_report(self.org, self.plan_id, self.report)
         self.record = self.dep.create(
-            organization_id=self.org, repository_id=self.repo_id, decoy_plan_id=self.plan_id,
-            validation_decision="accept", requested_by_actor_id=uuid4(),
-            target_branch="deceptiforge/decoy-x", source_branch="main",
-            base_commit_sha=_BASE, expires_at=None,
+            organization_id=self.org,
+            repository_id=self.repo_id,
+            decoy_plan_id=self.plan_id,
+            validation_decision="accept",
+            requested_by_actor_id=uuid4(),
+            target_branch="deceptiforge/decoy-x",
+            source_branch="main",
+            base_commit_sha=_BASE,
+            expires_at=None,
         )
         preview, contents = build_preview(
-            deployment_id=self.record.id, repository_id=self.repo_id, base_branch="main",
-            base_commit_sha=_BASE, target_branch=f"deceptiforge/decoy-{self.record.id}",
-            plan=plan, reports=(self.report,),
-            policy=PathPolicy.from_settings(self.settings), expires_at=None,
+            deployment_id=self.record.id,
+            repository_id=self.repo_id,
+            base_branch="main",
+            base_commit_sha=_BASE,
+            target_branch=f"deceptiforge/decoy-{self.record.id}",
+            plan=plan,
+            reports=(self.report,),
+            policy=PathPolicy.from_settings(self.settings),
+            expires_at=None,
         )
         self.dep.set_preview(self.record, preview, contents)
         self.repo = resolve_repo(self.org, self.repo_id, "main")

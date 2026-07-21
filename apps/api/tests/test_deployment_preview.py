@@ -37,8 +37,8 @@ def _build(plan, reports, deployment_id=None, base="abc123"):  # type: ignore[no
 
 def test_preview_includes_only_accepted_allowed_assets() -> None:
     good = make_asset("docs/decoys/runbook.md")
-    protected = make_asset("docs/.env.local")           # protected pattern
-    outside = make_asset("src/app.py")                  # outside allowlist
+    protected = make_asset("docs/.env.local")  # protected pattern
+    outside = make_asset("src/app.py")  # outside allowlist
     rejected_report = make_asset("docs/decoys/warn.md")  # report is REJECT
     plan = make_plan(good, protected, outside, rejected_report)
     reports = (

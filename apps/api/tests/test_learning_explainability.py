@@ -200,7 +200,12 @@ def test_explanation_contains_no_other_tenant_identifiers() -> None:
 def test_endpoint_result_includes_calibration_block(make_client) -> None:  # type: ignore[no-untyped-def]
     from app.services.api_keys import ApiKeyService
 
-    with make_client(demo_enabled=False, auth_enabled=True, app_env="development") as client:
+    with make_client(
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        analysis_lab_enabled=True,
+    ) as client:
         org = str(uuid4())
         session = client.app_session()
         _, key = ApiKeyService(session).create(UUID(org), "analyst", "analyst")

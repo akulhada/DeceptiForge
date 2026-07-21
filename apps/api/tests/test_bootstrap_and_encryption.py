@@ -80,6 +80,7 @@ def _prod(**overrides: object) -> Settings:
     base: dict[str, object] = {
         "database_url": "postgresql+psycopg://u:p@localhost/db",
         "app_env": "production",
+        "auth_enabled": True,
         "rate_limit_mode": "gateway",
         "replay_backend": "redis",
         "redis_url": "fakeredis://bootstrap-tests",
@@ -143,13 +144,24 @@ def _engine() -> Engine:
 
 def _alert(secret: str) -> NormalizedAlert:
     return NormalizedAlert(
-        alert_id=uuid4(), trace_identifier="DFG-A", decoy_id=uuid4(), severity=Severity.HIGH,
-        title="t", summary="observed", source_monitor=MonitorType.REPOSITORY, confidence=0.9,
-        first_seen=datetime.now(UTC), last_seen=datetime.now(UTC), event_count=1,
+        alert_id=uuid4(),
+        trace_identifier="DFG-A",
+        decoy_id=uuid4(),
+        severity=Severity.HIGH,
+        title="t",
+        summary="observed",
+        source_monitor=MonitorType.REPOSITORY,
+        confidence=0.9,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        event_count=1,
         deduplication_key="DFG-A:id:repository:path:repository:content_access",
-        affected_placement_id=uuid4(), affected_decoy_type="secret",
+        affected_placement_id=uuid4(),
+        affected_decoy_type="secret",
         evidence=(AlertEvidence(excerpt=secret, digest="a" * 64, location="src/x.py"),),
-        raw_event_ids=(uuid4(),), recommended_actions=("review",), correlation_id=uuid4(),
+        raw_event_ids=(uuid4(),),
+        recommended_actions=("review",),
+        correlation_id=uuid4(),
     )
 
 

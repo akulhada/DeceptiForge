@@ -26,6 +26,7 @@ def _settings(**over) -> Settings:  # type: ignore[no-untyped-def]
 
 # -- SSRF -------------------------------------------------------------------------------------
 
+
 def test_ssrf_rejects_loopback_and_metadata_and_private() -> None:
     s = _settings(app_env="production")
     for url in (
@@ -61,6 +62,7 @@ def test_ssrf_allowlist_enforced(monkeypatch) -> None:  # type: ignore[no-untype
 
 # -- retry ------------------------------------------------------------------------------------
 
+
 def test_retry_classification() -> None:
     assert retry.classify_status(200) == RetryDecision.SUCCESS
     assert retry.classify_status(500) == RetryDecision.RETRY
@@ -81,19 +83,30 @@ def test_retry_after_and_backoff_monotonic() -> None:
 
 # -- profiles ---------------------------------------------------------------------------------
 
+
 def _incident_event(narrative: str | None = None):  # type: ignore[no-untyped-def]
     return mapping.build_incident_event(
-        event_type=EventType.INCIDENT_CREATED, org="org-1", occurred_at=_NOW,
-        incident_id="i1", severity=Severity.HIGH, title="Incident", summary="a decoy was touched",
-        confidence=0.9, incident_status="open", affected_surfaces=("repository",),
-        evidence_summary="deterministic: 3 events across 1 surface", narrative=narrative,
+        event_type=EventType.INCIDENT_CREATED,
+        org="org-1",
+        occurred_at=_NOW,
+        incident_id="i1",
+        severity=Severity.HIGH,
+        title="Incident",
+        summary="a decoy was touched",
+        confidence=0.9,
+        incident_status="open",
+        affected_surfaces=("repository",),
+        evidence_summary="deterministic: 3 events across 1 surface",
+        narrative=narrative,
     )
 
 
 def test_minimal_profile_strips_detail() -> None:
     env = profiles.apply_profile(
-        _incident_event(narrative="gpt narrative"), PayloadProfile.MINIMAL,
-        include_narrative=True, max_bytes=65536,
+        _incident_event(narrative="gpt narrative"),
+        PayloadProfile.MINIMAL,
+        include_narrative=True,
+        max_bytes=65536,
     )
     assert env.summary == "" and env.narrative_summary is None
     assert env.affected_surfaces == () and env.deterministic_evidence_summary == ""
@@ -101,21 +114,27 @@ def test_minimal_profile_strips_detail() -> None:
 
 def test_narrative_only_when_allowed_and_labeled() -> None:
     with_narr = profiles.apply_profile(
-        _incident_event(narrative="gpt narrative"), PayloadProfile.ANALYST,
-        include_narrative=True, max_bytes=65536,
+        _incident_event(narrative="gpt narrative"),
+        PayloadProfile.ANALYST,
+        include_narrative=True,
+        max_bytes=65536,
     )
     assert with_narr.narrative_summary == "gpt narrative"
     assert profiles.is_labeled_narrative(with_narr)
     without = profiles.apply_profile(
-        _incident_event(narrative="gpt narrative"), PayloadProfile.ANALYST,
-        include_narrative=False, max_bytes=65536,
+        _incident_event(narrative="gpt narrative"),
+        PayloadProfile.ANALYST,
+        include_narrative=False,
+        max_bytes=65536,
     )
     assert without.narrative_summary is None
 
 
 def test_payload_size_bound_enforced() -> None:
     env = profiles.apply_profile(
-        _incident_event(narrative="x" * 2000), PayloadProfile.ANALYST, include_narrative=True,
+        _incident_event(narrative="x" * 2000),
+        PayloadProfile.ANALYST,
+        include_narrative=True,
         max_bytes=300,
     )
     assert len(env.model_dump_json().encode("utf-8")) <= 300 or env.narrative_summary is None
@@ -123,8 +142,15 @@ def test_payload_size_bound_enforced() -> None:
 
 def test_canonical_event_has_no_raw_evidence() -> None:
     env = mapping.build_alert_event(
-        event_type=EventType.ALERT_CREATED, org="org-1", occurred_at=_NOW, alert_id="a1",
-        severity=Severity.HIGH, title="Alert", summary="decoy accessed", confidence=0.9,
-        trace_ids=("DFAI-abc",), decoy_types=("rag_document",),
+        event_type=EventType.ALERT_CREATED,
+        org="org-1",
+        occurred_at=_NOW,
+        alert_id="a1",
+        severity=Severity.HIGH,
+        title="Alert",
+        summary="decoy accessed",
+        confidence=0.9,
+        trace_ids=("DFAI-abc",),
+        decoy_types=("rag_document",),
     )
     assert mapping.contains_no_raw_evidence(env)

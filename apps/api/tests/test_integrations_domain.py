@@ -29,8 +29,14 @@ def test_event_source_mapping() -> None:
 def test_envelope_bounds_arrays() -> None:
     with pytest.raises(ValidationError):
         SecurityEventEnvelope(
-            event_id="e", event_type=EventType.ALERT_CREATED, organization_id="o",
-            occurred_at="2026-07-19T00:00:00Z", severity=Severity.HIGH, title="t", summary="s",
-            source_object_type=SourceType.ALERT, source_object_id="a",
+            event_id="e",
+            event_type=EventType.ALERT_CREATED,
+            organization_id="o",
+            occurred_at="2026-07-19T00:00:00Z",
+            severity=Severity.HIGH,
+            title="t",
+            summary="s",
+            source_object_type=SourceType.ALERT,
+            source_object_id="a",
             trace_ids=tuple(str(i) for i in range(50)),  # exceeds max_length=20
         )

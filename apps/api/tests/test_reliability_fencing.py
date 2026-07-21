@@ -68,7 +68,9 @@ def test_readiness_fails_without_mandatory_replay() -> None:
     session = _session()
     # Auth + signatures enforced but Redis (memory backend) is not the distributed replay store.
     settings = _settings(
-        auth_enabled=True, monitor_signature_required=True, replay_backend="redis",
+        auth_enabled=True,
+        monitor_signature_required=True,
+        replay_backend="redis",
         redis_url="redis://unreachable:6379/0",
     )
     status = degraded.dependency_status(session, settings)

@@ -26,20 +26,26 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 def _client(make_client, *, signed: bool = False):  # type: ignore[no-untyped-def]
     return make_client(
-        demo_enabled=False, auth_enabled=True, app_env="development",
-        browser_sensor_enabled=True, monitor_signature_required=signed,
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
+        browser_sensor_enabled=True,
+        monitor_signature_required=signed,
     )
 
 
 def _enroll(c, admin_key, org):  # type: ignore[no-untyped-def]
-    token = c.post(
-        "/browser-sensors/enrollment-tokens", headers=_headers(admin_key, org)
-    ).json()["token"]
+    token = c.post("/browser-sensors/enrollment-tokens", headers=_headers(admin_key, org)).json()[
+        "token"
+    ]
     resp = c.post(
         "/browser-sensors/enroll",
         json={
-            "token": token, "name": "laptop", "installation_id": "inst-1",
-            "browser_family": "chromium", "extension_version": "0.1.0",
+            "token": token,
+            "name": "laptop",
+            "installation_id": "inst-1",
+            "browser_family": "chromium",
+            "extension_version": "0.1.0",
         },
     )
     assert resp.status_code == 201
@@ -57,12 +63,15 @@ def test_enroll_is_one_time_and_secret_shown_once(make_client) -> None:  # type:
     org = str(uuid4())
     with _client(make_client) as c:
         admin = _key(c, org, "admin")
-        token = c.post(
-            "/browser-sensors/enrollment-tokens", headers=_headers(admin, org)
-        ).json()["token"]
+        token = c.post("/browser-sensors/enrollment-tokens", headers=_headers(admin, org)).json()[
+            "token"
+        ]
         body = {
-            "token": token, "name": "laptop", "installation_id": "inst-1",
-            "browser_family": "chromium", "extension_version": "0.1.0",
+            "token": token,
+            "name": "laptop",
+            "installation_id": "inst-1",
+            "browser_family": "chromium",
+            "extension_version": "0.1.0",
         }
         first = c.post("/browser-sensors/enroll", json=body)
         assert first.status_code == 201
@@ -80,8 +89,11 @@ def test_unknown_token_rejected(make_client) -> None:  # type: ignore[no-untyped
         resp = c.post(
             "/browser-sensors/enroll",
             json={
-                "token": "does-not-exist", "name": "x", "installation_id": "i",
-                "browser_family": "chromium", "extension_version": "0.1.0",
+                "token": "does-not-exist",
+                "name": "x",
+                "installation_id": "i",
+                "browser_family": "chromium",
+                "extension_version": "0.1.0",
             },
         )
         assert resp.status_code == 404
@@ -93,9 +105,12 @@ def test_policy_version_is_monotonic(make_client) -> None:  # type: ignore[no-un
         admin = _key(c, org, "admin")
         v1 = c.put(
             "/browser-ai-policy",
-            json={"enabled": True, "rules": [
-                {"domain": "chatgpt.com", "classification": "shadow"},
-            ]},
+            json={
+                "enabled": True,
+                "rules": [
+                    {"domain": "chatgpt.com", "classification": "shadow"},
+                ],
+            },
             headers=_headers(admin, org),
         ).json()["policy_version"]
         v2 = c.put(
@@ -128,8 +143,10 @@ def test_revoked_sensor_cannot_ingest(make_client) -> None:  # type: ignore[no-u
         resp = c.post(
             "/monitoring/browser-events",
             json={
-                "trace_id": "DFAI-abc", "destination_domain": "chatgpt.com",
-                "event_type": "shadow_ai_paste_detected", "match_method": "exact",
+                "trace_id": "DFAI-abc",
+                "destination_domain": "chatgpt.com",
+                "event_type": "shadow_ai_paste_detected",
+                "match_method": "exact",
             },
             headers={
                 **_headers(enrolled["api_key"], org),
@@ -147,18 +164,25 @@ def test_event_minimized_and_classified(make_client) -> None:  # type: ignore[no
         admin = _key(c, org, "admin")
         c.put(
             "/browser-ai-policy",
-            json={"enabled": True, "rules": [
-                {"domain": "chatgpt.com", "classification": "shadow"},
-            ]},
+            json={
+                "enabled": True,
+                "rules": [
+                    {"domain": "chatgpt.com", "classification": "shadow"},
+                ],
+            },
             headers=_headers(admin, org),
         )
         enrolled = _enroll(c, admin, org)
         resp = c.post(
             "/monitoring/browser-events",
             json={
-                "trace_id": "DFAI-abc", "destination_domain": "chatgpt.com",
-                "event_type": "shadow_ai_paste_detected", "match_method": "exact",
-                "confidence": 0.9, "extension_version": "0.1.0", "policy_version": 2,
+                "trace_id": "DFAI-abc",
+                "destination_domain": "chatgpt.com",
+                "event_type": "shadow_ai_paste_detected",
+                "match_method": "exact",
+                "confidence": 0.9,
+                "extension_version": "0.1.0",
+                "policy_version": 2,
                 "metadata": {
                     "editor": "contenteditable",
                     "pasted_text": "SECRET DECOY VALUE",  # forbidden -> dropped
@@ -195,13 +219,20 @@ def test_signed_ingestion_and_replay(make_client) -> None:  # type: ignore[no-un
         import json as _json
 
         body_obj = {
-            "trace_id": "DFAI-abc", "destination_domain": "chatgpt.com",
-            "event_type": "shadow_ai_paste_detected", "match_method": "exact",
+            "trace_id": "DFAI-abc",
+            "destination_domain": "chatgpt.com",
+            "event_type": "shadow_ai_paste_detected",
+            "match_method": "exact",
         }
         raw = _json.dumps(body_obj).encode()
         canonical = canonical_request(
-            method="POST", path="/monitoring/browser-events", organization_id=org,
-            monitor_id=sensor_pub, timestamp=ts, nonce=nonce, body=raw,
+            method="POST",
+            path="/monitoring/browser-events",
+            organization_id=org,
+            monitor_id=sensor_pub,
+            timestamp=ts,
+            nonce=nonce,
+            body=raw,
         )
         signature = sign(secret, canonical)
         headers = {

@@ -203,8 +203,17 @@ def test_api_key_is_bound_to_one_organization(make_client) -> None:
 
 
 def test_auth_bypass_rejected_in_production(make_client) -> None:
-    with make_client(auth_enabled=False, app_env="production") as client:
-        assert client.get("/incidents").status_code == 401
+    """A production deployment with authentication disabled must refuse to start.
+
+    Previously this configuration booted and rejected every protected request with 401, which left a
+    deployment that looked healthy while being operationally unusable. Startup validation now fails
+    closed instead. Request-time enforcement remains as defense in depth.
+    """
+    import pytest
+
+    with pytest.raises(RuntimeError, match="AUTH_ENABLED"):
+        with make_client(auth_enabled=False, app_env="production"):
+            pass
 
 
 # ---- finding 7: safe error responses -------------------------------------------------------------

@@ -79,14 +79,18 @@ def test_time_boxed_bootstrap_is_allowed() -> None:
 
 
 def test_auth_bypass_rejected_in_production(make_client) -> None:  # type: ignore[no-untyped-def]
-    # AUTH_ENABLED=false is a development-only bypass; production rejects it at request time.
-    with make_client(auth_enabled=False, app_env="production") as client:
-        assert client.get("/incidents").status_code == 401
+    # AUTH_ENABLED=false is a development-only bypass. Production now refuses to START with it,
+    # rather than booting a deployment that reports healthy while rejecting every request.
+    import pytest
+
+    with pytest.raises(RuntimeError, match="AUTH_ENABLED"):
+        with make_client(auth_enabled=False, app_env="production"):
+            pass
 
 
 def test_demo_routes_absent_in_production(make_client) -> None:  # type: ignore[no-untyped-def]
     # Even with DEMO_ENABLED=true, demo routes require APP_ENV=development, so they are unmounted.
-    with make_client(demo_enabled=True, app_env="production") as client:
+    with make_client(demo_enabled=True, app_env="production", auth_enabled=True) as client:
         assert client.post("/demo/seed").status_code == 404
 
 

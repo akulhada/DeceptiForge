@@ -23,7 +23,9 @@ def _headers(key: str, org: str) -> dict[str, str]:
 
 def _client(make_client):  # type: ignore[no-untyped-def]
     return make_client(
-        demo_enabled=False, auth_enabled=True, app_env="development",
+        demo_enabled=False,
+        auth_enabled=True,
+        app_env="development",
         security_integrations_enabled=True,
     )
 
@@ -32,8 +34,12 @@ def _create(c, key, org, endpoint="https://93.184.216.34/hook"):  # type: ignore
     return c.post(
         "/security-integrations",
         json={
-            "integration_type": "generic_webhook", "name": "siem", "endpoint": endpoint,
-            "secret": "signing-secret", "minimum_severity": "low", "payload_profile": "standard",
+            "integration_type": "generic_webhook",
+            "name": "siem",
+            "endpoint": endpoint,
+            "secret": "signing-secret",
+            "minimum_severity": "low",
+            "payload_profile": "standard",
         },
         headers=_headers(key, org),
     )
@@ -67,9 +73,7 @@ def test_test_connection_uses_fake_transport(make_client, monkeypatch) -> None: 
         def send(self, request, *, timeout):  # type: ignore[no-untyped-def]
             return HttpResponse(status=200, headers={})
 
-    monkeypatch.setattr(
-        "app.api.integrations.build_http_transport", lambda: FakeTransport()
-    )
+    monkeypatch.setattr("app.api.integrations.build_http_transport", lambda: FakeTransport())
     org = str(uuid4())
     with _client(make_client) as c:
         admin = _key(c, org, "admin")
@@ -84,9 +88,12 @@ def test_cross_org_integration_isolation(make_client) -> None:  # type: ignore[n
         admin_a = _key(c, org_a, "admin")
         iid = _create(c, admin_a, org_a).json()["id"]
         admin_b = _key(c, org_b, "admin")
-        assert c.post(
-            f"/security-integrations/{iid}/disable", headers=_headers(admin_b, org_b)
-        ).status_code == 404
+        assert (
+            c.post(
+                f"/security-integrations/{iid}/disable", headers=_headers(admin_b, org_b)
+            ).status_code
+            == 404
+        )
         assert c.get("/security-integrations", headers=_headers(admin_b, org_b)).json() == []
 
 
@@ -98,11 +105,17 @@ def test_manual_incident_export_formats(make_client) -> None:  # type: ignore[no
         analyst = _key(c, org, "analyst")
         session = c.app_session()
         incident = IncidentRecord(
-            id=uuid4(), organization_id=UUID(org), status="open",
-            data=_json.dumps({
-                "title": "Decoy touched", "summary": "a repository decoy was accessed",
-                "severity": "high", "affected_surfaces": ["repository"],
-            }),
+            id=uuid4(),
+            organization_id=UUID(org),
+            status="open",
+            data=_json.dumps(
+                {
+                    "title": "Decoy touched",
+                    "summary": "a repository decoy was accessed",
+                    "severity": "high",
+                    "affected_surfaces": ["repository"],
+                }
+            ),
         )
         session.add(incident)
         session.commit()
@@ -120,15 +133,21 @@ def test_manual_incident_export_formats(make_client) -> None:  # type: ignore[no
         assert stix["type"] == "bundle"
         # Synthetic decoy is never a malicious Indicator.
         assert all(o["type"] != "indicator" for o in stix["objects"])
-        assert c.get(
-            f"/security-export/incidents/{iid}?format=bogus", headers=_headers(analyst, org)
-        ).status_code == 400
+        assert (
+            c.get(
+                f"/security-export/incidents/{iid}?format=bogus", headers=_headers(analyst, org)
+            ).status_code
+            == 400
+        )
 
 
 def test_export_permission_enforced(make_client) -> None:  # type: ignore[no-untyped-def]
     org = str(uuid4())
     with _client(make_client) as c:
         viewer = _key(c, org, "viewer")  # viewer has no incidents:export
-        assert c.get(
-            f"/security-export/incidents/{uuid4()}?format=json", headers=_headers(viewer, org)
-        ).status_code == 403
+        assert (
+            c.get(
+                f"/security-export/incidents/{uuid4()}?format=json", headers=_headers(viewer, org)
+            ).status_code
+            == 403
+        )
