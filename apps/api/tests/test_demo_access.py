@@ -130,4 +130,6 @@ class TestDemoAndJudgeCannotReachEachOther:
             client.post("/demo/seed", headers=_mint(client, "demo", DEMO_ORGANIZATION_ID))
 
             after = client.get("/api/v1/judge/export", headers=judge_headers).json()
-            assert after == {**before, "exported_at": after["exported_at"], "quotas": after["quotas"]}
+            # Ignore the fields that legitimately move on every export call.
+            volatile = {"exported_at": after["exported_at"], "quotas": after["quotas"]}
+            assert after == {**before, **volatile}
