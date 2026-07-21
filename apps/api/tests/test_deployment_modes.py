@@ -17,6 +17,7 @@ _HARDENED = dict(
     auth_enabled=True,
     demo_enabled=False,
     analysis_lab_enabled=False,
+    judge_workspace_enabled=False,
     rate_limit_mode="gateway",
     replay_backend="redis",
     redis_url="redis://localhost:6379/0",

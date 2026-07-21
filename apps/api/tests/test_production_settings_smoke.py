@@ -21,6 +21,8 @@ _PROD: dict[str, object] = {
     "app_env": "production",
     "auth_enabled": True,
     "demo_enabled": False,
+    # Pinned so a local .env cannot leak surface flags into a production assertion.
+    "judge_workspace_enabled": False,
     "monitor_signature_required": True,
     "rate_limit_mode": "app",
     "rate_limit_backend": "redis",
