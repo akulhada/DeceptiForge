@@ -1,98 +1,129 @@
-<!-- Purpose: Introduce the repository and its local development workflow. Responsibilities: document shared commands and application boundaries. Future modules: API, web, browser extension, and deployment runbooks. -->
-
 # DeceptiForge
 
-DeceptiForge is a context-aware deception platform for AI-era security. It generates stack-aware decoys and captures unauthorized access by people and AI agents.
+## Context-aware deception for the AI era
 
-> Context-aware deception for the AI era: believable synthetic business assets, placed where an
-> attacker or AI agent is likely to look, with deterministic reconstruction when they are touched.
+DeceptiForge analyzes how an organization works, creates believable synthetic business assets,
+places them where attackers and AI agents are likely to look, and reconstructs the incident when
+those assets are touched.
 
-## Workspace
+**Submission links:** public demo video and hosted judge sandbox are not published from this
+repository. Do not submit until their public URLs and restricted test access have been verified.
 
-- `apps/api` — FastAPI service and database migrations.
-- `apps/web` — Next.js application.
-- `apps/extension` — Plasmo browser extension.
-- `packages/*` — shared, versioned TypeScript packages.
+## Problem and approach
 
-## Local development
+Generic honeytokens can look detached from the code, documentation, and business workflows around
+them. DeceptiForge derives repository context, naming patterns, sensitive paths, and placement
+signals before producing schema-constrained synthetic decoys. The product then validates safety and
+believability, records a tripwire touch, creates a deterministic alert, and reconstructs a
+minimized-evidence incident timeline.
+
+The core flow is **Context → Decoy → Placement → Detection → Incident**. The built-in development
+demo uses fictional data only and demonstrates this complete backend-driven flow.
+
+## Implemented capabilities
+
+- Repository intelligence, naming-pattern inference, organization context, and placement reasoning.
+- Deterministic template-constrained secret, document, and database-record decoys with safety and
+  believability checks.
+- Trace monitoring, normalized alerting and deduplication, deterministic incident reconstruction,
+  coverage estimates, and a tenant-scoped dashboard.
+- Organization-scoped API keys, permissions, audit records, evidence minimization, replay controls,
+  bounded payloads, and optional Redis-backed protections.
+- Development-only controlled demo orchestration. Demo routes are mounted only when
+  `APP_ENV=development` and `DEMO_ENABLED=true`.
+
+Feature-flagged modules such as deployment workflows, database honey records, AI/browser/agent
+sensors, measured coverage, SIEM export, reliability, and capacity controls are documented in the
+links below. They are disabled by default and exercised with deterministic fakes. They are not a
+claim of production certification.
+
+## Architecture
+
+Next.js provides the dashboard. FastAPI hosts the API and deterministic security pipeline.
+PostgreSQL persists tenant-scoped artifacts; Redis is used for distributed replay and rate-limit
+stores when configured. Expensive reconstruction is queued. GPT is optional and isolated from the
+authoritative detection path.
+
+## GPT runtime use
+
+The current implementation uses a configurable OpenAI model for an **AI-assisted analyst summary**
+of an already reconstructed incident. It receives bounded, sanitized timeline context; output is
+validated and a deterministic fallback is returned when the model, credential, or response is
+unavailable. In the demo, a repository trace touch still produces its event, alert, severity, and
+incident if the model is disabled.
+
+GPT does not authorize access, approve deployments, assign severity, alter evidence, select an
+organization, accept monitoring events, or decide whether an incident exists. Decoy generation is
+deterministic in the current implementation; it does not require GPT.
+
+## How We Built DeceptiForge with Codex
+
+Codex acted as a development collaborator for repository navigation, domain/API and frontend work,
+test generation, authorization and signed-ingestion review, migrations, CI diagnosis, error
+handling, and demo reliability. Generated changes and recommendations were inspected, tested,
+revised, and validated by the author.
+
+The author selected the problem and product concept, kept deterministic security logic
+authoritative, set approval and safety boundaries, chose the demo flow, and made the final tradeoffs
+between realism, privacy, safety, and delivery time. Codex did not autonomously set product policy
+or authorize deployment. GPT is a runtime product capability; Codex was a development tool.
+
+Codex Session ID must be added manually from `/feedback` in the primary development thread before
+submission. It is intentionally not invented or stored as a placeholder here.
+
+## Quick start and judge testing
+
+Prerequisites: Docker Desktop, Python 3.12+, Node.js compatible with pnpm 9.15.4, and pnpm 9.15.4.
+The verified local path is Docker Desktop on macOS with Chrome; the web dashboard is expected to
+work in current Chromium browsers on Linux and Windows, but those environments have not been
+certified here.
 
 ```sh
+git clone <repository-url>
+cd DeceptiForge
 cp .env.example .env
-docker compose up -d postgres
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
 pnpm install
-pnpm dev
+docker compose up --build -d
+docker compose exec api alembic upgrade head
+pnpm --filter @deceptiforge/web dev
 ```
 
-Module-specific setup is documented as each application is added.
+Open `http://localhost:3000`. With the development templates, `DEMO_ENABLED=true` and
+`NEXT_PUBLIC_DEMO_MODE=true` expose the fictional demo. Select **Run DeceptiForge Demo** and
+confirm repository context, placement reasoning, synthetic validation, event, alert, incident,
+coverage, and an AI-assisted or deterministic-fallback narrative. Refreshing the page is safe.
+`POST http://localhost:8000/demo/reset` clears only the demo organization.
 
-## Quality checks
+For detailed setup, API, security, and deployment instructions, use the linked durable documents.
+No judge credentials, production secrets, or customer data belong in this repository.
 
-```sh
-pnpm lint
-pnpm test
-pnpm format:check
-```
+## Security, privacy, and limitations
 
-## Demo
+All demo assets are fictional and synthetic. The local demo trigger uses the real deterministic
+pipeline but currently invokes it inside the development-only API rather than through a registered
+signed monitor HTTP client. Signed monitoring ingestion, replay rejection, and monitor credentials
+exist separately and remain the production boundary. A signed-demo-trigger integration is required
+before claiming the demo proves that boundary end to end.
 
-With `DEMO_ENABLED=true` (development/demo only), open the dashboard and click **Run DeceptiForge
-Demo**. It runs the full pipeline — repository analysis → context → placements → decoys →
-validation → tripwires → detection → alert → incident → optional AI summary → coverage — with
-per-step status, then shows a weighted coverage estimate. A run is exportable as Markdown/JSON. See
-[Dashboard](docs/Dashboard.md) and [Pipeline API](docs/Api.md).
+This repository is a controlled-staging project, not a production-certified security service.
+Current limitations include no live GitHub/GitLab provider, no full user OAuth/SSO implementation,
+and no API-key rotation. See [Production readiness](docs/ProductionReadiness.md).
 
-The demo uses only fictional data and development-only routes. Start the API and web app with the
-normal local-development commands, set `APP_ENV=development` and `DEMO_ENABLED=true`, then open the
-dashboard and run the demo. `POST /demo/run` is repeatable; `/demo/reset` removes **only** the demo
-organization's data. `/demo/state` (or `/demo/status`) exposes backend-derived progress, and
-`/demo/trigger` uses the normal deterministic pipeline to create the event, alert, and incident.
-These routes are never mounted in staging or production.
+## Supported Platforms
 
-GPT is optional and bounded to an AI-assisted incident narrative using minimized context. It cannot
-make authorization, approval, severity, evidence, monitoring-acceptance, organization-access, or
-incident-existence decisions; deterministic services remain authoritative and provide a fallback.
+- Tested: macOS, Docker Desktop, Python 3.12, PostgreSQL 16, Redis 7, Node.js with pnpm 9.15.4,
+  and Chrome for the local dashboard.
+- Expected but not certified: current Chromium browsers on Linux and Windows, including Docker via
+  WSL2.
 
-## Documentation
+## Documentation and license
 
-- [Architecture](docs/Architecture.md)
-- [Development](docs/Development.md)
-- [Contributing](docs/Contributing.md)
-- [Folder structure](docs/FolderStructure.md)
-- [Production readiness](docs/ProductionReadiness.md) · [Security model](docs/SecurityModel.md) · [Preflight checklist](docs/checklists/ProductionPreflight.md)
-- [Dashboard](docs/Dashboard.md) · [Pipeline API](docs/Api.md) · [Incident narrative](docs/IncidentNarrative.md) · [Production boundary](docs/ProductionBoundary.md)
-- [Performance architecture](docs/PerformanceArchitecture.md) · [SLOs](docs/ServiceLevelObjectives.md) · [Load testing](docs/LoadTesting.md) · [Capacity planning](docs/CapacityPlanning.md) · [Tenant limits](docs/TenantLimits.md)
-
-## Current status
-
-Controlled-staging grade, not a finished multi-tenant SaaS — see
-[Production readiness](docs/ProductionReadiness.md). Local-path repository scanning and all `/demo/*`
-routes are development/demo-only (gated by `DEMO_ENABLED`/`AUTH_ENABLED`, off by default). Advanced
-deception surfaces and reliability features ship **disabled by default** behind feature flags and are
-exercised in CI against deterministic fakes — never live third-party services.
-
-**Implemented & tested (core).** Repository scan → context profiling → decoy generation → monitoring
-→ alerting → incident reconstruction → optional AI narrative → coverage estimate; organization-scoped
-persistence and incident upsert (no global delete/reinsert); hashed, scoped, revocable API keys;
-signed (`monitor-signature-v1`), replay-protected, size-bounded monitoring ingestion; Redis-backed
-distributed rate limiting and replay store; evidence encryption at rest; scheduled advisory-locked
-retention/lifecycle jobs. Covered by the backend suite plus live-PostgreSQL and live-Redis CI jobs.
-
-**Implemented behind default-off feature flags (controlled environments).** Each is CI-tested against
-deterministic fakes; no paid/live provider is contacted:
-
-- Decoy deployment approval + lifecycle — `docs/DecoyDeployment.md` (live GitHub App is a fake adapter — see Planned).
-- Database honey records (PostgreSQL) — `docs/DatabaseHoneyRecords.md`.
-- AI tripwires (RAG / MCP) — `docs/AiTripwires.md`, `docs/AiDataHandling.md`.
-- Browser AI-paste sensor (Shadow AI) — `docs/BrowserAiSensor.md`, `docs/BrowserPrivacy.md`.
-- AI agent activity sensor (scope violations) — `docs/AiAgentSensor.md`, `docs/AgentScopePolicies.md`.
-- Measured coverage engine + placement optimization — `docs/CoverageEngine.md`, `docs/PlacementOptimization.md`.
-- SIEM/SOAR export + incident export — `docs/SecurityIntegrations.md`, `docs/IncidentExport.md`.
-- Multi-region reliability + disaster recovery — `docs/DisasterRecovery.md`, `docs/RestoreDrills.md`.
-
-**Partially implemented.** The API-key/organization boundary has no key rotation. The demo path shows
-a lightweight weighted coverage estimate; the flagged measured coverage engine is the accurate path.
-
-**Planned / not implemented.** Real user identity (OAuth/SSO and full RBAC beyond role→scope); live
-GitHub/GitLab App provider integration (currently a fake adapter); API-key rotation. No production
-certification is claimed — certify via a staging restore drill + regional rehearsal
-(see [Staging verification](docs/checklists/StagingVerification.md)).
+- [Architecture](docs/Architecture.md), [Development](docs/Development.md), and
+  [Dashboard](docs/Dashboard.md)
+- [Pipeline API](docs/Api.md), [Security model](docs/SecurityModel.md), and
+  [Production boundary](docs/ProductionBoundary.md)
+- [Incident narrative](docs/IncidentNarrative.md), [Performance architecture](docs/PerformanceArchitecture.md),
+  [Capacity planning](docs/CapacityPlanning.md), and [Disaster recovery](docs/DisasterRecovery.md)
+- [MIT License](LICENSE)
