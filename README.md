@@ -6,7 +6,7 @@ DeceptiForge analyzes repository and organizational signals, proposes believable
 
 **OpenAI Build Week category:** Developer Tools.
 
-**Public video:** Pending public upload. Add the verified YouTube URL before submission.
+**Public video:** https://youtu.be/8HOHHayxvO4
 
 **Hosted judge workspace:** Distributed to judges through the submission channel. Its URL and credentials are intentionally not committed to this repository.
 
