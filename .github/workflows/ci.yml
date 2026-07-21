@@ -217,7 +217,24 @@ jobs:
           # A regression to 'unsafe-inline' scripts would silently undo the protection.
           script_src="$(echo "$csp" | grep -o "script-src[^;]*")"
           echo "$script_src" | grep -q "unsafe-inline" && { echo "script-src allows unsafe-inline"; exit 1; }
-          echo "security headers verified on live responses"
+          # REGRESSION GUARD. A statically prerendered page is built once with no nonce, while the
+          # middleware sends a fresh per-request nonce. Under 'strict-dynamic' a nonce is the only
+          # thing that authorises a script, so a prerendered page has every script blocked and the
+          # app never hydrates — with no console error and no failing header assertion. The only
+          # reliable signal is that the nonce in the HTML matches the nonce in the header.
+          page="$(curl -s -D /tmp/hdr.txt http://127.0.0.1:3100/)"
+          header_nonce="$(grep -io "nonce-[a-f0-9]\{32\}" /tmp/hdr.txt | head -1 | sed 's/^nonce-//I')"
+          html_nonce="$(printf '%s' "$page" | grep -o 'nonce="[a-f0-9]\{32\}"' | head -1 | sed 's/nonce="//; s/"//')"
+          if [ -z "$html_nonce" ]; then
+            echo "no nonce in the served HTML: scripts would be blocked and the app would not hydrate"
+            exit 1
+          fi
+          if [ "$header_nonce" != "$html_nonce" ]; then
+            echo "nonce mismatch: header=$header_nonce html=$html_nonce"
+            echo "the page is probably statically prerendered; scripts will be blocked at runtime"
+            exit 1
+          fi
+          echo "security headers verified on live responses (nonce matches the served HTML)"
       # Extension hardening: the built MV3 bundle must request only minimal permissions, ship a
       # locked-down CSP, and contain no eval, no remote code, and no embedded secrets.
       - name: Extension manifest + permission audit

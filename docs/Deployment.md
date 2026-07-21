@@ -96,6 +96,29 @@ Startup validation and router composition enforce this independently, so neither
 Setting `DEMO_ENABLED=true` or `ANALYSIS_LAB_ENABLED=true` in an environment that forbids it fails
 startup rather than leaving a deployment whose configuration and behaviour disagree.
 
+### Frontend route model
+
+| Route | Purpose | Available when |
+| --- | --- | --- |
+| `/` | restricted judge workspace, or the ordinary tenant workspace | workspace in development/judge with `NEXT_PUBLIC_JUDGE_WORKSPACE_ENABLED=true`; tenant dashboard otherwise |
+| `/demo` | the curated fictional story used in the video | development/judge with `NEXT_PUBLIC_DEMO_MODE=true` |
+| `/analysis-lab` | internal deterministic fixtures | development/test with `NEXT_PUBLIC_ANALYSIS_LAB_ENABLED=true` |
+
+There is no `/judge` route. The root route serves the judge workspace directly, so there is no
+second component duplicating its state.
+
+`NEXT_PUBLIC_APP_ENV` selects the frontend mode. An unrecognised or absent value resolves to
+`production` — the most restrictive mode — so a misconfigured build hides demonstration surfaces
+rather than revealing them. Each gated route calls the shared eligibility helper itself and returns
+a real 404: hiding a navigation link is not a control.
+
+**These pages are rendered per request, not prerendered.** The nonce CSP and static prerendering are
+incompatible: a prerendered page is built once with no nonce, while the middleware sends a fresh
+per-request nonce, and under `strict-dynamic` a nonce is the only thing that authorises a script.
+A prerendered page therefore has every script blocked and never hydrates — silently, with no console
+error. `app/layout.tsx` reads a request header to opt out of prerendering, and CI asserts the nonce
+in the served HTML matches the one in the header.
+
 ### Restricted judge workspace
 
 `JUDGE_WORKSPACE_ENABLED=true` mounts `/api/v1/judge/*`. Each judge gets a TTL-bound sandbox: a
