@@ -245,7 +245,15 @@ def test_rejected_authentication_is_persisted_to_the_security_audit(make_client)
     assert audit.detail == "missing key"
 
 
-def test_cors_allows_required_monitoring_headers(make_client) -> None:
+def test_cors_does_not_offer_signing_headers_to_browsers(make_client) -> None:
+    """Signed monitoring ingestion is not a browser-page capability.
+
+    This previously asserted that replay headers were advertised via CORS. Signed ingestion is
+    produced by server-side senders and by the MV3 extension, which uses host_permissions and so
+    never traverses page CORS. Advertising nonce/timestamp/signature headers to a browser origin
+    would grant a page a capability it must not have, so the allow-list is scoped to what the
+    dashboard actually sends.
+    """
     with make_client(
         demo_enabled=False,
         auth_enabled=True,
@@ -258,16 +266,14 @@ def test_cors_allows_required_monitoring_headers(make_client) -> None:
                 "Origin": "https://dashboard.example.test",
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": (
-                    "X-DeceptiForge-API-Key, X-DeceptiForge-Org-Id, "
                     "X-DeceptiForge-Nonce, X-DeceptiForge-Timestamp"
                 ),
             },
         )
 
-    assert response.status_code == 200
-    allowed = response.headers["access-control-allow-headers"].lower()
-    assert "x-deceptiforge-nonce" in allowed
-    assert "x-deceptiforge-timestamp" in allowed
+    allowed = response.headers.get("access-control-allow-headers", "").lower()
+    assert "x-deceptiforge-nonce" not in allowed
+    assert "x-deceptiforge-timestamp" not in allowed
 
 
 def test_admin_can_create_list_and_revoke_keys(client) -> None:

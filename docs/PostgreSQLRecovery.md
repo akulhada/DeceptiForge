@@ -12,7 +12,8 @@ Never restore over production during routine testing. Restore into an isolated r
 4. Replay WAL for point-in-time where supported.
 5. Validate PostgreSQL version + extensions; confirm migration revision.
 6. Run integrity checks (`scripts/reliability/verify_restore.sh`).
-7. Verify organization isolation, legal holds, audit, encryption-key references.
+7. Verify organization isolation, audit, and encryption-key references. (Legal holds are not
+   implemented; the restore drill makes no hold claim.)
 8. Run application smoke tests.
 9. Produce a checksummed restore report; record achieved RPO/RTO.
 10. Destroy the isolated recovery environment after the retention period.

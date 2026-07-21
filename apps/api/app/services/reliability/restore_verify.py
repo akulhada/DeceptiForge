@@ -1,7 +1,8 @@
 # Purpose: deterministic restore-integrity verification against a restored database.
 # Responsibilities: run a fixed set of checks (expected tables, migration revision, organization
-#   scoping, encryption round-trip, reclaimable stale leases, plausible row counts, legal-hold
-#   presence when modeled) and assemble a checksummed RestoreReport. Never restores over production;
+#   scoping, encryption round-trip, reclaimable stale leases, and plausible row counts) and assemble
+#   a checksummed RestoreReport. Legal holds are not implemented, so no hold claim is made. Never
+#   restores over production;
 #   operates on whatever session it is given (an isolated recovery database). No secrets in output.
 # Dependencies: settings, reliability domain, encryption.
 from __future__ import annotations
@@ -50,7 +51,8 @@ def verify(session: Session, settings: Settings, *, expected_migration: str) -> 
         revision = None
     checks.append(
         _check(
-            "migration_revision", revision == expected_migration,
+            "migration_revision",
+            revision == expected_migration,
             f"found={revision} expected={expected_migration}",
         )
     )
@@ -94,8 +96,10 @@ def verify(session: Session, settings: Settings, *, expected_migration: str) -> 
                 counts_ok = False
     checks.append(_check("row_counts_plausible", counts_ok))
 
-    # Legal hold: pass-if-absent (not modeled as a table yet); when present it must be non-empty.
-    checks.append(_check("legal_holds_present", True, "not modeled or present"))
+    # Legal holds are NOT implemented (no hold model, and no retention/deletion path consults one).
+    # This drill therefore makes no legal-hold claim: emitting a passing "legal_holds_present" check
+    # would have certified preservation that does not exist. Reinstate a real check together with an
+    # enforced hold model — see docs/BackupPolicy.md.
     return checks
 
 
@@ -115,9 +119,15 @@ def build_report(
     body = "|".join(f"{c.name}:{c.passed}" for c in checks) + f"|{migration_revision}"
     checksum = hashlib.sha256(body.encode("utf-8")).hexdigest()
     return RestoreReport(
-        drill_id=drill_id, backup_identifier=backup_identifier, recovery_point=recovery_point,
-        started_at=started_at, finished_at=finished_at,
-        achieved_rpo_minutes=achieved_rpo_minutes, achieved_rto_minutes=achieved_rto_minutes,
-        migration_revision=migration_revision, checks=tuple(checks), passed=passed,
+        drill_id=drill_id,
+        backup_identifier=backup_identifier,
+        recovery_point=recovery_point,
+        started_at=started_at,
+        finished_at=finished_at,
+        achieved_rpo_minutes=achieved_rpo_minutes,
+        achieved_rto_minutes=achieved_rto_minutes,
+        migration_revision=migration_revision,
+        checks=tuple(checks),
+        passed=passed,
         checksum=checksum,
     )

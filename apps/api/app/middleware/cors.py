@@ -7,13 +7,18 @@ from collections.abc import Sequence
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
+# CORS is scoped to what a BROWSER PAGE actually sends. The dashboard issues only GET and POST and
+# never performs a PUT, so no write verb beyond POST is advertised.
 _ALLOWED_METHODS = ["GET", "POST", "OPTIONS"]
+
+# Only the headers the dashboard sends. Signed-ingestion headers (monitor id, signature, nonce,
+# timestamp) are deliberately ABSENT: signed monitoring is produced by server-side senders and by
+# the MV3 extension, which uses host_permissions and therefore does not go through page CORS.
+# Advertising signing headers here would hand browser-origin pages a capability they must not have.
 _ALLOWED_HEADERS = [
     "content-type",
     "x-deceptiforge-api-key",
     "x-deceptiforge-org-id",
-    "x-deceptiforge-nonce",
-    "x-deceptiforge-timestamp",
 ]
 
 

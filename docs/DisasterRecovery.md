@@ -5,7 +5,8 @@
 ## Principles
 
 PostgreSQL authoritative; Redis disposable; backups valid only when restored; failover preserves
-organization isolation; encryption valid after restore; legal holds survive backup/restore/retention;
+organization isolation; encryption valid after restore; (legal holds are NOT implemented — see
+BackupPolicy);
 workers idempotent and recoverable; core ingestion fails safe; no silent data loss; no automatic
 cross-region failover without split-brain protection; GPT is irrelevant to recovery.
 

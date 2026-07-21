@@ -19,7 +19,10 @@ safe under multi-worker/multi-region operation — without losing legally-held o
   cleanup is auditable.
 - Only the primary region runs schedulers/side-effect workers; retention skips on a non-leader region
   (see [ADR 0005](0005-release-certification-criteria.md) and the reliability docs).
-- Legal holds and audit records survive retention, backup, and restore.
+- Audit records survive retention, backup, and restore. **Legal holds are not implemented**: there
+  is no hold model and no retention or deletion path consults one, so nothing is exempted from
+  retention today. Implementing them requires an organization-scoped hold model enforced in every
+  deletion path plus a restore-drill check; until then no document, drill, or UI may claim holds.
 
 ## Consequences
 
