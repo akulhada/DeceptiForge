@@ -112,12 +112,25 @@ function ConnectedTenant({ onDisconnect }: { onDisconnect: () => void }) {
   );
 }
 
+// After connecting, honor a `?next=` return path (e.g. from the Analysis Lab) — but only a
+// same-origin absolute path, never a protocol-relative or external URL.
+function handleConnected(setConnected: (value: boolean) => void): () => void {
+  return () => {
+    const next = new URLSearchParams(window.location.search).get('next');
+    if (next && next.startsWith('/') && !next.startsWith('//')) {
+      window.location.assign(next);
+      return;
+    }
+    setConnected(true);
+  };
+}
+
 export function TenantDashboard() {
   const [connected, setConnected] = useState(() => getSession() !== null);
   if (!connected) {
     return (
       <div className="mx-auto max-w-7xl px-6 py-16">
-        <ConnectPanel onConnected={() => setConnected(true)} />
+        <ConnectPanel onConnected={handleConnected(setConnected)} />
       </div>
     );
   }

@@ -5,9 +5,12 @@
 //   stale-result tracking, explainable result sections, comparison, and JSON/Markdown export.
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getSession } from '@/services/authSession';
 import { AnalysisApiError, listScenarios, runPreview } from '@/services/analysisLabApi';
 import type {
@@ -16,6 +19,18 @@ import type {
   ScenarioSummary,
 } from '@/services/analysisLabTypes';
 import { safeFilename, toJson, toMarkdown } from '@/services/analysisLabExport';
+import {
+  buildConnectHref,
+  LAB_BODY_CLASS,
+  LAB_CARD_CLASS,
+  LAB_MUTED_CLASS,
+  LAB_TITLE_CLASS,
+  preApiStatus,
+  statusFromApiError,
+  type LabStatus,
+} from '@/services/analysisLabState';
+
+const RETURN_PATH = '/analysis-lab';
 
 interface ParsePosition {
   line: number;
@@ -64,12 +79,109 @@ function Meter({ label, value }: { label: string; value: number }) {
 
 const EMPTY_SIGNALS = '{\n  "languages": [],\n  "services": []\n}';
 
+function GateCard({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <main className="p-6">
+      <Card className={LAB_CARD_CLASS}>
+        <CardHeader>
+          <CardTitle className={LAB_TITLE_CLASS}>{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className={LAB_BODY_CLASS}>{children}</div>
+          {action}
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+
+// A dashboard-connect link styled and focusable like a primary button (keyboard-accessible anchor).
+function ConnectAction() {
+  return (
+    <Link
+      href={buildConnectHref(RETURN_PATH)}
+      className="inline-flex h-9 items-center justify-center rounded-lg bg-sky-600 px-4 text-sm font-medium text-white transition-colors hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+    >
+      Go to the dashboard to connect
+    </Link>
+  );
+}
+
+function LabGate({ status }: { status: LabStatus }) {
+  if (status === 'loading') {
+    return (
+      <main className="p-6" aria-busy="true" aria-live="polite">
+        <h1 className="sr-only">Loading the Interactive Analysis Lab</h1>
+        <Card className={LAB_CARD_CLASS}>
+          <CardHeader>
+            <CardTitle className={LAB_TITLE_CLASS}>Interactive Analysis Lab</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-24 w-full" />
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  if (status === 'unauthenticated' || status === 'no-organization') {
+    return (
+      <GateCard title="Connect your workspace" action={<ConnectAction />}>
+        <p>
+          The Analysis Lab is authenticated and organization-scoped. Connect your workspace on the
+          dashboard, then return here — your place is preserved.
+        </p>
+        {status === 'no-organization' && (
+          <p className={`mt-2 ${LAB_MUTED_CLASS}`}>
+            Your session is missing an organization. Reconnect and select a workspace.
+          </p>
+        )}
+      </GateCard>
+    );
+  }
+
+  if (status === 'forbidden') {
+    return (
+      <GateCard title="Not permitted">
+        <p role="alert">
+          Your role does not include the <code>analysis:preview</code> permission. Ask a workspace
+          admin for access, then reload this page.
+        </p>
+      </GateCard>
+    );
+  }
+
+  // 'unavailable'
+  return (
+    <GateCard
+      title="Analysis service unavailable"
+      action={
+        <Button type="button" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      }
+    >
+      <p role="alert">
+        The analysis service could not be reached. Check the connection and retry.
+      </p>
+    </GateCard>
+  );
+}
+
 export function AnalysisLab() {
-  // Resolve the session after mount so SSR and first client render agree (no hydration mismatch).
-  const [connected, setConnected] = useState(false);
-  useEffect(() => {
-    setConnected(getSession() !== null);
-  }, []);
+  // Explicit route state machine. Resolve the shared tenant session after mount so SSR and the
+  // first client render agree (no hydration mismatch), then verify authorization with the API.
+  const [status, setStatus] = useState<LabStatus>('loading');
 
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [scenarioId, setScenarioId] = useState<string>('');
@@ -89,14 +201,28 @@ export function AnalysisLab() {
   const resultRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!connected) return;
+    // Reuse the existing application session (authSession) — no separate lab auth mechanism.
+    const pre = preApiStatus(getSession());
+    if (pre !== 'loading') {
+      setStatus(pre);
+      return;
+    }
+    let cancelled = false;
     listScenarios()
       .then((list) => {
+        if (cancelled) return;
         setScenarios(list);
         if (list.length > 0) setScenarioId(list[0].id);
+        setStatus('ready');
       })
-      .catch((e) => setApiError(e instanceof Error ? e.message : 'Failed to load scenarios.'));
-  }, [connected]);
+      .catch((e) => {
+        if (cancelled) return;
+        setStatus(e instanceof AnalysisApiError ? statusFromApiError(e.status) : 'unavailable');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scenarioName = useMemo(
     () => scenarios.find((s) => s.id === scenarioId)?.name ?? null,
@@ -199,16 +325,8 @@ export function AnalysisLab() {
     [result, scenarioName],
   );
 
-  if (!connected) {
-    return (
-      <main className="mx-auto max-w-2xl p-8 text-slate-200">
-        <h1 className="text-2xl font-semibold">Interactive Analysis Lab</h1>
-        <p className="mt-4 text-slate-400">
-          Connect a tenant session on the dashboard to use the lab. Analysis is authenticated and
-          organization-scoped.
-        </p>
-      </main>
-    );
+  if (status !== 'ready') {
+    return <LabGate status={status} />;
   }
 
   return (
