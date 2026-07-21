@@ -103,6 +103,67 @@ Judge credentials are provisioned out of band, shown once, organization-bound, a
 
 The curated `/demo` story is development/judge-only. `/analysis-lab` is development/test-only and returns 404 elsewhere.
 
+## Installing the sensors (developer tools)
+
+Two components install into a developer's own environment. Both are **disabled by default**: their
+routers do not mount until the server flag is set, so the endpoints return 404 until then.
+
+### Browser extension (AI-paste sensor)
+
+Server: set `BROWSER_SENSOR_ENABLED=true`.
+
+```sh
+pnpm --filter @deceptiforge/extension build   # -> apps/extension/build/chrome-mv3-prod
+```
+
+Chrome: `chrome://extensions` -> enable Developer mode -> **Load unpacked** -> select
+`apps/extension/build/chrome-mv3-prod`. Chrome MV3 only; Firefox is not supported, and the
+extension is not published to the Web Store.
+
+It requests `storage` and `alarms` and nothing else, with host access scoped to the supported AI
+surfaces. Each install enrolls with a one-time short-lived token that exchanges for a scoped ingest
+credential, never a dashboard key. Matching is local against hashed trace tokens; pasted text,
+prompts, and model responses are never transmitted or stored.
+
+### Agent adapter SDK and CLI
+
+Server: set `AGENT_SENSOR_ENABLED=true`. Detect-only by default (`AGENT_SENSOR_MODE=detect`).
+
+Enroll first: an admin creates a one-time token (`POST /agent-sensors/enrollment-tokens`) which the
+wrapper exchanges (`POST /agent-sensors/enroll`) for a sensor identity, a scoped signing secret, and
+an `agent_sensor` ingest key.
+
+```sh
+# Credentials come from the environment, never from arguments:
+# DECEPTIFORGE_URL / _ORG_ID / _API_KEY / _SENSOR_ID / _SENSOR_SECRET
+python -m app.agent_sdk.cli start --session-id S --agent-type claude-code \
+  --task "Fix navbar" --allow "apps/web/**"
+echo '{"id":"e1","event_type":"file_read","path":"apps/web/navbar.tsx"}' \
+  | python -m app.agent_sdk.cli event --session-id S --adapter jsonl
+python -m app.agent_sdk.cli finish --session-id S
+```
+
+The CLI does not run your agent; it reports observed events alongside one. Raw content (file
+contents, command output, prompts, reasoning, SQL) is stripped before an event leaves the process.
+
+### Testing path for judges
+
+```sh
+cd apps/api && python -m pytest        # backend suite
+pnpm typecheck && pnpm lint && pnpm test
+pnpm --filter @deceptiforge/extension build
+```
+
+Confirm the sensors are gated before enabling them:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/browser-sensors   # 404 while off
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/agent-sensors     # 404 while off
+```
+
+CI additionally fails the build on any forbidden extension permission, any `eval`/`new Function`,
+any remote script URL, or any embedded secret in the built MV3 bundle.
+
 ## Supported platforms
 
 - **Tested:** macOS, Docker Desktop, Python 3.12, PostgreSQL 16, Redis 7, Node.js with pnpm 9.15.4, and Chrome for the local dashboard.
