@@ -37,10 +37,18 @@ def test_demo_routes_present_in_development(make_client) -> None:
         assert client.get("/demo/state").status_code == 200
 
 
-def test_demo_routes_blocked_in_production_even_if_enabled(make_client) -> None:
-    with make_client(demo_enabled=True, app_env="production", auth_enabled=True) as client:
-        assert client.get("/demo/state").status_code == 404
-        assert client.post("/demo/run").status_code == 404
+def test_production_refuses_to_start_with_demo_enabled(make_client) -> None:
+    """A tenant deployment must not boot with the demo surface requested.
+
+    Previously the routes were merely left unmounted. Refusing to start is stronger: it surfaces
+    the misconfiguration to the operator instead of running a deployment whose configuration says
+    one thing and whose behaviour says another.
+    """
+    import pytest
+
+    with pytest.raises(RuntimeError, match="DEMO_ENABLED"):
+        with make_client(demo_enabled=True, app_env="production", auth_enabled=True):
+            pass
 
 
 _BINDINGS = f'{{"prodkey": "{DEMO_ORGANIZATION_ID}"}}'
@@ -66,9 +74,14 @@ def test_local_scan_allowed_in_development(make_client) -> None:
         assert response.status_code == 200
 
 
-def test_local_scan_remains_blocked_in_production_demo_mode(make_client) -> None:
+def test_local_scan_remains_blocked_in_the_judge_demo_environment(make_client) -> None:
+    """The judge environment mounts the demo story but is still hosted.
+
+    DEMO_ENABLED must not reopen arbitrary server filesystem scanning: the demo scans its own
+    bundled fixture internally, and judges supply structured signals rather than paths.
+    """
     with make_client(
-        demo_enabled=True, auth_enabled=True, app_env="production", api_key_bindings=_BINDINGS
+        demo_enabled=True, auth_enabled=True, app_env="judge", api_key_bindings=_BINDINGS
     ) as client:
         response = client.post(
             "/repositories/scan", json={"path": str(_FIXTURE_PATH)}, headers=_PROD_AUTH

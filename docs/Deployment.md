@@ -73,11 +73,34 @@ are covered in `docs/DisasterRecovery.md`, `docs/BackupPolicy.md`, `docs/Regiona
 `docs/RegionalFailback.md`, with automation in `scripts/reliability/` and runbooks in
 `docs/runbooks/`.
 
+## Deployment modes (`APP_ENV`)
+
+`APP_ENV` is validated against a closed set, so a typo fails startup instead of silently
+resolving to "not development" and picking some middle behaviour.
+
+| Mode | Security contract | `/demo` | Analysis Lab |
+| --- | --- | --- | --- |
+| `development` | relaxed (local scanning, demo-key bypass, plaintext HTTP allowed) | with `DEMO_ENABLED=true` | with `ANALYSIS_LAB_ENABLED=true` |
+| `test` | hardened | never | with `ANALYSIS_LAB_ENABLED=true` |
+| `judge` | **hardened — identical to production** | with `DEMO_ENABLED=true` | never (404) |
+| `staging` | hardened | never | never (404) |
+| `production` | hardened | never | never (404) |
+
+`judge` is a hosted, internet-reachable demonstration environment. It is deliberately *not* a
+development mode: authentication, Redis fail-closed behaviour, signed ingestion and the ban on
+arbitrary filesystem scanning all apply exactly as in production. The only thing it relaxes is
+which demonstration surface may be mounted.
+
+Both demonstration surfaces need an explicit feature flag *and* an environment that permits them.
+Startup validation and router composition enforce this independently, so neither is the only gate.
+Setting `DEMO_ENABLED=true` or `ANALYSIS_LAB_ENABLED=true` in an environment that forbids it fails
+startup rather than leaving a deployment whose configuration and behaviour disagree.
+
 ## Required environment (multi-worker production)
 
 | Variable | Purpose |
 | --- | --- |
-| `APP_ENV=production` | disables demo routes, local scanning, and auth bypass |
+| `APP_ENV=production` | disables demo routes, local scanning, and auth bypass (see modes above) |
 | `DATABASE_URL` | PostgreSQL DSN (private network) |
 | `AUTH_ENABLED=true` | bypass rejected outside development |
 | `REDIS_URL` | required when a Redis-backed backend is selected (private network) |

@@ -7,6 +7,18 @@ from functools import lru_cache
 from pydantic import Field, PostgresDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The deployment modes DeceptiForge recognises. Only `development` relaxes security controls;
+# `judge` is a hosted demonstration environment and is deliberately production-like — it inherits
+# every startup guard (auth required, Redis fail-closed, signed ingestion, no filesystem scanning)
+# and differs from production only in which demonstration surfaces may be mounted.
+DEPLOYMENT_MODES = frozenset({"development", "test", "judge", "staging", "production"})
+
+# Environments where the curated demo story may be mounted, and only with DEMO_ENABLED=true.
+_DEMO_MODES = frozenset({"development", "judge"})
+
+# The Analysis Lab is an internal fixture surface. It is never mounted in a hosted environment.
+_ANALYSIS_LAB_MODES = frozenset({"development", "test"})
+
 
 class Settings(BaseSettings):
     """Environment-derived settings required by the infrastructure layer."""
@@ -251,6 +263,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_cluster_role(self) -> "Settings":
+        # A typo in APP_ENV must not silently select the most permissive behaviour. Every
+        # environment-dependent guard keys off this value, so an unrecognised mode is rejected
+        # rather than treated as "not development" by accident.
+        if self.app_env not in DEPLOYMENT_MODES:
+            raise ValueError(f"app_env must be one of {sorted(DEPLOYMENT_MODES)}")
         # Ambiguous cluster-role configuration is rejected everywhere; production must be explicit.
         if self.cluster_role not in {"primary", "standby", "recovery"}:
             raise ValueError("cluster_role must be one of primary, standby, recovery")
@@ -326,10 +343,11 @@ class Settings(BaseSettings):
             )
         if self._redis_required and self.redis_url is None:
             raise RuntimeError("REDIS_URL is required when a Redis-backed backend is selected")
-        if self.analysis_lab_enabled:
+        if self.analysis_lab_enabled and not self.allows_analysis_lab:
             raise RuntimeError(
-                "ANALYSIS_LAB_ENABLED=true is not permitted outside development; the analysis lab "
-                "is a demonstration surface and must return 404 in staging and production"
+                f"ANALYSIS_LAB_ENABLED=true is not permitted in {self.app_env}; the analysis lab "
+                "is an internal fixture surface and must return 404 in judge, staging and "
+                "production"
             )
         # P0: security controls must never fail open outside development. A Redis outage must
         # refuse signed ingestion and deny rate-limited requests, not silently admit them.
@@ -386,6 +404,14 @@ class Settings(BaseSettings):
             )
         if self._redis_required:
             self._verify_redis_reachable()
+        # Checked last so that a security misconfiguration is always reported first. The demo story
+        # is fictional but still a write surface driving the real pipeline, so it may exist only in
+        # development and in the hosted judge environment.
+        if self.demo_enabled and not self.allows_demo_surface:
+            raise RuntimeError(
+                f"DEMO_ENABLED=true is not permitted in {self.app_env}; the curated demo story is "
+                "available only in development and in the hosted judge environment"
+            )
 
     def _verify_redis_reachable(self) -> None:
         """Ping the configured Redis so startup fails fast when a required store is down."""
@@ -407,9 +433,38 @@ class Settings(BaseSettings):
         return self.app_env == "development"
 
     @property
+    def is_judge(self) -> bool:
+        """Whether this is the hosted judge environment.
+
+        Judge mode is NOT a development mode. It is internet-reachable and therefore keeps every
+        production security control; the only thing it relaxes is which demonstration surfaces may
+        be mounted. Nothing should branch on this property to weaken a security decision.
+        """
+        return self.app_env == "judge"
+
+    @property
     def is_production_like(self) -> bool:
-        """Staging and production share the hardened runtime contract (no dev conveniences)."""
-        return self.app_env in {"staging", "production"}
+        """Environments that share the hardened runtime contract (no dev conveniences).
+
+        Judge is included: it is hosted, so unsigned ingestion, fail-open Redis, disabled auth and
+        filesystem scanning are as unacceptable there as in production.
+        """
+        return self.app_env in {"judge", "staging", "production"}
+
+    @property
+    def allows_demo_surface(self) -> bool:
+        """Whether the curated demo story may be mounted at all in this environment.
+
+        DEMO_ENABLED is still required on top of this; the environment only decides eligibility.
+        Staging and production always refuse, so the demo cannot appear on a real tenant
+        deployment even if the flag is set.
+        """
+        return self.app_env in _DEMO_MODES
+
+    @property
+    def allows_analysis_lab(self) -> bool:
+        """Whether the Analysis Lab may be mounted. Development and test only — never hosted."""
+        return self.app_env in _ANALYSIS_LAB_MODES
 
     @property
     def allows_local_path_scan(self) -> bool:

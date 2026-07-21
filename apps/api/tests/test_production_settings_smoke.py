@@ -89,9 +89,16 @@ def test_auth_bypass_rejected_in_production(make_client) -> None:  # type: ignor
 
 
 def test_demo_routes_absent_in_production(make_client) -> None:  # type: ignore[no-untyped-def]
-    # Even with DEMO_ENABLED=true, demo routes require APP_ENV=development, so they are unmounted.
-    with make_client(demo_enabled=True, app_env="production", auth_enabled=True) as client:
+    # The demo surface is eligible only in development and judge, so production leaves it unmounted.
+    with make_client(demo_enabled=False, app_env="production", auth_enabled=True) as client:
         assert client.post("/demo/seed").status_code == 404
+
+
+def test_production_rejects_demo_enabled_at_startup(make_client) -> None:  # type: ignore[no-untyped-def]
+    # Stronger than leaving the routes unmounted: the operator is told the configuration is invalid.
+    with pytest.raises(RuntimeError, match="DEMO_ENABLED"):
+        with make_client(demo_enabled=True, app_env="production", auth_enabled=True):
+            pass
 
 
 # ---- production Compose topology --------------------------------------------------------

@@ -87,6 +87,8 @@ def _prod(**overrides: object) -> Settings:
         "evidence_encryption_mode": "local",
         "monitor_signature_required": True,
         "api_key_bindings": {"k": _ORG},
+        # Pinned so a local .env cannot leak DEMO_ENABLED into a production assertion.
+        "demo_enabled": False,
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
