@@ -4,7 +4,9 @@
 # Copy and adapt; supply secrets via your orchestrator, not this file.
 services:
   postgres:
-    image: postgres:16-alpine
+    # Pinned by digest so a rebuild cannot pull different contents. Human-readable tag:
+    # postgres:16-alpine (update the digest and this comment together).
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?}
       POSTGRES_USER: ${POSTGRES_USER:?}
@@ -23,7 +25,8 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7-alpine
+    # Pinned by digest. Human-readable tag: redis:7-alpine.
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     command: ['redis-server', '--save', '', '--appendonly', 'no']
     # No host ports: the rate-limit/replay store is reachable only on the internal network.
     networks: [internal]

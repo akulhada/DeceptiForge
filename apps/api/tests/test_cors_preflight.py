@@ -31,9 +31,15 @@ def _preflight(client, method: str, headers: str = "content-type", origin: str =
 # ---- allowed surface -----------------------------------------------------------------------------
 
 
-def test_allowed_origin_may_preflight_get_and_post(make_client) -> None:  # type: ignore[no-untyped-def]
+def test_allowed_origin_may_preflight_every_method_the_dashboard_uses(make_client) -> None:  # type: ignore[no-untyped-def]
+    """Regression: PUT and DELETE are real dashboard calls (policy update and policy removal).
+
+    browserSensorApi PUTs /browser-ai-policy; agentSensorApi PUTs and DELETEs
+    /agent-scope-policies/{id}. Dropping them from the allow-list breaks policy administration at
+    preflight, which is exactly what a narrowing pass must not do.
+    """
     with _client(make_client) as client:
-        for method in ("GET", "POST"):
+        for method in ("GET", "POST", "PUT", "DELETE"):
             response = _preflight(client, method)
             assert response.status_code == 200, method
             assert response.headers["access-control-allow-origin"] == ORIGIN
@@ -59,10 +65,10 @@ def test_disallowed_origin_is_not_echoed(make_client) -> None:  # type: ignore[n
         assert response.headers.get("access-control-allow-origin") not in (OTHER_ORIGIN, "*")
 
 
-def test_disallowed_methods_are_refused(make_client) -> None:  # type: ignore[no-untyped-def]
-    """The browser surface is read + create only; PUT and DELETE are never advertised."""
+def test_methods_no_client_uses_are_not_advertised(make_client) -> None:  # type: ignore[no-untyped-def]
+    """No route accepts PATCH and no client sends it, so it stays off the allow-list."""
     with _client(make_client) as client:
-        for method in ("PUT", "DELETE", "PATCH"):
+        for method in ("PATCH", "TRACE"):
             response = _preflight(client, method)
             allowed = response.headers.get("access-control-allow-methods", "")
             assert method not in allowed, f"{method} must not be advertised to browsers"

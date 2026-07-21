@@ -32,7 +32,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Diagnostics (safe)
         run: |
           echo "python: $(python --version)"
@@ -100,7 +102,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Diagnostics (safe)
         run: |
           echo "alembic: $(alembic --version)"
@@ -151,7 +155,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Distributed replay + rate-limit integration (real Redis)
         env:
           REDIS_TEST_URL: redis://localhost:6379/0
@@ -180,6 +186,37 @@ jobs:
         run: pnpm test
       - name: Build (web dashboard + extension)
         run: pnpm build
+      # Assert the headers on REAL responses from the production server. Reading next.config.ts only
+      # proves intent; this proves the built application emits them. It still does not prove a
+      # deployed ingress preserves them — that must be verified against the real edge.
+      - name: Security headers present on production responses
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          PORT=3100 pnpm start > /tmp/web-prod.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:3100/ && break
+            [ "$i" = "30" ] && { echo "web server never started"; cat /tmp/web-prod.log; exit 1; }
+            sleep 2
+          done
+          headers="$(curl -sI http://127.0.0.1:3100/)"
+          echo "$headers"
+          for header in \
+            'content-security-policy' \
+            'x-content-type-options' \
+            'x-frame-options' \
+            'referrer-policy' \
+            'permissions-policy' \
+            'strict-transport-security'; do
+            echo "$headers" | grep -qi "^$header:" || { echo "missing header: $header"; exit 1; }
+          done
+          csp="$(echo "$headers" | grep -i '^content-security-policy:')"
+          echo "$csp" | grep -q "nonce-" || { echo "CSP is missing a per-request nonce"; exit 1; }
+          echo "$csp" | grep -q "frame-ancestors 'none'" || { echo "CSP allows framing"; exit 1; }
+          # A regression to 'unsafe-inline' scripts would silently undo the protection.
+          script_src="$(echo "$csp" | grep -o "script-src[^;]*")"
+          echo "$script_src" | grep -q "unsafe-inline" && { echo "script-src allows unsafe-inline"; exit 1; }
+          echo "security headers verified on live responses"
       # Extension hardening: the built MV3 bundle must request only minimal permissions, ship a
       # locked-down CSP, and contain no eval, no remote code, and no embedded secrets.
       - name: Extension manifest + permission audit
@@ -215,7 +252,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       - name: Production settings smoke test
         run: pytest -vv tests/test_production_settings_smoke.py
       - name: Production Compose renders
@@ -338,7 +377,7 @@ jobs:
           set -euo pipefail
           python -m venv /tmp/rtaudit
           /tmp/rtaudit/bin/pip install --upgrade pip >/dev/null
-          /tmp/rtaudit/bin/pip install ./apps/api >/dev/null
+          /tmp/rtaudit/bin/pip install --require-hashes -r apps/api/requirements.lock.txt >/dev/null
           /tmp/rtaudit/bin/pip install pip-audit >/dev/null
           ignores=""
           if [ -f .pip-audit-ignore ]; then
@@ -351,7 +390,9 @@ jobs:
           /tmp/rtaudit/bin/pip-audit --skip-editable --progress-spinner off $ignores
       - name: Install API dependencies (dev group)
         working-directory: apps/api
-        run: pip install -e '.[dev]'
+        run: |
+          pip install --require-hashes -r requirements-dev.lock.txt
+          pip install --no-deps -e .
       # Tier 2 (reported, non-blocking): developer tooling never reaches the production image, so a
       # finding here is surfaced in the log rather than blocking a release. It is never hidden.
       - name: Development dependency audit (reported)
@@ -373,7 +414,7 @@ jobs:
           set -euo pipefail
           mkdir -p sbom
           cyclonedx-py environment --of JSON -o sbom/api-dependencies.cdx.json
-          pnpm dlx @cyclonedx/cyclonedx-npm@latest --output-format JSON \
+          pnpm dlx @cyclonedx/cyclonedx-npm@6.0.0 --output-format JSON \
             --output-file sbom/web-dependencies.cdx.json ||
             echo 'web SBOM generation unavailable; API SBOM still produced'
       # Every SBOM is tied to the exact revision it describes.

@@ -10,16 +10,20 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching. (No lockfile exists yet; ranges live in
-# pyproject. FUTURE_HARDENING: generate and install from a lockfile / hashes.)
+# Dependencies come from a hash-verified lockfile, installed before the source for layer caching.
+# --require-hashes makes pip refuse any artifact whose hash is not listed, so a compromised or
+# substituted wheel fails the build instead of shipping. Regenerate with:
+#   make lock            (see apps/api/README or docs/Development.md)
 # The build context is the monorepo root so the API image can package the shared analysis fixtures.
+COPY apps/api/requirements.lock.txt ./requirements.lock.txt
 COPY apps/api/pyproject.toml ./pyproject.toml
 COPY apps/api/app ./app
 COPY apps/api/migrations ./migrations
 COPY apps/api/alembic.ini ./
 COPY packages/contracts/fixtures/analysis ./fixtures/analysis
 
-RUN pip install --no-cache-dir . \
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt \
+    && pip install --no-cache-dir --no-deps . \
     && adduser --disabled-password --gecos "" --uid 10001 appuser \
     && chown -R appuser:appuser /app
 

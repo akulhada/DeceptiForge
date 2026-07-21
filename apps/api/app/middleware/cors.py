@@ -7,9 +7,12 @@ from collections.abc import Sequence
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-# CORS is scoped to what a BROWSER PAGE actually sends. The dashboard issues only GET and POST and
-# never performs a PUT, so no write verb beyond POST is advertised.
-_ALLOWED_METHODS = ["GET", "POST", "OPTIONS"]
+# CORS is scoped to what a BROWSER PAGE actually sends — verified against the dashboard clients:
+#   GET/POST            general reads and creates
+#   PUT                 policy updates (PUT /browser-ai-policy, PUT /agent-scope-policies/{id})
+#   DELETE              policy removal (DELETE /agent-scope-policies/{id})
+# PATCH is absent because no route accepts it and no client sends it.
+_ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
 # Only the headers the dashboard sends. Signed-ingestion headers (monitor id, signature, nonce,
 # timestamp) are deliberately ABSENT: signed monitoring is produced by server-side senders and by
