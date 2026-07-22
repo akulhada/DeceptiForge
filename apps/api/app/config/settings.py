@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     incident_narrative_enabled: bool = True
     narrative_cooldown_seconds: int = 30
     openai_api_key: str | None = None
-    openai_incident_model: str = "gpt-4o-mini"
+    openai_incident_model: str = "gpt-5.6"
     # Abuse / resource limits (single-process MVP; production needs edge enforcement).
     max_request_body_bytes: int = 1_048_576
     max_artifact_bytes: int = 2_097_152

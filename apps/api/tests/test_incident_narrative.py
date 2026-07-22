@@ -165,6 +165,7 @@ def test_model_success_produces_generated_narrative() -> None:
 
     assert narrative.source is NarrativeSource.MODEL
     assert narrative.status is NarrativeStatus.GENERATED
+    assert narrative.model == "gpt-5.6"
     assert narrative.token_usage is not None and narrative.token_usage.total_tokens == 15
     assert narrative.prompt_version == "incident-narrative-v1"
 

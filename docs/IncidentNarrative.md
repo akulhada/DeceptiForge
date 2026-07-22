@@ -76,7 +76,7 @@ on every narrative. The system prompt forbids inventing facts, requires cautious
 # apps/api/.env
 INCIDENT_NARRATIVE_ENABLED=true
 OPENAI_API_KEY=sk-...
-OPENAI_INCIDENT_MODEL=gpt-4o-mini
+OPENAI_INCIDENT_MODEL=gpt-5.6
 ```
 
 Then `POST /incidents/{id}/narrative` returns `source = model` with token usage.

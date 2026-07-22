@@ -39,7 +39,7 @@ Next.js provides the dashboard; FastAPI hosts the deterministic security pipelin
 
 The runtime integration is model-configurable. It can use an approved OpenAI model to turn an already verified, deterministic incident timeline into an analyst-readable narrative. Input is minimized and sanitized, output is schema-validated and bounded, and model failure, missing credentials, or invalid output falls back to a deterministic narrative.
 
-The current checked-in default is `gpt-4o-mini`. If the Build Week recording uses GPT-5.6, set `OPENAI_INCIDENT_MODEL` to the approved GPT-5.6 model identifier and verify that exact model in the recording before claiming it on Devpost.
+The current checked-in default is `gpt-5.6`, the GPT-5.6 Sol alias. Verify the rendered model badge in the recording before claiming GPT-5.6 on Devpost.
 
 GPT does not assign severity, authorize deployment, accept monitoring events, alter evidence, choose an organization, or determine that an incident exists. Decoy generation is deterministic in the current implementation. A concrete demo example is a repository-trace touch that still produces its event, alert, severity, and incident when model access is disabled; only the analyst prose falls back.
 
