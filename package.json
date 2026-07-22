@@ -16,5 +16,10 @@
   "devDependencies": {
     "prettier": "^3.5.3",
     "turbo": "^2.4.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": "^0.35.0"
+    }
   }
 }
