@@ -13,3 +13,14 @@ allowBuilds:
   msgpackr-extract: true
   sharp: true
   unrs-resolver: true
+
+# Dependency overrides. pnpm 9 reads these from package.json ("pnpm.overrides"); pnpm 10 reads them
+# from here and ignores that field. Both are declared so an upgrade cannot silently drop the pin.
+# Keep the two in sync.
+overrides:
+  # next declares sharp as ^0.34.3, and a caret on a 0.x version cannot reach 0.35, so no Next
+  # upgrade in the 15 line clears the libvips CVEs. sharp is optional and unused here (no
+  # next/image), so pinning forward is safe.
+  sharp: '^0.35.0'
+  # PostCSS XSS via unescaped </style> in stringify output. Build-time only, never a request path.
+  postcss: '^8.5.10'
